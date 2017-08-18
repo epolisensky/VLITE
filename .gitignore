@@ -1,0 +1,7 @@
+# ignore certain file types
+*.pyc
+*.txt
+*.sh
+
+# ignore old directories
+old/
