@@ -1,0 +1,147 @@
+"""cat_to_db.py reads in the sky survey catalogs 
+using the catalogio.py module and stores them
+in separate but identical tables in a database
+called SkyCatalogs.sqlite."""
+
+
+import sqlite3
+import sys
+import os
+import catalogio
+
+
+# Read sky catalogs
+print 'Reading TGSS...'
+tgss = catalogio.readTGSS()
+
+print 'Reading NVSS...'
+nvss = catalogio.readNVSSerrs()
+
+print 'Reading FIRST...'
+first = catalogio.readFIRST()
+
+print 'Reading SUMSS...'
+sumss = catalogio.readSUMSS()
+
+print 'Reading WENSS...'
+wenss = catalogio.readWENScomplete()
+
+print 'Reading GLEAM...'
+gleam = catalogio.readGLEAM()
+
+tables = ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS', 'GLEAM']
+catalogs = [tgss, nvss, first, sumss, wenss, gleam]
+
+# convert source sizes to arcsec
+# ignore them if set to 'None'
+for cat in catalogs:
+    for src in cat:
+        try:
+            src.maj = src.maj * 3600.
+            src.min = src.min * 3600.
+        except:
+            pass
+        try:
+            src.e_maj = src.e_maj * 3600.
+            src.e_min = src.e_min * 3600.
+        except:
+            pass
+            
+
+dbname = os.path.join(catalogio.catalogdir, 'SkyCatalogs.sqlite')
+conn = sqlite3.connect(dbname)
+cur = conn.cursor()
+
+for table in tables:
+    cur.execute('DROP TABLE IF EXISTS %s' % table)
+
+    cur.execute('''CREATE TABLE %s (
+        id INTEGER NOT NULL UNIQUE PRIMARY KEY,
+        name TEXT UNIQUE,
+        ra REAL,
+        e_ra REAL,
+        dec REAL,
+        e_dec REAL,
+        total_flux REAL,
+        e_total_flux REAL,
+        peak_flux REAL,
+        e_peak_flux REAL,
+        maj REAL,
+        e_maj REAL,
+        min REAL,
+        e_min REAL,
+        pa REAL,
+        e_pa REAL,
+        rms REAL,
+        field TEXT
+    )''' % table)
+
+
+for src in nvss:
+    cur.execute('''INSERT OR IGNORE INTO NVSS (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+for src in tgss:
+    cur.execute('''INSERT OR IGNORE INTO TGSS (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+for src in first:
+    cur.execute('''INSERT OR IGNORE INTO FIRST (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+for src in sumss:
+    cur.execute('''INSERT OR IGNORE INTO SUMSS (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+for src in wenss:
+    cur.execute('''INSERT OR IGNORE INTO WENSS (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+for src in gleam:
+    cur.execute('''INSERT OR IGNORE INTO GLEAM (
+        name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
+        peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
+        rms, field) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
+                 src.total_flux, src.e_total_flux, src.peak_flux,
+                 src.e_peak_flux, src.maj, src.e_maj, src.min,
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+
+conn.commit()
+cur.close()

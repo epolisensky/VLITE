@@ -3,5 +3,7 @@
 *.txt
 *.sh
 
-# ignore old directories
+# ignore certain directories
 old/
+obsolete/
+testing/

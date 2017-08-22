@@ -1,4 +1,4 @@
-"""sourcedb.py creates/updates an SQLite database to store
+"""database.py creates/updates an SQLite database to store
 results from source finding on an image using PyBDSF (see
 runPyBDSF.py). The database contains three tables: source 
 parameters (location, flux, size, etc.) are inserted into
@@ -7,10 +7,16 @@ sources reside, such as flux, rms, mean, and residual values
 are inserted into the Island table, and metadata characterizing
 the images are inserted into the Image table. Source & island
 values are extracted from the bdsf.process_image() output object 
-or from a pre-existing PyBDSF ascii source catalog. Image values
-primarily come from the image header and PyBDSF log output. An
-Image table object is created to more easily pass all these values 
-to the filldb_tables() method.
+or from a pre-existing PyBDSF ascii source catalog and stored in
+an DetectedSource object. Image values primarily come from the 
+image header and PyBDSF log output. An ImageTable object is created 
+to more easily pass all these values to the filldb_tables() method.
+It's important that the DetectedSource and ImageTable object
+attribute names match the database table column names to allow
+consistent access to source properties later on when input to
+catalog cross-matching functions can accept a variety of inputs 
+(i.e. internal objects with attributes or row dictionaries read
+in from external database tables).
 
 All database flux/brightness units are received as Jy (or Jy/beam) 
 and converted to mJy. All database angular size units are received
@@ -24,7 +30,7 @@ import re
 import sys
 import os
 from astropy.io import fits
-import readPyBDSFcat
+import pybdsf_source
 
 
 class ImageTable(object):
@@ -32,26 +38,26 @@ class ImageTable(object):
     passed to SQL table insertion functions. Object attributes
     correspond to the Image table column values."""
     def __init__(self):
-        self.name = ''
-        self.imsize = '(-999, -999)' # pixels
-        self.obs_ra = -99.9 # deg
-        self.obs_dec = -99.9 # deg
-        self.pixscale = -99.9 # deg --> gets converted to arcsec
-        self.obj = ''
-        self.obs_date = 'yyyy-mm-dd' # date format will vary
-        self.map_date = 'yyyy-mm-dd' # date format will vary
-        self.freq = -99.9 # MHz
-        self.bmaj = -99.9 # deg --> gets converted to arcsec
-        self.bmin = -99.9 # deg --> gets converted to arcsec
-        self.bpa = -99.9 # deg
-        self.noise = -99.9 # Jy/beam --> gets converted to mJy/beam
-        self.peak = -99.9 # Jy/beam --> gets converted to mJy/beam
-        self.config = ''
-        self.nvis = -9999
-        self.tau_time = -9999 # seconds? integration time?
-        self.duration = -9999 # seconds? total TOS?
-        self.nsrc = -9999 # number of sources found by PyBDSF
-        self.rms_box = '(-999, -999)' # box size used by PyBDSF
+        self.name = None
+        self.imsize = None # pixels
+        self.obs_ra = None # deg
+        self.obs_dec = None # deg
+        self.pixel_scale = None # deg/pixel --> gets converted to arcsec/pixel
+        self.obj = None
+        self.obs_date = None # date format will vary
+        self.map_date = None # date format will vary
+        self.freq = None # MHz
+        self.bmaj = None # deg --> gets converted to arcsec
+        self.bmin = None # deg --> gets converted to arcsec
+        self.bpa = None # deg
+        self.noise = None # Jy/beam --> gets converted to mJy/beam
+        self.peak = None # Jy/beam --> gets converted to mJy/beam
+        self.config = None
+        self.nvis = None
+        self.tau_time = None # seconds? integration time?
+        self.duration = None # seconds? total TOS?
+        self.nsrc = None # number of sources found by PyBDSF
+        self.rms_box = None # box size used by PyBDSF
 
 
     def header_extract(self, hdr):
@@ -74,12 +80,12 @@ class ImageTable(object):
         except KeyError:
             self.obs_dec = None
         try:
-            self.pixscale = abs(hdr['CDELT1']) # deg
+            self.pixel_scale = abs(hdr['CDELT1']) * 3600. # arcsec/pixel
         except KeyError:
             try:
-                self.pixscale = abs(hdr['CDELT2']) # deg
+                self.pixel_scale = abs(hdr['CDELT2']) * 3600. # arcsec/pixel
             except KeyError:
-                self.pixscale = None
+                self.pixel_scale = None
         try:
             self.obj = hdr['OBJECT']
         except KeyError:
@@ -103,26 +109,26 @@ class ImageTable(object):
             except KeyError:
                 self.freq = None
         try:
-            self.bmaj = hdr['BMAJ'] # deg
-            self.bmin = hdr['BMIN'] # deg
+            self.bmaj = hdr['BMAJ'] * 3600. # arcsec
+            self.bmin = hdr['BMIN'] * 3600. # arcsec
             self.bpa = hdr['BPA'] # deg
         except KeyError:
             try:
-                self.bmaj = hdr['CLEANBMJ'] # deg
-                self.bmin = hdr['CLEANBMN'] # deg
+                self.bmaj = hdr['CLEANBMJ'] * 3600. # arcsec
+                self.bmin = hdr['CLEANBMN'] * 3600. # arcsec
                 self.bpa = hdr['CLEANBPA'] # deg
             except KeyError:
                 try:
-                    # search for beam params in AIPS history
+                    # Search for beam params in AIPS history
                     hl = list(hdr['HISTORY'])
                     for line in hl:
                         x = re.findall('BMAJ=\s+([0-9]\S+)', line)
                         y = re.findall('BMIN=\s+([0-9]\S+)', line)
                         z = re.findall('BPA=\s+([0-9]\S+)', line)
                         if len(x) > 0:
-                            self.bmaj = float(x[0]) # deg
+                            self.bmaj = float(x[0]) * 3600. # arcsec
                         if len(y) > 0:
-                            self.bmin = float(y[0]) # deg
+                            self.bmin = float(y[0]) * 3600. # arcsec
                         if len(z) > 0:
                             self.bpa = float(z[0]) # deg
                 except KeyError:
@@ -130,14 +136,14 @@ class ImageTable(object):
                     self.bmin = None
                     self.bpa = None
         try:
-            self.noise = hdr['ACTNOISE'] # Jy/beam
+            self.noise = hdr['ACTNOISE'] * 1000. # mJy/beam
         except KeyError:
             self.noise = None
         try:
-            self.peak = hdr['PEAK'] # Jy/beam
+            self.peak = hdr['PEAK'] * 1000. # mJy/beam
         except KeyError:
             try:
-                self.peak = hdr['DATAMAX'] # Jy/beam
+                self.peak = hdr['DATAMAX'] * 1000. # mJy/beam
             except KeyError:
                 self.peak = None
         try:
@@ -173,7 +179,7 @@ def log_extract(path):
     x = re.findall('.*rms_box.*:\s(\(.*\))', log)
     rms_box = x[-1]
     y = re.findall('.*std. dev:\s(.*)\s\(', log)
-    gresid_std = float(y[-1]) # Jy/beam
+    gresid_std = float(y[-1]) * 1000. # mJy/beam
     return rms_box, gresid_std
 
 
@@ -276,18 +282,18 @@ def create_db(dbname):
 
 def filldb_tables(dbname, it, sources):
     """Method to fill existing database tables. Takes as
-    input the database name, an Image table object (from
-    classes.py), and a list of source objects. Attributes
-    of these objects should correspond to the table columns.
-    This method first checks if the image name (including
-    the full directory path) already exists. If it does,
-    it UPDATES the Image table entry and DELETES corresponding
-    Island & Source table entries then INSERTS the new values."""
+    input the database name, an ImageTable object, and a 
+    list of DetectedSource objects. Attributes of these 
+    objects correspond to the table columns. This method 
+    first checks if the image name (including the full 
+    directory path) already exists. If it does, it UPDATES 
+    the Image table entry and DELETES corresponding Island 
+    and Source table entries then INSERTS the new values."""
     conn = sqlite3.connect(dbname)
     cur = conn.cursor()
     cur.execute('PRAGMA foreign_keys = "1"')
       
-    # check if image has already been run & insert or update accordingly
+    # Check if image has already been run & insert or update accordingly
     cur.execute('SELECT id FROM Image WHERE name = ?', (it.name, ))
     exists = cur.fetchone()
     if exists is None:
@@ -298,12 +304,11 @@ def filldb_tables(dbname, it, sources):
             tau_time, duration, nsrc, rms_box) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
             ?, ?, ?, ?, ?)''', (it.name, it.imsize, it.obs_ra, it.obs_dec,
-                                (it.pixscale * 3600.), it.obj, it.obs_date,
-                                it.map_date, it.freq, (it.bmaj * 3600.),
-                                (it.bmin * 3600.), it.bpa, (it.noise * 1000.),
-                                (it.peak * 1000.), it.config, it.nvis,
+                                it.pixel_scale, it.obj, it.obs_date,
+                                it.map_date, it.freq, it.bmaj, it.bmin, it.bpa,
+                                it.noise, it.peak, it.config, it.nvis,
                                 it.tau_time, it.duration, it.nsrc, it.rms_box))
-        # get new image id
+        # Get new image id
         cur.execute('SELECT id FROM Image WHERE name = ?', (it.name, ))
         img_id = cur.fetchone()[0]
     else:
@@ -315,12 +320,11 @@ def filldb_tables(dbname, it, sources):
             peak = ?, config = ?, nvis = ?, tau_time = ?, duration = ?, 
             nsrc = ?, rms_box = ? WHERE id = ?''',
                     (it.name, it.imsize, it.obs_ra, it.obs_dec,
-                     (it.pixscale * 3600.), it.obj, it.obs_date, it.map_date,
-                     it.freq, (it.bmaj * 3600.), (it.bmin * 3600.), it.bpa,
-                     (it.noise * 1000.), (it.peak * 1000.), it.config,
-                     it.nvis, it.tau_time, it.duration,
-                     it.nsrc, it.rms_box, img_id))
-        # delete corresponding Island & Source table entries
+                     it.pixel_scale, it.obj, it.obs_date,
+                     it.map_date, it.freq, it.bmaj, it.bmin, it.bpa,
+                     it.noise, it.peak, it.config, it.nvis, it.tau_time,
+                     it.duration, it.nsrc, it.rms_box, img_id))
+        # Delete corresponding Island & Source table entries
         cur.execute('DELETE FROM Island WHERE image_id = ?', (img_id, ))
 
     for src in sources:
@@ -329,10 +333,9 @@ def filldb_tables(dbname, it, sources):
             isl_id, image_id, total_flux, e_total_flux, 
             rms, mean, resid_rms, resid_mean) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-            (src.island_id, img_id, f(src.total_flux_isl * 1000.),
-             f(src.total_flux_islE * 1000.),
-             f(src.rms_isl * 1000.), f(src.mean_isl * 1000.),
-             f(src.gresid_rms * 1000.), f(src.gresid_mean * 1000.)))
+            (src.isl_id, img_id, f(src.total_flux_isl), f(src.total_flux_islE),
+             f(src.rms_isl), f(src.mean_isl), f(src.resid_rms),
+             f(src.resid_mean)))
 
         # Insert values into Source table
         cur.execute('''INSERT INTO Source (
@@ -343,23 +346,13 @@ def filldb_tables(dbname, it, sources):
             dc_pa, e_dc_pa, code) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
               ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (src.source_id, src.island_id, img_id,
-             f(src.posn_sky_centroid[0]), f(src.posn_sky_centroidE[0]),
-             f(src.posn_sky_centroid[1]), f(src.posn_sky_centroidE[1]),
-             f(src.total_flux * 1000.), f(src.total_fluxE * 1000.),
-             f(src.peak_flux_centroid * 1000.),
-             f(src.peak_flux_centroidE * 1000.),
-             f(src.posn_sky_max[0]), f(src.posn_sky_maxE[0]),
-             f(src.posn_sky_max[1]), f(src.posn_sky_maxE[1]),
-             f(src.size_sky[0] * 3600.), f(src.size_skyE[0] * 3600.),
-             f(src.size_sky[1] * 3600.), f(src.size_skyE[1] * 3600.),
-             f(src.size_sky[2]), f(src.size_skyE[2]),
-             f(src.deconv_size_sky[0] * 3600.),
-             f(src.deconv_size_skyE[0] * 3600.),
-             f(src.deconv_size_sky[1] * 3600.),
-             f(src.deconv_size_skyE[1] * 3600.),
-             f(src.deconv_size_sky[2]), f(src.deconv_size_skyE[2]),
-             src.code))
+            (src.src_id, src.isl_id, img_id, f(src.ra), f(src.e_ra),
+             f(src.dec), f(src.e_dec), f(src.total_flux), f(src.e_total_flux),
+             f(src.peak_flux), f(src.e_peak_flux), f(src.ra_max),
+             f(src.e_ra_max), f(src.dec_max), f(src.e_dec_max), f(src.maj),
+             f(src.e_maj), f(src.min), f(src.e_min), f(src.pa), f(src.e_pa),
+             f(src.dc_maj), f(src.e_dc_maj), f(src.dc_min), f(src.e_dc_min),
+             f(src.dc_pa), f(src.e_dc_pa), src.code))
 
     conn.commit()
     cur.close()
@@ -369,7 +362,7 @@ def pybdsf_to_db(dbname, out):
     """Initializes necessary inputs and then calls 
     filldb_tables() when the object on hand is the output
     from the PyBDSF source finding task process_image()."""
-    # initialize Image table object
+    # Initialize ImageTable object
     it = ImageTable()
     it.name = out.filename
     it.nsrc = out.nsrc
@@ -386,28 +379,34 @@ def pybdsf_to_db(dbname, out):
     if it.bpa is None:
         it.bpa = out.beam[2] # deg
 
-    # pass Image table object & list of source objects
-    filldb_tables(dbname, it, out.sources)
+    # Create new DetectedSource objects from PyBDSF output objects
+    newsrcs = []
+    for oldsrc in out.sources:
+        newsrcs.append(pybdsf_source.DetectedSource())
+        newsrcs[-1].cast(oldsrc)
+
+    # Pass the objects to table writing function
+    filldb_tables(dbname, it, newsrcs)
+
+    # Return ImageTable & DetectedSource objects for use in cross-matching
+    return it, newsrcs
     
 
 def cat_to_db(dbname, cat):
     """Initializes necessary inputs and then calls
     filldb_tables() when the object on hand is a pre-existing
-    ascii source catalog. The catalog is read using the iofuncs.py
-    task readPybdsfCatFile, which creates a list of pybdsf_source
-    objects. Attributes are edited/added to this object to match
-    the attributes of the bdsf.process_image() output object, which
-    has the correct formatting for input into the Source & Island 
-    tables. In this case, the PyBDSF output log is also accessed
+    ascii source catalog. The catalog is read using the 
+    pybdsf_source.py task read_catalog, which creates a list of 
+    DetectedSource objects. The PyBDSF output log is also accessed
     to input values into the Image table."""
     print('\nReading catalog {}'.format(re.findall('\S+/(\S+)', cat)[0]))
-    src_obj_list = readPyBDSFcat.read_catalog(cat)
+    sources = pybdsf_source.read_catalog(cat)
 
-    # initialize Image table object
+    # Initialize ImageTable object
     it = ImageTable()
-    it.nsrc = len(src_obj_list)
+    it.nsrc = len(sources)
 
-    # Find image file
+    # Find image & log files
     '''Assumes there is a directory called 'catalogs' inside the 
     directory containing the fits images:'''
     path = re.findall('(\S+/)catalogs', cat)[0]
@@ -415,53 +414,14 @@ def cat_to_db(dbname, cat):
     it.name = os.path.join(path, imname)
     data, header = fits.getdata(it.name, header=True)
     it.header_extract(header)
-    
     logname = imname + '.pybdsf.log'
     logdir = 'logs/' + logname
     logpath = os.path.join(path, logdir)
     it.rms_box, it.noise = log_extract(logpath)
 
-    key_map = {'source_id' : 'srcID',
-               'island_id' : 'islID',
-               'total_flux' : 'Total',
-               'total_fluxE' : 'dTotal',
-               'peak_flux_centroid' : 'Peak',
-               'peak_flux_centroidE' : 'dPeak',
-               'total_flux_isl' : 'islTotal',
-               'total_flux_islE' : 'dislTotal',
-               'rms_isl' : 'islRMS',
-               'mean_isl' : 'islMEAN',
-               'gresid_rms' : 'RRMS',
-               'gresid_mean' : 'RMEAN',
-               'code': 'SCode'}
 
-    for src in src_obj_list:
-        # rename attrs
-        for key in key_map.keys():
-            src.__dict__[key] = src.__dict__.pop(key_map[key])
+    # Pass the objects to table writing function
+    filldb_tables(dbname, it, sources)
 
-        # combine old attrs into new ones
-        src.__dict__['posn_sky_centroid'] = [src.__dict__['RA'],
-                                             src.__dict__['Dec']]
-        src.__dict__['posn_sky_centroidE'] = [src.__dict__['dRA'],
-                                              src.__dict__['dDec']]
-        src.__dict__['posn_sky_max'] = [src.__dict__['RAmax'],
-                                        src.__dict__['Decmax']]
-        src.__dict__['posn_sky_maxE'] = [src.__dict__['dRAmax'],
-                                         src.__dict__['dDecmax']]
-        src.__dict__['size_sky'] = [src.__dict__['BMAJ'],
-                                    src.__dict__['BMIN'],
-                                    src.__dict__['PA']]
-        src.__dict__['size_skyE'] = [src.__dict__['dBMAJ'],
-                                     src.__dict__['dBMIN'],
-                                     src.__dict__['dPA']]
-        src.__dict__['deconv_size_sky'] = [src.__dict__['BMAJDC'],
-                                           src.__dict__['BMINDC'],
-                                           src.__dict__['PADC']]
-        src.__dict__['deconv_size_skyE'] = [src.__dict__['dBMAJDC'],
-                                            src.__dict__['dBMINDC'],
-                                            src.__dict__['dPADC']]
-
-
-    # pass Image table object & list of source objects
-    filldb_tables(dbname, it, src_obj_list)
+    # Return ImageTable & DetectedSource objects for use in cross-matching
+    return it, sources
