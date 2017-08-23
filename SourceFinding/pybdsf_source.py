@@ -18,6 +18,7 @@ class DetectedSource(object):
     def __init__(self):
         self.src_id = None
         self.isl_id= None
+        self.image_id = None
         self.ra = None
         self.e_ra = None
         self.dec = None
@@ -49,9 +50,12 @@ class DetectedSource(object):
         self.resid_rms = None
         self.resid_mean = None
         self.code = None
-        self.sig = None
-	self.alpha = None
-	self.phi = None
+        self.catalog_id = None
+        self.match_id = None
+        self.min_deRuiter = None
+        #self.sig = None
+	#self.alpha = None
+	#self.phi = None
 
 
     def cast(self, origsrc):
@@ -83,7 +87,7 @@ class DetectedSource(object):
         self.dc_min = origsrc.deconv_size_sky[1] * 3600.
         self.e_dc_min = origsrc.deconv_size_skyE[1] * 3600.
         self.dc_pa = origsrc.deconv_size_sky[2]
-        self.e_dc_a = origsrc.deconv_size_skyE[2]
+        self.e_dc_pa = origsrc.deconv_size_skyE[2]
         self.total_flux_isl = origsrc.total_flux_isl * 1000. # mJy
         self.total_flux_islE = origsrc.total_flux_islE * 1000. # mJy
         self.rms_isl = origsrc.rms_isl * 1000. # mJy/beam
@@ -91,7 +95,7 @@ class DetectedSource(object):
         self.resid_rms = origsrc.gresid_rms * 1000. # mJy/beam
         self.resid_mean = origsrc.gresid_mean * 1000. # mJy/beam
         self.code = origsrc.code
-        self.sig = self.peak_flux / self.rms_isl
+        #self.sig = self.peak_flux / self.rms_isl
 
 
 def read_catalog(fname):
@@ -156,10 +160,10 @@ def read_catalog(fname):
         sources[-1].resid_rms = float(line[42]) * 1000. # mJy/beam
         sources[-1].resid_mean = float(line[43]) * 1000. # mJy/beam
         sources[-1].code = line[44] # 'S', 'C', or 'M'
-        if float(line[40]) > 0.0000009:
-            sources[-1].sig = sources[-1].peak_flux / sources[-1].rms_isl
+        #if float(line[40]) > 0.0000009:
+            #sources[-1].sig = sources[-1].peak_flux / sources[-1].rms_isl
             # sigma of detection = Peak/islRMS
-        else:
-            sources[-1].sig = (0.0)
+        #else:
+            #sources[-1].sig = (0.0)
     fin.close()
     return sources

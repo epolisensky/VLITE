@@ -53,7 +53,7 @@ class BDSFImage(object):
     @classmethod
     def image_count(cls):
         """Prints the number of images initialized."""
-        print("\nProcessed {:d} images.\n".format(cls.num_images))
+        print("Processed {:d} images.\n".format(cls.num_images))
 
 
     def read_image(self):

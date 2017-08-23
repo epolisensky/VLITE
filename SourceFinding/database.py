@@ -39,25 +39,25 @@ class ImageTable(object):
     correspond to the Image table column values."""
     def __init__(self):
         self.name = None
-        self.imsize = None # pixels
-        self.obs_ra = None # deg
-        self.obs_dec = None # deg
-        self.pixel_scale = None # deg/pixel --> gets converted to arcsec/pixel
+        self.imsize = None
+        self.obs_ra = None
+        self.obs_dec = None
+        self.pixel_scale = None
         self.obj = None
-        self.obs_date = None # date format will vary
-        self.map_date = None # date format will vary
-        self.freq = None # MHz
-        self.bmaj = None # deg --> gets converted to arcsec
-        self.bmin = None # deg --> gets converted to arcsec
-        self.bpa = None # deg
-        self.noise = None # Jy/beam --> gets converted to mJy/beam
-        self.peak = None # Jy/beam --> gets converted to mJy/beam
+        self.obs_date = None
+        self.map_date = None
+        self.freq = None
+        self.bmaj = None
+        self.bmin = None
+        self.bpa = None
+        self.noise = None
+        self.peak = None
         self.config = None
         self.nvis = None
-        self.tau_time = None # seconds? integration time?
-        self.duration = None # seconds? total TOS?
-        self.nsrc = None # number of sources found by PyBDSF
-        self.rms_box = None # box size used by PyBDSF
+        self.tau_time = None
+        self.duration = None
+        self.nsrc = None
+        self.rms_box = None
 
 
     def header_extract(self, hdr):
@@ -267,6 +267,9 @@ def create_db(dbname):
             dc_pa REAL,
             e_dc_pa REAL,
             code TEXT,
+            catalog_id INTEGER,
+            match_id INTEGER,
+            min_deRuiter REAL,
             PRIMARY KEY(src_id, isl_id, image_id),
             FOREIGN KEY(isl_id, image_id) REFERENCES Island(isl_id, image_id) 
               ON DELETE CASCADE
@@ -343,16 +346,16 @@ def filldb_tables(dbname, it, sources):
             total_flux, e_total_flux, peak_flux, e_peak_flux, 
             ra_max, e_ra_max, dec_max, e_dec_max, maj, e_maj, 
             min, e_min, pa, e_pa, dc_maj, e_dc_maj, dc_min, e_dc_min,
-            dc_pa, e_dc_pa, code) 
+            dc_pa, e_dc_pa, code, catalog_id, match_id, min_deRuiter) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (src.src_id, src.isl_id, img_id, f(src.ra), f(src.e_ra),
              f(src.dec), f(src.e_dec), f(src.total_flux), f(src.e_total_flux),
              f(src.peak_flux), f(src.e_peak_flux), f(src.ra_max),
              f(src.e_ra_max), f(src.dec_max), f(src.e_dec_max), f(src.maj),
              f(src.e_maj), f(src.min), f(src.e_min), f(src.pa), f(src.e_pa),
              f(src.dc_maj), f(src.e_dc_maj), f(src.dc_min), f(src.e_dc_min),
-             f(src.dc_pa), f(src.e_dc_pa), src.code))
+             f(src.dc_pa), f(src.e_dc_pa), src.code, None, None, None))
 
     conn.commit()
     cur.close()

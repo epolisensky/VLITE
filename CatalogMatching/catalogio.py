@@ -36,14 +36,15 @@ class catalog_source(object):
         self.e_total_flux = None # mJy
         self.peak_flux = None # mJy/beam
         self.e_peak_flux = None # mJy/beam
-        self.maj = None # deg
-        self.e_maj = None # deg
-        self.min = None # deg
-        self.e_min = None # deg
+        self.maj = None # arcsec
+        self.e_maj = None # arcsec
+        self.min = None # arcsec
+        self.e_min = None # arcsec
         self.pa = None # deg
         self.e_pa = None # deg
         self.rms = None # mJy/beam
         self.field = None
+        self.catalog_id = None
 
 
 def readTGSS():
@@ -69,10 +70,10 @@ def readTGSS():
         sources[-1].e_total_flux = float(d[7]) # mJy
         sources[-1].peak_flux = float(d[8]) # mJy/beam
         sources[-1].e_peak_flux = float(d[9]) # mJy/beam
-        sources[-1].maj = float(d[10])/3600.0 # deg
-        sources[-1].e_maj = float(d[11])/3600.0 # deg
-        sources[-1].min = float(d[12])/3600.0 # deg
-        sources[-1].e_min = float(d[13])/3600.0 # deg
+        sources[-1].maj = float(d[10]) # arcsec
+        sources[-1].e_maj = float(d[11]) # arcsec
+        sources[-1].min = float(d[12]) # arcsec
+        sources[-1].e_min = float(d[13]) # arcsec
         sources[-1].pa = float(d[14]) # deg
         sources[-1].e_pa = float(d[15]) # deg
         sources[-1].rms = float(d[16]) # mJy/beam
@@ -108,8 +109,8 @@ def readFIRST():
                 sources[-1].peak_flux = float(line[7]) # mJy/beam
                 sources[-1].total_flux = float(line[8]) # mJy
                 sources[-1].rms = float(line[9]) # mJy/beam
-                sources[-1].maj = float(line[10])/3600.0 # deg
-                sources[-1].min = float(line[11])/3600.0 # deg
+                sources[-1].maj = float(line[10]) # arcsec
+                sources[-1].min = float(line[11]) # arcsec
                 sources[-1].pa = float(line[12])
                 # HACK! setting FIRST positional uncertainty to 1 arcsec
                 # actual uncertainties need to be calculated, see FIRST
@@ -157,8 +158,8 @@ def readSUMSS():
             sources[-1].e_peak_flux = float(line[9])
             sources[-1].total_flux = float(line[10]) # mJy
             sources[-1].e_total_flux = float(line[11])
-            sources[-1].maj = float(line[12])/3600.0 # deg
-            sources[-1].min = float(line[13])/3600.0 # deg
+            sources[-1].maj = float(line[12]) # arcsec
+            sources[-1].min = float(line[13]) # arcsec
             sources[-1].pa = float(line[14])
     fread.close()
     print 'read %d SUMSS sources' % len(sources)
@@ -182,17 +183,17 @@ def readWENScomplete():
             line = line.split()
             sources[-1].name = 'WENSS_'+str(cnt)
             cnt += 1
-            sources[-1].ra = float(line[0])
-            sources[-1].dec = float(line[1])
+            sources[-1].ra = float(line[0]) # deg
+            sources[-1].dec = float(line[1]) # deg
             sources[-1].total_flux = float(line[2]) # mJy
             sources[-1].e_total_flux = float(line[3]) # mJy
             sources[-1].peak_flux = float(line[4]) # mJy/beam
             sources[-1].e_peak_flux = float(line[5]) # mJy/beam
             sources[-1].rms = float(line[6]) # mJy/beam
-            sources[-1].e_ra = float(line[7])/3600.0
-            sources[-1].e_dec = float(line[8])/3600.0
-            sources[-1].maj = float(line[9])/3600.0
-            sources[-1].min = float(line[10])/3600.0
+            sources[-1].e_ra = float(line[7])/3600.0 # deg
+            sources[-1].e_dec = float(line[8])/3600.0 # deg
+            sources[-1].maj = float(line[9]) # arcsec
+            sources[-1].min = float(line[10]) # arcsec
             sources[-1].pa = float(line[11])
     print 'read %d WENSS sources' % len(sources)
     fread.close()
@@ -237,19 +238,19 @@ def readNVSSerrs():
             else:
                 sources[-1].total_flux = float(line[25:30])
             if line[32] == ' ': #maj
-                sources[-1].maj  = float(line[33:36])/3600.0 # deg
+                sources[-1].maj  = float(line[33:36]) # arcsec
             elif line[31] == ' ' and line[32] != ' ':
-                sources[-1].maj = float(line[32:36])/3600.0
+                sources[-1].maj = float(line[32:36])
             elif line[31]=='<':
-                sources[-1].maj = float(line[32:36])/3600.0
+                sources[-1].maj = float(line[32:36])
             else:
-                sources[-1].maj = float(line[31:36])/3600.0
+                sources[-1].maj = float(line[31:36])
             if line[37] == '<': # min
-                sources[-1].min = float(line[38:42])/3600.0 # deg
+                sources[-1].min = float(line[38:42]) # arcsec
             elif line[37] == ' ' and line[38] != ' ':
-                sources[-1].min = float(line[38:42])/3600.0
+                sources[-1].min = float(line[38:42])
             else:
-                sources[-1].min = float(line[39:42])/3600.0
+                sources[-1].min = float(line[39:42])
             if line[43] == '-': # pa
                 sources[-1].pa = float(line[43:48])
             elif line[43] == ' ' and line[44] == ' ' and line[45] != ' ':
@@ -299,10 +300,10 @@ def readGLEAM():
         sources[-1].e_total_flux = float(d[17])*1000.0 # mJy
         sources[-1].peak_flux = float(d[14])*1000.0 # mJy/beam
         sources[-1].e_peak_flux = float(d[15])*1000.0 # mJy/beam
-        sources[-1].maj = float(d[18])/3600.0 # deg
-        sources[-1].e_maj = float(d[19])/3600.0 # deg
-        sources[-1].min = float(d[20])/3600.0 # deg
-        sources[-1].e_min = float(d[21])/3600.0 # deg
+        sources[-1].maj = float(d[18]) # arcsec
+        sources[-1].e_maj = float(d[19]) # arcsec
+        sources[-1].min = float(d[20]) # arcsec
+        sources[-1].e_min = float(d[21]) # arcsec
         sources[-1].pa = float(d[22]) # deg
         sources[-1].e_pa = float(d[23]) # deg
         # sources[-1].rms = float(d[16]) # mJy/beam

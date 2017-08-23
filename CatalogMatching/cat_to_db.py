@@ -1,7 +1,15 @@
 """cat_to_db.py reads in the sky survey catalogs 
 using the catalogio.py module and stores them
 in separate but identical tables in a database
-called SkyCatalogs.sqlite."""
+called SkyCatalogs.sqlite.
+
+Currently included catalogs:
+1. TGSS - GMRT 150 MHz, 25" res.
+2. NVSS - VLA 1.4 GHz, 45" res.
+3. FIRST - VLA 1.4 GHz, 5" res.
+4. SUMSS - MOST 843 MHz, 45" res.
+5. WENSS - WSRT 325 MHz, 54" res.
+6. GLEAM - MWA 74-231 MHz, 100" res."""
 
 
 import sqlite3
@@ -32,25 +40,27 @@ gleam = catalogio.readGLEAM()
 tables = ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS', 'GLEAM']
 catalogs = [tgss, nvss, first, sumss, wenss, gleam]
 
-# convert source sizes to arcsec
-# ignore them if set to 'None'
-for cat in catalogs:
-    for src in cat:
-        try:
-            src.maj = src.maj * 3600.
-            src.min = src.min * 3600.
-        except:
-            pass
-        try:
-            src.e_maj = src.e_maj * 3600.
-            src.e_min = src.e_min * 3600.
-        except:
-            pass
-            
+catid_dict = {}
+idnum = 1
+for table in sorted(tables):
+    catid_dict[table] = idnum
+    idnum += 1
 
 dbname = os.path.join(catalogio.catalogdir, 'SkyCatalogs.sqlite')
 conn = sqlite3.connect(dbname)
 cur = conn.cursor()
+
+cur.executescript('''
+DROP TABLE IF EXISTS CatalogID;
+
+CREATE TABLE CatalogID (
+    id INTEGER NOT NULL UNIQUE PRIMARY KEY,
+    name TEXT UNIQUE
+    );
+''')
+for catalog in catid_dict.keys():
+    cur.execute('INSERT INTO CatalogID (id, name) VALUES (?, ?)',
+                (catid_dict[catalog], catalog))
 
 for table in tables:
     cur.execute('DROP TABLE IF EXISTS %s' % table)
@@ -73,7 +83,8 @@ for table in tables:
         pa REAL,
         e_pa REAL,
         rms REAL,
-        field TEXT
+        field TEXT,
+        catalog_id INTEGER
     )''' % table)
 
 
@@ -81,67 +92,73 @@ for src in nvss:
     cur.execute('''INSERT OR IGNORE INTO NVSS (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['NVSS']))
 
 for src in tgss:
     cur.execute('''INSERT OR IGNORE INTO TGSS (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['TGSS']))
 
 for src in first:
     cur.execute('''INSERT OR IGNORE INTO FIRST (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['FIRST']))
 
 for src in sumss:
     cur.execute('''INSERT OR IGNORE INTO SUMSS (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['SUMSS']))
 
 for src in wenss:
     cur.execute('''INSERT OR IGNORE INTO WENSS (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['WENSS']))
 
 for src in gleam:
     cur.execute('''INSERT OR IGNORE INTO GLEAM (
         name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
         peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
-        rms, field) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        rms, field, catalog_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (src.name, src.ra, src.e_ra, src.dec, src.e_dec,
                  src.total_flux, src.e_total_flux, src.peak_flux,
                  src.e_peak_flux, src.maj, src.e_maj, src.min,
-                 src.e_min, src.pa, src.e_pa, src.rms, src.field))
+                 src.e_min, src.pa, src.e_pa, src.rms, src.field,
+                 catid_dict['GLEAM']))
 
 conn.commit()
 cur.close()

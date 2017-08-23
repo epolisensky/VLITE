@@ -9,6 +9,7 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
     deRuiter radius < match_der, which defaults to 5.68, and
     have an angular distance < 0.5 * image beam width."""
     match = 0
+    match_catsrc = None
     for catsrc in catalog:
         # If catalog is a list of catalog_source objects,
         # cast to a dictionary so it's attributes can be
@@ -26,6 +27,8 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
             # Check if deRuiter radius < previous minimum
             if der < min_der:
                 min_der = der
+                src['min_deRuiter'] = min_der
+                match_catsrc = catsrc
             # Check if deRuiter radius < required match limit
             if der < match_der:
                 # Check if angular distance < 0.5*beam
@@ -33,7 +36,7 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
                            catsrc['ra'], catsrc['dec']) < (0.5 * bmaj):
                     match = 1
                     break
-    return match, min_der, catsrc
+    return match, match_catsrc
 
 
 def quickcheck(dec1, dec2, deglim):
