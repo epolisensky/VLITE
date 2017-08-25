@@ -14,6 +14,9 @@ Post-Processing Pipeline (P3) Stage 4"""
 import os
 import sys
 import sqlite3
+import numpy as np
+from astropy.coordinates import Angle
+import astropy.units as u
 import catalogio
 import crossmatch
 
@@ -60,39 +63,71 @@ def update_database(database, imname, matches, non_matches):
 
 
 def search_range(image):
-    # FIX 360 = 0 ISSUE
     """Returns the minimum & maximum RA, Dec of an image (in degrees).
     Used to limit the number of catalog sources extracted for 
     cross-matching."""
     try:
         # image must be a dictionary
         imsize = float(image['imsize'][1:].split(',')[0])
-        fov = (image['pixel_scale'] * imsize) / 3600. # deg
-        ramin = image['obs_ra'] - fov
-        ramax = image['obs_ra'] + fov
-        decmin = image['obs_dec'] - fov
-        decmax = image['obs_dec'] + fov
+        fov = (image['pixel_scale'] * imsize) / 3600.
+        fov = Angle(((image['pixel_scale'] * imsize) / 3600.) * u.deg)
     except TypeError:
-        # If imsize, pixel_scale, obs_ra, or obs_dec is 'None'
+        # imsize and/or pixel_scale are None
+        fov = Angle(10. * u.deg) # default to 10 degrees
+    try:      
+        ra_ang = Angle(image['obs_ra'] * u.deg)
+        ramin = (ra_ang - fov).wrap_at(360 * u.deg).degree
+        ramax = (ra_ang + fov).wrap_at(360 * u.deg).degree
+    except TypeError:
+        # obs_ra is None
         ramin = None
         ramax = None
+    try:
+        dec_ang = Angle(image['obs_dec'] * u.deg)
+        # ignore +/- 90 deg limit - won't matter
+        decmin = (dec_ang - fov).degree
+        decmax = (dec_ang + fov).degree
+    except TypeError:
+        # obs_dec is None
         decmin = None
         decmax = None
-
+            
     search_range = (ramin, ramax, decmin, decmax)
     return search_range
 
 
 def catalog_extract(cursor, catalogs, limits):
     """Returns a dictionary containing catalogs and their sources
-    which lie in the specified range of RA, Dec.""" 
+    which lie in the specified range of RA, Dec."""
     ramin, ramax, decmin, decmax = limits
     catdict = {}
     for catalog in catalogs:
-        query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND dec '\
-                'BETWEEN ? AND ?' % catalog
-        cursor.execute(query, (ramin, ramax, decmin, decmax))
-        catdict[catalog] = cursor.fetchall()
+        if np.all(limits) is not None: # use both RA & Dec limits
+            if ramin > ramax: # passes through 0
+                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND dec '\
+                        'BETWEEN ? AND ? OR ra BETWEEN ? AND ? AND dec '\
+                        'BETWEEN ? AND ?' % catalog
+                cursor.execute(query, (ramin, 360., decmin, decmax,
+                                       0., ramax, decmin, decmax))
+            else:
+                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND dec '\
+                        'BETWEEN ? AND ?' % catalog
+                cursor.execute(query, (ramin, ramax, decmin, decmax))
+            catdict[catalog] = cursor.fetchall()
+        elif ramin is not None: # use only RA limits
+            if ramin > ramax:
+                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND ra'\
+                        'BETWEEN ? AND ?' % catalog
+                cursor.execute(query, (ramin, 360., 0., ramax))
+            else:
+                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ?' % catalog
+                cursor.execute(query, (ramin, ramax))
+            catdict[catalog] = cursor.fetchall()
+        else: # use only Dec limits
+            query = 'SELECT * FROM %s WHERE dec BETWEEN ? AND ?' % catalog
+            cursor.execute(query, (decmin, decmax))
+            catdict[catalog] = cursor.fetchall()
+
     return catdict
 
 

@@ -1,2 +1,2 @@
 # VLITE
-Frequencies so low, they'll make you megahertz.
+Coming soon to an antenna near you

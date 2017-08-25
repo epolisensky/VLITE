@@ -59,8 +59,8 @@ for img in imglist:
     # STAGE 1 - Source finding
     # *******************************************
     # Define any desired PyBDSF parameters here
-    bdsfim = runPyBDSF.BDSFImage(impath, trim_box=(400, 1300, 400, 1300),
-                                 thresh='hard')
+    bdsfim = runPyBDSF.BDSFImage(impath, thresh='hard')
+    # trim_box=(400, 1300, 400, 1300)
     out = bdsfim.find_sources() # Run PyBDSF source finding
 
     if out is not None:
@@ -102,14 +102,11 @@ for img in imglist:
 print_run_stats(start_time, pybdsfdir)
 
 '''
-Matched 114/168 sources
-.
+Matched 285/291 sources.
 
 Processed 1 images.
 
-
 Wrote 1 catalogs.
 
-
-Total runtime: 0:00:07.623528
+Total runtime: 0:00:22.085565
 '''
