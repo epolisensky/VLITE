@@ -11,6 +11,8 @@ import radioXmatch
 def print_run_stats(start_time, outdir):
     """Print general information about the just
     completed run of the Post-Processing Pipeline."""
+    print('\n======================================\n')
+    print('Run statistics:')
     # Count the number of images processed
     runPyBDSF.BDSFImage.image_count()
     # Count the number of catalogs written
@@ -23,29 +25,46 @@ def print_run_stats(start_time, outdir):
 # Start the timer
 start_time = datetime.datetime.now()
 
+rootpath = '/nfsshare/vpipe/processed/'
+dbdir = '/data3/vpipe/'
 
 # ========================================================
 # User-defined parameters
 # ========================================================
-# Define path to images & database
-rootdir = '/nfsshare/vpipe/processed/2017-08/01/'
-dbname = '/data3/vpipe/test.sqlite'
-# Define which and what order to check catalogs
-catalogs = ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS']
+rootdir = os.path.join(rootpath, sys.argv[1])
+dbname = os.path.join(dbdir, sys.argv[2])
+catalogs = [c for c in sys.argv[3].split(', ')]
+print('Using {} for cross-matching\n'.format(catalogs))
 # ========================================================
 
-#imgdir = os.path.join(rootdir, 'Images/')
-imgdir = os.path.join(rootdir, 'testing/')
-pybdsfdir = os.path.join(rootdir, 'PyBDSF/')
-if not os.path.isdir(pybdsfdir):
-    os.system('mkdir '+pybdsfdir)
+# Catch potential user input errors
+imgdir = os.path.join(rootdir, 'Images/')
+if not os.path.isdir(imgdir):
+    print('ERROR: Image directory does not exist.')
+    sys.exit(0)
 else:
     pass
+
+# Make sure given catalogs exist
+catalog_opts = ['FIRST', 'GLEAM', 'NVSS', 'SUMSS', 'TGSS', 'WENSS']
+for cat in catalogs:
+    if cat not in catalog_opts:
+        print('ERROR: Catalog {} is not a valid option.'.format(cat))
+        sys.exit(0)
+    else:
+        pass
 
 # Create database if it doesn't already exist
 #  - User will be prompted to verify creation
 if not os.path.isfile(dbname):
     database.create_db(dbname)
+else:
+    pass
+
+# Define/make directory for PyBDSF output
+pybdsfdir = os.path.join(rootdir, 'PyBDSF/')
+if not os.path.isdir(pybdsfdir):
+    os.system('mkdir '+pybdsfdir)
 else:
     pass
 
@@ -102,11 +121,10 @@ for img in imglist:
 print_run_stats(start_time, pybdsfdir)
 
 '''
-Matched 285/291 sources.
+Run statistics:
+Processed 14 images.
 
-Processed 1 images.
+Wrote 14 catalogs.
 
-Wrote 1 catalogs.
-
-Total runtime: 0:00:22.085565
+Total runtime: 0:02:54.720177
 '''

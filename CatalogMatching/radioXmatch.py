@@ -48,7 +48,8 @@ def write_region(srclist, impath, ext='.reg'):
 def update_database(database, imname, matches, non_matches):
     """Updates the catalog_id, match_id, & min_deRuiter
     columns in the database Source table with the results
-    from the catalog cross-matching."""    
+    from the catalog cross-matching."""
+    print('Adding catalog cross-match results to database Source table.\n')
     cur, conn = dbconnect(database)
     cur.execute('SELECT id FROM Image WHERE name = ?', (imname, ))
     img_id = cur.fetchone()[0]
@@ -100,6 +101,9 @@ def catalog_extract(cursor, catalogs, limits):
     """Returns a dictionary containing catalogs and their sources
     which lie in the specified range of RA, Dec."""
     ramin, ramax, decmin, decmax = limits
+    print('Extracting sources from sky survey catalogs with RA between '
+          '{} and {} and Dec between {} and {}.\n'.format(ramin, ramax,
+                                                          decmin, decmax))
     catdict = {}
     for catalog in catalogs:
         if np.all(limits) is not None: # use both RA & Dec limits
@@ -154,6 +158,7 @@ def match(image, sources, catalogs):
     bmaj = image['bmaj'] / 3600. # deg
 
     # Cross-match each source to the catalog sources
+    print('Searching for catalog cross-matches...\n')
     matches = []
     non_matches = []
     cat_matches = []
