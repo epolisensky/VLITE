@@ -120,7 +120,7 @@ def catalog_extract(cursor, catalogs, limits):
             catdict[catalog] = cursor.fetchall()
         elif ramin is not None: # use only RA limits
             if ramin > ramax:
-                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND ra'\
+                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND ra '\
                         'BETWEEN ? AND ?' % catalog
                 cursor.execute(query, (ramin, 360., 0., ramax))
             else:

@@ -166,7 +166,7 @@ def readSUMSS():
     return sources
 
 
-def readWENScomplete():
+def readWENSS():
     """Generates a list of catalog_source objects to be
     input into a SkyCatalogs database table.
     Telescope/frequency: WSRT 325 MHz
@@ -200,7 +200,7 @@ def readWENScomplete():
     return sources
 
 
-def readNVSSerrs():
+def readNVSS():
     """Generates a list of catalog_source objects to be
     input into a SkyCatalogs database table.
     Telescope/frequency: VLA 1.4 GHz

@@ -15,7 +15,17 @@ Currently included catalogs:
 import sqlite3
 import sys
 import os
+import pandas as pd
 import catalogio
+
+
+def fill_null(catalog, attrs):
+    for attr in attrs:
+        s = pd.Series([getattr(src, attr) for src in catalog])
+        s.loc[s.notnull() == False] = s.median()
+        for idx in range(len(catalog)):
+            setattr(catalog[idx], attr, s[idx])
+    return catalog
 
 
 # Read sky catalogs
@@ -23,7 +33,7 @@ print 'Reading TGSS...'
 tgss = catalogio.readTGSS()
 
 print 'Reading NVSS...'
-nvss = catalogio.readNVSSerrs()
+nvss = fill_null(catalogio.readNVSS(), ['e_ra', 'e_dec'])
 
 print 'Reading FIRST...'
 first = catalogio.readFIRST()
@@ -32,10 +42,10 @@ print 'Reading SUMSS...'
 sumss = catalogio.readSUMSS()
 
 print 'Reading WENSS...'
-wenss = catalogio.readWENScomplete()
+wenss = catalogio.readWENSS()
 
 print 'Reading GLEAM...'
-gleam = catalogio.readGLEAM()
+gleam = fill_null(catalogio.readGLEAM(), ['e_ra', 'e_dec'])
 
 tables = ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS', 'GLEAM']
 catalogs = [tgss, nvss, first, sumss, wenss, gleam]
