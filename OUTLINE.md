@@ -41,12 +41,12 @@ Pre-requisites:
 1. Calculate the range in RA and Dec spanned by the image. -- Use astropy.wcs & calc_footprint which returns 4 corners of image in RA & Dec (see https://github.com/bjanesh/odi-tools/blob/master/odi_coords.py line 727)
 2. Extract all previously detected VLITE sources within the RA and Dec range from the AssocSource table.
 3. Cross-match current sources to extracted AssocSource sources (going to need some association logic for this):
-   a. If a match is found, check highestResConfig column in AssocSource table to determine if current measurements will have higher or lower spatial resolution than previous measurement(s):
-      i. If current source measurement is from a higher res. config, update AssocSource table with new position, size, shape, etc. values, add (src_id, image_id) to list of rawSource_ids, and add one to num_detections.
-      ii. If current source measurement is from the same config as previous highest res. measurements, compute weighted average, update position, size, shape, etc. values, add (src_id, image_id) to list of rawSource_ids, and add one to num_detections.
-      iii. If current source measurement is from lower res. config, just add (src_id, image_id) to list of rawSource_ids and add one to num_detections.
-   b. If no previous VLITE match is found, add the current source to the AssocSource table as a new entry and set num_detections to 1.
-   c. Add one to num_nulls column for all un-matched AssocSource sources. This is a source that was detected previously in an image covering the same area on the sky, but was not detected in current image. Flagging these will help identify false detections and transients, assuming we figure out how to properly account for different sensitivites and resolutions.
+    a. If a match is found, check highestResConfig column in AssocSource table to determine if current measurements will have higher or lower spatial resolution than previous measurement(s):
+        i. If current source measurement is from a higher res. config, update AssocSource table with new position, size, shape, etc. values, add (src_id, image_id) to list of rawSource_ids, and add one to num_detections.
+	ii. If current source measurement is from the same config as previous highest res. measurements, compute weighted average, update position, size, shape, etc. values, add (src_id, image_id) to list of rawSource_ids, and add one to num_detections.
+	iii. If current source measurement is from lower res. config, just add (src_id, image_id) to list of rawSource_ids and add one to num_detections.
+    b. If no previous VLITE match is found, add the current source to the AssocSource table as a new entry and set num_detections to 1.
+    c. Add one to num_nulls column for all un-matched AssocSource sources. This is a source that was detected previously in an image covering the same area on the sky, but was not detected in current image. Flagging these will help identify false detections and transients, assuming we figure out how to properly account for different sensitivites and resolutions.
 
 #### Stage 6: Sky Survey Catalog Cross-Matching
 1. Consult run configuration file to determine if catalog cross-matching is to be run for all detected sources or just new and updated sources.
