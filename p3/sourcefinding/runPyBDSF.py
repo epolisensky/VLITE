@@ -15,6 +15,7 @@ Post-Processing Pipeline (P3) Stage 1"""
 from astropy.io import fits
 import numpy as np
 import bdsf
+from database.dbclasses import Image
 
 
 def write_sources(out):
@@ -30,87 +31,36 @@ def write_sources(out):
     # out.export_image(img_type='gaus_model', clobber=True)
 
 
-class BDSFImage(object):
-    """Image object to be manipulated and read into PyBDSF."""
-    
-    # A class variable to count the number of images
-    num_images = 0
-
-    
+class BDSFImage(Image):
+    """Object to be manipulated and read into PyBDSF.
+    Inherits all methods defined for Image class, but
+    overrides initialization."""
+ 
     def __init__(self, image, box_incr=10, max_iter=10, **kwargs):
-        """Initializes the image object. PyBDSF will use any 
-        arguments it recognizes and ignore the rest."""
+        """Initializes the Image subclass object. PyBDSF will 
+        use any arguments it recognizes and ignore the rest."""
         self.filename = image
         self.box_incr = box_incr # used in minimize_islands
         self.max_iter = max_iter # used in minimize_islands
         for key, value in kwargs.items():
             setattr(self, key, value)
         
-        # Increase the image count by one
-        BDSFImage.num_images += 1
 
-
-    @classmethod
-    def image_count(cls):
-        """Prints the number of images initialized."""
-        print("Processed {:d} images.\n".format(cls.num_images))
-
-
-    def read_image(self):
-        """Reads the FITS image data & header."""
-        self.data, self.header = fits.getdata(self.filename, header=True)
-
-
-    def write_image(self):
-        """Writes new FITS image data & header."""
-        if hasattr(self, 'data'):
-            fits.writeto(self.filename, self.data, self.header,
-                         overwrite=True)
-        else:
-            print ("\nNo image changes to write.\n")
-
-
-    def fix_ctype3(self):
+    def fix_ctype3(self, data, header):
         """Change Obit-generated header keyword CTYPE3 from
         'SPECLNMF' to 'FREQ'."""
-        if hasattr(self, 'header'):
-            pass
-        else:
-            self.read_image()
-        if self.header['CTYPE3'] == 'SPECLNMF':
-            self.header['CTYPE3'] = 'FREQ'
-            self.write_image()
-        else:
-            pass
-
-
-    def set_trim_box(self):
-        """Set trim_box arg to image size. 
-        Dimensions in pixels: (xmin, xmax, ymin, ymax).
-        xmax & ymax are decreased by 1 pixel to avoid
-        cases with uneven edges."""
-        if hasattr(self, 'data'):
-            pass
-        else:
-            self.read_image()
-        xmin = self.data.shape[0]
-        xmax = self.data.shape[2] - 1 # avoid uneven edges
-        ymin = self.data.shape[1]
-        ymax = self.data.shape[3] - 1 # avoid uneven edges
-        self.trim_box = (xmin, xmax, ymin, ymax)
-
-
-    def noise(self):
-        """Estimates image noise by giving the standard 
-        deviation. This works best if run on a residual
-        image where sources have been removed."""
-        if hasattr(self, 'data'):
-            pass
-        else:
-            self.read_image()
-        noise = np.std(self.data)
-        # print ("Image standard deviation: {}".format(noise))
-        return noise
+        try:
+            if header['CTYPE3'] == 'SPECLNMF':
+                header['CTYPE3'] = 'FREQ'
+                self.write(data, header)
+        except:
+            try:
+                data, header = self.read()
+                if header['CTYPE3'] == 'SPECLNMF':
+                    header['CTYPE3'] = 'FREQ'
+                    self.write(data, header)
+            except:
+                print('\nERROR: Unable to update image header.\n')
 
 
     def get_attr(self):

@@ -1,11 +1,9 @@
 import os
 import sys
 import datetime
-sys.path.insert(0, '/data3/erichards/codes/SourceFinding')
-import runPyBDSF
-import database
-sys.path.insert(0, '/data3/erichards/codes/CatalogMatching')
-import radioXmatch
+from database import createdb, dbclasses, filldb
+from sourcefinding import runPyBDSF
+from catalogmatching import radioXmatch
 
 
 def print_run_stats(start_time, outdir):
@@ -14,12 +12,12 @@ def print_run_stats(start_time, outdir):
     print('\n======================================\n')
     print('Run statistics:')
     # Count the number of images processed
-    runPyBDSF.BDSFImage.image_count()
+    dbclasses.Image.image_count()
     # Count the number of catalogs written
     catnum = len([f for f in os.listdir(outdir) if f[-4:] == '.srl'])
-    print ("Wrote {} catalogs.\n".format(catnum))
+    print ('\nWrote {} catalogs.'.format(catnum))
     # Print the runtime
-    print("Total runtime: {}\n".format(datetime.datetime.now() - start_time)) 
+    print('\nTotal runtime: {}\n'.format(datetime.datetime.now() - start_time)) 
 
 
 # Start the timer
@@ -34,13 +32,13 @@ dbdir = '/data3/vpipe/'
 rootdir = os.path.join(rootpath, sys.argv[1])
 dbname = os.path.join(dbdir, sys.argv[2])
 catalogs = [c for c in sys.argv[3].split(', ')]
-print('Using {} for cross-matching\n'.format(catalogs))
+print('\nUsing {} for cross-matching.'.format(catalogs))
 # ========================================================
 
 # Catch potential user input errors
 imgdir = os.path.join(rootdir, 'Images/')
 if not os.path.isdir(imgdir):
-    print('ERROR: Image directory does not exist.')
+    print('\nERROR: Image directory does not exist.')
     sys.exit(0)
 else:
     pass
@@ -49,7 +47,7 @@ else:
 catalog_opts = ['FIRST', 'GLEAM', 'NVSS', 'SUMSS', 'TGSS', 'WENSS']
 for cat in catalogs:
     if cat not in catalog_opts:
-        print('ERROR: Catalog {} is not a valid option.'.format(cat))
+        print('\nERROR: Catalog {} is not a valid option.'.format(cat))
         sys.exit(0)
     else:
         pass
@@ -57,7 +55,10 @@ for cat in catalogs:
 # Create database if it doesn't already exist
 #  - User will be prompted to verify creation
 if not os.path.isfile(dbname):
-    database.create_db(dbname)
+    print('\nDatabase {} does not yet exist.'.format(dbname))
+    print('It is safe to make a new one.')
+    safe = True
+    createdb.create(dbname, safe)
 else:
     pass
 
@@ -75,7 +76,13 @@ imglist = [f for f in os.listdir(imgdir) if f[-10:] == 'IPln1.fits']
 for img in imglist:
     impath = os.path.join(imgdir, img)
 
-    # STAGE 1 - Source finding
+    # STAGE 1 -- Initialize Image object & table
+    # STAGE 2 -- Run preliminary quality checks
+    # *********************************************
+    img = filldb.addImage(dbname, impath)
+
+
+    # STAGE 3 - Source finding
     # *******************************************
     # Define any desired PyBDSF parameters here
     bdsfim = runPyBDSF.BDSFImage(impath, thresh='hard')
@@ -88,43 +95,36 @@ for img in imglist:
         os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
         os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
 
-        # STAGE 2 - Database
-        # *******************************************
         '''Write sources to database; sources will be overwritten
-        if this image has already been processed. The ImageTable
+        if this image has already been processed. The Image
         and DetectedSources objects are returned to be used in
         cross-matching.'''
-        imgtbl, sources = database.pybdsf_to_db(dbname, out)
+        img, sources = filldb.pipe_to_table(dbname, img, out)
 
-        # STAGE 3 - Image quality check
+        # STAGE 4 - Final image quality check
         # *******************************************
 
+        # STAGE 5 - Source association
+        # *******************************************
+        
 
-        # STAGE 4 - Catalog cross-matching
+        # STAGE 6 - Catalog cross-matching
         # *******************************************
         # Run catalog cross-matching
         matched_srcs, non_matched_srcs, matched_catsrcs = radioXmatch.main(
-            catalogs=catalogs, database=False, objects=(imgtbl, sources))
+            catalogs=catalogs, database=False, objects=(img, sources))
         # Write ds9 regions file of the matched catalog sources
         radioXmatch.write_region(matched_catsrcs, impath, ext='_matches.reg')
         os.system('mv '+imgdir+'*.reg '+pybdsfdir+'.')
         # Update the database Source table with match info
-        radioXmatch.update_database(dbname, imgtbl.name,
+        radioXmatch.update_database(dbname, img.filename,
                                     matched_srcs, non_matched_srcs)
 
     else:
         # Image failed to process
+        filldb.pybdsf_fail(dbname, img)
         with open(pybdsfdir+'failed.txt', 'a') as f:
             f.write(img+'\n')
 
 
 print_run_stats(start_time, pybdsfdir)
-
-'''
-Run statistics:
-Processed 14 images.
-
-Wrote 14 catalogs.
-
-Total runtime: 0:02:54.720177
-'''
