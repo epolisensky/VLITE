@@ -2,7 +2,7 @@
 ## For all our storage and analysis needs
 ### Task/Architecture Outline
 
-*Note*: Italics indicates functionality that has not yet been implemented.
+*Note: Italics indicates functionality that has not yet been implemented.*
 
 ##### Pre-requisites:
 - *run configuration file*
@@ -11,7 +11,7 @@
 
 #### Stage 0: Pre-Run Checks
 1. *Read in run configuration file*
-2. Check path to database/create it if doesn't exist yet
+2. Check path to database/create it if it doesn't exist yet
 3. Check if images exist/path is correct
 4. Check if path to SkyCatalogs database is correct
 5. Make sure requested cross-match catalogs exist in the SkyCatalogs database
@@ -47,25 +47,24 @@ quality checks. We can remove this step if experience demonstrates that this
 is useless or too difficult to define generally.
 2. Other ideas?
 3. Update database Error table/Image table error_id
-4. Possible future development: use this stage to figure out optimal matching
-parameters. 
 
 #### *Stage 5: Source Association*
-1. Calculate radius of field-of-view for SQL cone search.
+1. Calculate radius or field-of-view for SQL cone search.
 2. Extract all previously detected VLITE sources within the search range
-and which were detected in the same configuration as the current sources from
-the AssocSource table.
+and which were detected in the same configuration or similar beam size as the
+current sources from the AssocSource table.
 3. Cross-match current sources to extracted AssocSource sources:
     1. If a match is found, compute weighted average for position and shape,
-    add (src_id, image_id) to list of rawSource_ids to link back to rawSource
-    table for flux measurements, and add one to num_detections.
+    add rawSource rowid to list of rawSrc_rowids to link back to rawSource
+    table for flux measurements, and add one to num_detect.
     2. If no previous VLITE match is found, add the current source to the
-    AssocSource table as a new entry and set num_detections to 1.
-4. Add one to num_nulls column for all un-matched AssocSource sources. This is
+    AssocSource table as a new entry and set num_detect to 1.
+4. Add one to num_null column for all un-matched AssocSource sources. This is
 a source that was detected previously in an image covering the same area on the
-sky in the same configuration, but was not detected in the current image.
-Flagging these will help identify false detections and transients, assuming we
-figure out how to properly account for different sensitivities.
+sky in the same configuration or similar beam size, but was not detected in the
+current image. Flagging these will help identify false detections and
+transients, assuming we figure out how to properly account for different
+sensitivities.
 5. Future development will hopefully include a way to cross-match sources
 detected in different configurations, using the highest res. measurements as
 the "true" source position and shape. Some thought and experience is needed to
@@ -78,8 +77,8 @@ examples for dealing with this, but they aren't great.
 1. *Consult run configuration file to determine if catalog cross-matching is to
 be run for all detected sources or just new sources.*
 2. Extract catalog sources from the first sky survey table specified in the run
-configuration file using same range in RA & Dec spanned by image used to
-extract sources from the AssocSource table in Stage 5.
+configuration file using same cone search used to extract sources from the
+AssocSource table in Stage 5.
 2. Cross-match VLITE sources with the extracted catalog sources.
 3. Update the catalog_id, match_id, min_DeRuiter columns in AssocSource table
 with match results.
@@ -97,21 +96,21 @@ with match results.
     * rawSource -- Fitting results from PyBDSF source finding. Each row
     corresponds to a single source detected in a single image, so this table
     may contain "duplicates" of the same source detected in multiple images.
-    The isl_id is a foreign key linking to the rawIsland table. The primary key
-    is the combination of src_id and image_id, where image_id is a foreign key
-    linking to the Image table.
+    The primary key is the combination of src_id and image_id. The foreign key
+    (isl_id, image_id) links back to the corresponding combination in the
+    rawIsland table.
     * AssocSource -- Amalgamation of source measurements where multiple
-    detections of the same source (in the same configuration) are combined to
-    form a single position and shape. Each detected source is cross-matched
-    with sources in this table to determine whether the source has been
-    detected previously in the same configuration. The number of detections for
-    a source (in each configuration) is recorded. The number of null detections
-    for a source is also recorded (see Stage 5). Each source has a list of
-    row_id foreign keys which link back to the corresponding rawSource
-    measurements for extraction of lighcurves. Results of the sky survey
-    catalog cross-matching are included as the foreign keys catalog_id and
+    detections of the same source (in the same configuration or beam size) are
+    combined to form a single position and shape. Each detected source is
+    cross-matched with sources in this table to determine whether the source
+    has been detected previously in the same configuration. The number of
+    detections for a source (in each configuration) is recorded. The number of
+    null detections for a source is also recorded (see Stage 5). Each source
+    has a list of rowids which can be used to link back to the corresponding
+    rawSource measurements for extraction of lighcurves. Results of the sky
+    survey catalog cross-matching are included as catalog_id and
     match_id, which can be used link to the corresponding matched catalog
-    source in the SkyCatalogs database, and the minimum de Ruiter radius
+    source in the SkyCatalogs database, and the minimum deRuiter radius
     calculated between the associated sources.
     * Error -- List of reasons why an image could be rejected for processing.
     The error_id foreign key in the Image table links to the primary key id in
