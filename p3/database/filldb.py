@@ -42,12 +42,24 @@ def initImage(impath):
     data, header = img.read()
     img.header_attrs(header) # Use header info to set attributes
 
-    # Quality check here
-
     return img
 
 
-def addImage(dbname, impath):
+#def qa(img):
+    # 1st quality checks
+
+
+def existCheck(dbname, impath):
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+    cur.execute('SELECT id FROM Image WHERE filename = ?', (impath, ))
+    exists = cur.fetchone()
+    cur.close()
+
+    return exists
+
+
+def addImage(dbname, impath, exists):
     # Initialize Image object
     img = initImage(impath)
     
@@ -57,10 +69,8 @@ def addImage(dbname, impath):
     cur.execute('PRAGMA foreign_keys = "1"') 
     
     # Check if image has already been run and insert or update accordingly
-    cur.execute('SELECT id FROM Image WHERE filename = ?', (img.filename, ))
-    exists = cur.fetchone()
     if exists is None:
-        print("\nAdding {} to database.\n".format(img.filename))
+        print('\nAdding {} to database'.format(img.filename))
         cur.execute('''INSERT INTO Image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, freq, bmaj, bmin, bpa, noise, peak, config, nvis,
@@ -73,7 +83,7 @@ def addImage(dbname, impath):
                      img.peak, img.config, img.nvis, img.mjdtime, img.tau_time,
                      img.duration, img.nsrc, img.rms_box, img.error_id))
     else:
-        print("\nUpdating existing entries for {}\n".format(img.filename))
+        print('\nUpdating existing entries for {}'.format(img.filename))
         imgid = exists[0]
         cur.execute('''UPDATE Image SET filename = ?, imsize = ?, obs_ra = ?,
             obs_dec = ?, pixel_scale = ?, object = ?, obs_date = ?, 
@@ -86,7 +96,7 @@ def addImage(dbname, impath):
                      img.peak, img.config, img.nvis, img.mjdtime, img.tau_time,
                      img.duration, img.nsrc, img.rms_box, img.error_id, imgid))
         # Delete corresponding Island & Source table entries
-        cur.execute('DELETE FROM Island WHERE image_id = ?', (imgid, ))
+        cur.execute('DELETE FROM rawIsland WHERE image_id = ?', (imgid, ))
 
     conn.commit()
     cur.close()
@@ -111,10 +121,10 @@ def addSources(dbname, img, sources):
                  img.nsrc, img.rms_box, img.error_id, imgid))     
 
     # Insert DetectedSources into Source and Island tables
-    print('\nAdding sources to database.')
+    print('\nAdding sources to database')
     for src in sources:
-        # Insert values into Island table
-        cur.execute('''INSERT OR IGNORE INTO Island (
+        # Insert values into rawIsland table
+        cur.execute('''INSERT OR IGNORE INTO rawIsland (
             isl_id, image_id, total_flux, e_total_flux, 
             rms, mean, resid_rms, resid_mean) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -122,22 +132,22 @@ def addSources(dbname, img, sources):
              f(src.rms_isl), f(src.mean_isl), f(src.resid_rms),
              f(src.resid_mean)))
 
-        # Insert values into Source table
-        cur.execute('''INSERT INTO Source (
+        # Insert values into rawSource table
+        cur.execute('''INSERT INTO rawSource (
             src_id, isl_id, image_id, ra, e_ra, dec, e_dec,
             total_flux, e_total_flux, peak_flux, e_peak_flux, 
             ra_max, e_ra_max, dec_max, e_dec_max, maj, e_maj, 
             min, e_min, pa, e_pa, dc_maj, e_dc_maj, dc_min, e_dc_min,
-            dc_pa, e_dc_pa, code, catalog_id, match_id, min_deRuiter) 
+            dc_pa, e_dc_pa, code, assoc_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (src.src_id, src.isl_id, imgid, f(src.ra), f(src.e_ra),
              f(src.dec), f(src.e_dec), f(src.total_flux), f(src.e_total_flux),
              f(src.peak_flux), f(src.e_peak_flux), f(src.ra_max),
              f(src.e_ra_max), f(src.dec_max), f(src.e_dec_max), f(src.maj),
              f(src.e_maj), f(src.min), f(src.e_min), f(src.pa), f(src.e_pa),
              f(src.dc_maj), f(src.e_dc_maj), f(src.dc_min), f(src.e_dc_min),
-             f(src.dc_pa), f(src.e_dc_pa), src.code, None, None, None))
+             f(src.dc_pa), f(src.e_dc_pa), src.code, None))
 
     conn.commit()
     cur.close()

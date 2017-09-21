@@ -1,6 +1,8 @@
 # ignore certain file types
 *.pyc
 *.txt
+*.sh
+*.ipynb
 
 # ignore certain directories
 old/
@@ -13,3 +15,5 @@ quality/
 
 # miscellaneous
 test.py
+driver_example.py
+

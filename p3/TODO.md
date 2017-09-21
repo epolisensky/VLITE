@@ -51,16 +51,14 @@ function. I need to see how slow this is and then do more research.
 
 # To Do List
 
-1. Implement configuration file functionality
-2. Implement cone search in SQL for extracting sources from tables within
+- [x] Implement configuration file functionality
+- [ ] Implement cone search in SQL for extracting sources from tables within
 circular region. Or implement alpha function in SQL for extraction from
 square region on the sky. Since an SQL function needs to be defined either way,
 the circular region is preferred.
-3. Update database schema:
-    - add Error and AssocSource tables
-    - change Island table to rawIsland
-    - change Source table to rawSource and remove cross-matching results
-4. Implement source association
-5. Implement image quality checks
-6. Write testing scripts
-7. Write documentation
+- [x] Update database schema
+- [ ] Implement source association
+- [ ] Update catalog cross-matching
+- [ ] Implement image quality checks
+- [ ] Write testing scripts
+- [ ] Write documentation

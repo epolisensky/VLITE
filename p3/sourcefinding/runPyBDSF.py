@@ -14,6 +14,7 @@ Post-Processing Pipeline (P3) Stage 1"""
 
 from astropy.io import fits
 import numpy as np
+import warnings
 import bdsf
 from database.dbclasses import Image
 
@@ -42,6 +43,7 @@ class BDSFImage(Image):
         self.filename = image
         self.box_incr = box_incr # used in minimize_islands
         self.max_iter = max_iter # used in minimize_islands
+        self.quiet = True
         for key, value in kwargs.items():
             setattr(self, key, value)
         
@@ -74,11 +76,13 @@ class BDSFImage(Image):
         """Run PyBDSF process_image() task using object attributes
         as parameter inputs. Returns None if PyBDSF fails."""
         opts = self.get_attr()
-        try:
-            out = bdsf.process_image(opts, quiet=True, output_all=False)
-            return out
-        except:
-            return None  
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', r'invalid value')
+            try:
+                out = bdsf.process_image(opts)
+                return out
+            except:
+                return None  
 
 
     def minimize_islands(self):
@@ -111,7 +115,7 @@ class BDSFImage(Image):
         while i < self.max_iter: # stop at max number of iterations
             box_size += self.box_incr
             box_step = int(box_size / 3.)
-            self.rms_box(box_size, box_step)
+            self.rms_box = (box_size, box_step)
             print ("\nTrying box {}\n".format(self.rms_box))
             out = self.find_sources()
             if out is not None:
@@ -135,7 +139,7 @@ class BDSFImage(Image):
         while i < self.max_iter:
             box_size -= self.box_incr
             box_step = int(box_size / 3.)
-            self.rms_box(box_size, box_step)
+            self.rms_box = (box_size, box_step)
             if box_size > 0: # stop if box size goes to 0 or below
                 print ("\nTrying box {}\n".format(self.rms_box))
                 out = self.find_sources()

@@ -207,7 +207,7 @@ def main(catalogs=['NVSS'], **kwargs):
     the catalogs keyword with the default being only NVSS."""  
     # main(catalogs=catalogs, database=False, objects=(imgtbl, sources))
     # main(catalogs=catalogs, database=True, images=imglist,
-    #      file='/data3/erichards/vlite/allvlite.sqlite')
+    #      file='/data3/erichards/codes/p3/test/test.sqlite')
     if kwargs['database'] is True:
         try:
             dbname = kwargs['file']
