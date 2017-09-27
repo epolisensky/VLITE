@@ -133,6 +133,7 @@ def create(dbname, safe):
             e_min REAL,
             pa REAL,
             e_pa REAL,
+            beam REAL,
             num_detect INTEGER,
             num_null INTEGER,
             catalog_id INTEGER,

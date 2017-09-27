@@ -4,7 +4,8 @@ from datetime import datetime
 from errors import ConfigError
 from database import createdb, dbclasses, filldb
 from sourcefinding import runPyBDSF
-from catalogmatching import radioXmatch
+from matching import radioXmatch
+from skycatalog import catalogio
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -29,17 +30,23 @@ def print_run_stats(start_time, outdir):
 def cfgparse(cfgfile): 
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
+        s1 = (data['stages'])['save_to_database']
+        s1qa = (data['stages'])['quality_checks']
+        s2 = (data['stages'])['source_finding']
+        s3 = (data['stages'])['source_association']
+        s4 = (data['stages'])['catalog_matching']
         rootdir = (data['setup'])['rootdir']
         yr = (data['setup'])['year']
         mo = (data['setup'])['month']
         days = (data['setup'])['day']
-        dbpath = os.path.join((data['setup'])['dbdir'],
-                              (data['setup'])['dbname'])
-        overwrite = (data['setup'])['overwrite']
+        dbpath = (data['setup'])['dbname']
+        owrite = (data['setup'])['overwrite']
+        reproc = (data['setup'])['reprocess']
+        catdb = (data['setup'])['catdb']
         catalogs = (data['setup'])['catalogs']
-        reprocess = (data['setup'])['reprocess']
         params = data['pybdsf_params']
-        matchfor = (data['catalog_matching'])['do_for']
+        res_tol = (data['matching'])['res_tol']
+        catmatch = (data['matching'])['catalog_match']
 
     # Perform checks on path to images
     if not os.path.isdir(rootdir): # check root directory
@@ -60,40 +67,70 @@ def cfgparse(cfgfile):
         days = next(os.walk(monthdir))[1]
 
     # Define path to processing directories
-    procdirs = []
+    dirs = []
     for day in days:
         if type(day) != 'string':
             day = str(day)
         procdir = os.path.join(monthdir, day, 'Images/')
         if not os.path.isdir(procdir): # check full image path
             raise ConfigError('Directory does not exist: {}'.format(procdir))
-        procdirs.append(procdir)
+        dirs.append(procdir)
 
-    # Make sure requested catalogs exist
-    catalog_opts = ['FIRST', 'GLEAM', 'NVSS', 'SUMSS', 'TGSS', 'WENSS']
-    for cat in catalogs:
-        if type(cat) != 'string':
-            cat = str(cat)
-        if cat not in catalog_opts:
-            print('\nCurrently available catalogs: {}\n'.format(catalog_opts))
-            raise ConfigError('Catalog {} is not a valid option'.format(cat))
+    # Perform checks based on stages to process
+    if s1 or s3:
+        if dbpath is None:
+            raise ConfigError('No database specified.')
+        # Ensure reprocess & overwrite are boolean True/False or yes/no
+        if isinstance(owrite, bool):
+            pass
+        else:
+            raise ConfigError('Setup: overwrite must be True/False or yes/no.')
+        if s3:
+            if isinstance(reproc, bool):
+                pass
+            else:
+                raise ConfigError('Setup: reprocess must be True/False '
+                                  'or yes/no.')
 
-    # Ensure reprocess & overwrite are boolean True/False or yes/no
-    if isinstance(overwrite, bool):
-        pass
-    else:
-        raise ConfigError('Setup: overwrite must be True/False or yes/no.')
-    if isinstance(reprocess, bool):
-        pass
-    else:
-        raise ConfigError('Setup: reprocess must be True/False or yes/no.')
-    
-    # Cross-match all or only new sources with sky catalogs
-    catalog_match_opts = ['new', 'all']
-    if matchfor not in catalog_match_opts:
-        raise ConfigError('Catalog_matching: do_for must be all or new.')
-    
-    return procdirs, dbpath, overwrite, catalogs, reprocess, params, matchfor
+    try:
+        # Create & check path to sky catalogs database
+        skycat = os.path.join(catalogio.catalogdir, catdb)
+    except AttributeError:
+        skycat = None
+    if s4:
+        if not os.path.isfile(skycat):
+            raise ConfigError('Sky catalogs database does not exist: {}'.format(
+            skycat))
+
+        # Make sure requested catalogs exist
+        catalog_opts = ['FIRST', 'GLEAM', 'NVSS', 'SUMSS', 'TGSS', 'WENSS']
+        for cat in catalogs:
+            if type(cat) != 'string':
+                cat = str(cat)
+            if cat not in catalog_opts:
+                print('\nCurrently available catalogs: {}\n'.format(
+                    catalog_opts))
+                raise ConfigError('Catalog {} is not a valid option'.format(
+                    cat))
+
+        # Cross-match all or only new sources with sky catalogs
+        catalog_match_opts = ['new', 'all']
+        if catmatch not in catalog_match_opts:
+            raise ConfigError('Matching: catalog_match must be all or new.')
+
+    if s3 or s4:
+        # Check resolution tolerance input
+        try:
+            res_tol = float(res_tol)
+        except ValueError:
+            raise ConfigError('Matching: res_tol must be a number.')
+        except TypeError: # None
+            pass
+
+    stages = (s1, s1qa, s2, s3, s4)
+      
+    return stages, dirs, dbpath, owrite, skycat, catalogs, reproc, params, \
+        res_tol, catmatch
 
 
 def dbinit(dbname, overwrite):
@@ -116,14 +153,34 @@ def dbinit(dbname, overwrite):
             createdb.create(dbname, safe)
 
 
-def stage1(dbname, impath, exists):
-    # STAGE 1 -- Initialize Image object & table + 1st quality check
-    img = filldb.addImage(dbname, impath, exists)
-    return img
+def stage1(add, qa, dbname, impath):
+    # STAGE 1 -- Initialize image object, add to table, 1st quality check
+    # Add image to database?
+    if add:
+        # See if image is already in database
+        exists = filldb.existCheck(dbname, impath)
+        if exists is not None:
+            if not reproc:
+                imobj = None
+            else:
+                imobj = filldb.addImage(dbname, impath, exists)
+        else:
+            imobj = filldb.addImage(dbname, impath, exists)
+    else:
+        imobj = filldb.initImage(impath)
+
+    # Run quality checks?
+    if qa:
+        # quality check
+        pass
+    else:
+        pass
+    
+    return imobj
 
 
-def stage2(impath, params):
-    # STAGE 2 - Source finding + 2nd quality check
+def stage2(add, qa, dbname, impath, params, imobj):
+    # STAGE 2 -- Source finding + 2nd quality check
     print('\nExtracting sources from {}'.format(impath))
     # Initialize source finding image object
     bdsfim = runPyBDSF.BDSFImage(impath)
@@ -134,11 +191,45 @@ def stage2(impath, params):
     else:
         out = bdsfim.minimize_islands()
 
-    return out
+    if out is not None:
+        # Write PyBDSF(M) files to daily directory
+        runPyBDSF.write_sources(out)
+        imobj, sources = filldb.pipe_translate(imobj, out)
+        if add:
+            filldb.addSources(dbname, imobj, sources)
+        if qa:
+            # run more quality checks
+            pass
+        else:
+            pass
+    else:
+        sources = None
+
+    return imobj, sources
 
 
-#def stage3():
+def stage3(dbname, imobj, sources, res_tol):
     # STAGE 3 - Source association
+    radius = imobj.search_radius()
+    center = (imobj.obs_ra, imobj.obs_dec)
+    dassoc = radioXmatch.cone_search(dbname, ['AssocSource'], center, radius,
+                                     same_res=True, beam=imobj.bmaj,
+                                     res_tol=res_tol)
+    #src = dassoc[dassoc.keys()[0]][0]
+    #print src['ra']
+    if not dassoc[dassoc.keys()[0]]: # table is empty, so add all sources
+        assocsrcs = sources
+        for asrc in assocsrcs:
+            asrc.beam = imobj.bmaj
+            asrc.num_detect = 1
+            asrc.num_null = 0
+        filldb.addAssoc(dbname, assocsrcs)
+        for src in sources:
+            src.assoc_id = src.src_id + 1
+        filldb.updateAssocid(dbname, sources)
+    else:
+        print('\nMatching new sources to existing VLITE sources')
+        
 
 
 def stage4(imobj, sources, catalogs):
@@ -149,7 +240,8 @@ def stage4(imobj, sources, catalogs):
     return matched_srcs, non_matched_srcs, matched_catsrcs
 
             
-def process(dirs, dbname, catalogs, reproc, params, matchfor):   
+def process(stages, dirs, dbname, skycat, catalogs, reproc, params,
+            res_tol, catmatch):   
     # Begin loop through daily directories
     for imgdir in dirs:
         # Define/make directory for PyBDSF output
@@ -166,32 +258,28 @@ def process(dirs, dbname, catalogs, reproc, params, matchfor):
         for img in imglist:
             impath = os.path.join(imgdir, img)
 
-            # See if image is already in database
-            exists = filldb.existCheck(dbname, impath)
-            if exists is not None:
-                if not reproc:
-                    break
+            # STAGE 1 -- Initialize image object, add to table, QA
+            imobj = stage1(stages[0], stages[1], dbname, impath)
+            if imobj is None: # skip re-processing
+                continue
 
-            # 1.) 1st quality check + insertion into database
-            imobj = stage1(dbname, impath, exists)
+            # STAGE 2 -- Source finding
+            if stages[2]:
+                imobj, sources = stage2(stages[0], stages[1], dbname, impath,
+                                        params, imobj)
+                if sources is None:
+                    # Image failed to process
+                    with open(pybdsfdir+'failed.txt', 'a') as f:
+                        f.write(img+'\n')
+                    if stages[0]:
+                        filldb.pybdsf_fail(dbname, imobj)
+                    continue
 
-            # 2.) source finding
-            out = stage2(impath, params)
-            if out is not None:
-                # Write PyBDSF(M) files to daily directory
-                runPyBDSF.write_sources(out)
-                os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
-                os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
+            # STAGE 3 -- Source association
+            if stages[3]:
+                stage3(dbname, imobj, sources, res_tol)
 
-                '''Write sources to database; sources will be overwritten
-                if this image has already been processed. The Image
-                and DetectedSource objects are returned to be used in
-                cross-matching. 2nd quality check is also performed here.'''
-                imobj, sources = filldb.pipe_to_table(dbname, imobj, out)
 
-                # 3.) Source association
-                #stage3()
-                
                 # 4.) Catalog cross-matching
                 '''
                 if matchfor == 'new':
@@ -209,25 +297,29 @@ def process(dirs, dbname, catalogs, reproc, params, matchfor):
                 radioXmatch.update_database(dbname, imobj.filename, matched,
                                             not_matched)
                 '''
-            else:
-                # Image failed to process
-                filldb.pybdsf_fail(dbname, imobj)
-                with open(pybdsfdir+'failed.txt', 'a') as f:
-                    f.write(imobj+'\n')
+
+        #os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
+        #os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
+
 
 
 
 # Start the timer
 start_time = datetime.now()
 
-cf = sys.argv[1]
+try:
+    cf = sys.argv[1]
+except IndexError:
+    raise ConfigError('Please provide a configuration file.')
 # Parse config file
-dirs, dbname, owrite, catalogs, reproc, params, matchfor = cfgparse(cf)
+stages, dirs, dbname, owrite, skycat, catalogs, reproc, params, rtol, \
+    catmatch = cfgparse(cf)
 
-# Create/overwrite database if requested
-dbinit(dbname, owrite)
+if stages[0] or stages[3]:
+    # Create/overwrite database if requested
+    dbinit(dbname, owrite)
 
 # Process images
-process(dirs, dbname, catalogs, reproc, params, matchfor)
+process(stages, dirs, dbname, skycat, catalogs, reproc, params, rtol, catmatch)
 
 print('\nTotal runtime: {}\n'.format(datetime.now() - start_time))

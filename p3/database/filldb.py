@@ -26,10 +26,10 @@ Post-Processing Pipeline (P3) Stage 2"""
 
 import sqlite3
 import numpy as np
+import re
 from astropy.io import fits
 import pybdsfcat
 import dbclasses
-#from quality import test
 
 
 def f(num):
@@ -45,10 +45,6 @@ def initImage(impath):
     return img
 
 
-#def qa(img):
-    # 1st quality checks
-
-
 def existCheck(dbname, impath):
     conn = sqlite3.connect(dbname)
     cur = conn.cursor()
@@ -61,7 +57,7 @@ def existCheck(dbname, impath):
 
 def addImage(dbname, impath, exists):
     # Initialize Image object
-    img = initImage(impath)
+    img = initImage(impath)    
     
     """Insert or update database Image table."""
     conn = sqlite3.connect(dbname)
@@ -104,56 +100,25 @@ def addImage(dbname, impath, exists):
     return img
 
 
-def addSources(dbname, img, sources):
-    """Inserts DetectedSource objects into database Island
-    and Source tables. The Image object and table is also
-    updated with some results from the source finding."""
-    conn = sqlite3.connect(dbname)
-    cur = conn.cursor()
-    cur.execute('PRAGMA foreign_keys = "1"')
+def bdsfcat_translate(img, pybdsfdir):
+    # Set the file path
+    prefix = re.findall('.*\/(.*)\.', img.filename)[0]
+    srl = prefix + '.pybdsm.srl'
+    catalog = os.path.join(pybdsfdir, srl)
+    # Read the catalog
+    print('\nExtracting sources from {}'.format(srl))
+    sources = pybdsfcat.read_catalog(catalog)
 
-    # Update Image table -- overwrites all possible updated columns
-    cur.execute('SELECT id FROM Image WHERE filename = ?', (img.filename, ))
-    imgid = cur.fetchone()[0]
-    cur.execute('''UPDATE Image SET imsize = ?, freq = ?, bmaj = ?, bmin = ?, 
-        bpa = ?, noise = ?, nsrc = ?, rms_box = ?, error_id = ? WHERE id = ?''',
-                (img.imsize, img.freq, img.bmaj, img.bmin, img.bpa, img.noise,
-                 img.nsrc, img.rms_box, img.error_id, imgid))     
+    # Count the number of sources
+    img.nsrc = len(sources)
 
-    # Insert DetectedSources into Source and Island tables
-    print('\nAdding sources to database')
-    for src in sources:
-        # Insert values into rawIsland table
-        cur.execute('''INSERT OR IGNORE INTO rawIsland (
-            isl_id, image_id, total_flux, e_total_flux, 
-            rms, mean, resid_rms, resid_mean) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-            (src.isl_id, imgid, f(src.total_flux_isl), f(src.total_flux_islE),
-             f(src.rms_isl), f(src.mean_isl), f(src.resid_rms),
-             f(src.resid_mean)))
+    # Extract rms_box size and noise from log file
+    img.rms_box, img.noise, raw_rms = img.log_attrs(pybdsfdir)
 
-        # Insert values into rawSource table
-        cur.execute('''INSERT INTO rawSource (
-            src_id, isl_id, image_id, ra, e_ra, dec, e_dec,
-            total_flux, e_total_flux, peak_flux, e_peak_flux, 
-            ra_max, e_ra_max, dec_max, e_dec_max, maj, e_maj, 
-            min, e_min, pa, e_pa, dc_maj, e_dc_maj, dc_min, e_dc_min,
-            dc_pa, e_dc_pa, code, assoc_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (src.src_id, src.isl_id, imgid, f(src.ra), f(src.e_ra),
-             f(src.dec), f(src.e_dec), f(src.total_flux), f(src.e_total_flux),
-             f(src.peak_flux), f(src.e_peak_flux), f(src.ra_max),
-             f(src.e_ra_max), f(src.dec_max), f(src.e_dec_max), f(src.maj),
-             f(src.e_maj), f(src.min), f(src.e_min), f(src.pa), f(src.e_pa),
-             f(src.dc_maj), f(src.e_dc_maj), f(src.dc_min), f(src.e_dc_min),
-             f(src.dc_pa), f(src.e_dc_pa), src.code, None))
-
-    conn.commit()
-    cur.close()
+    return img, sources
 
 
-def pipe_to_table(dbname, img, out):
+def pipe_translate(img, out):
     """Method to translate PyBDSF output within the
     pipeline to DetectedSource objects and update Image 
     object."""
@@ -182,35 +147,88 @@ def pipe_to_table(dbname, img, out):
         newsrcs.append(dbclasses.DetectedSource())
         newsrcs[-1].cast(oldsrc)
 
-    # Second quality check here
-        
-    # Pass the objects to table writing function
-    addSources(dbname, img, newsrcs)
-
-    # Return Image & DetectedSource objects for use in cross-matching
     return img, newsrcs
+
+
+def addSources(dbname, img, sources):
+    """Inserts DetectedSource objects into database Island
+    and Source tables. The Image object and table is also
+    updated with some results from the source finding."""
     
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+    cur.execute('PRAGMA foreign_keys = "1"')
 
-def cat_to_table(dbname, img, pybdsfdir):
-    # Set the file path
-    prefix = re.findall('.*\/(.*)\.', img.filename)[0]
-    srl = prefix + '.pybdsm.srl'
-    catalog = os.path.join(pybdsfdir, srl)
-    # Read the catalog
-    print('\nExtracting sources from {}'.format(srl))
-    sources = pybdsfcat.read_catalog(catalog)
+    # Update Image table -- overwrites all possible updated columns
+    cur.execute('SELECT id FROM Image WHERE filename = ?', (img.filename, ))
+    imgid = cur.fetchone()[0]
+    cur.execute('''UPDATE Image SET imsize = ?, freq = ?, bmaj = ?, bmin = ?, 
+        bpa = ?, noise = ?, nsrc = ?, rms_box = ?, error_id = ? WHERE id = ?''',
+                (img.imsize, img.freq, img.bmaj, img.bmin, img.bpa, img.noise,
+                 img.nsrc, img.rms_box, img.error_id, imgid))     
 
-    # Count the number of sources
-    img.nsrc = len(sources)
+    # Insert DetectedSources into rawSource and rawIsland tables
+    print('\nAdding sources to database')
+    for src in sources:
+        # Insert values into rawIsland table
+        cur.execute('''INSERT OR IGNORE INTO rawIsland (
+            isl_id, image_id, total_flux, e_total_flux, 
+            rms, mean, resid_rms, resid_mean) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (src.isl_id, imgid, f(src.total_flux_isl), f(src.total_flux_islE),
+             f(src.rms_isl), f(src.mean_isl), f(src.resid_rms),
+             f(src.resid_mean)))
 
-    # Extract rms_box size and noise from log file
-    img.rms_box, img.noise, raw_rms = img.log_attrs(pybdsfdir)
+        # Insert values into rawSource table
+        cur.execute('''INSERT INTO rawSource (
+            src_id, isl_id, image_id, ra, e_ra, dec, e_dec,
+            total_flux, e_total_flux, peak_flux, e_peak_flux, 
+            ra_max, e_ra_max, dec_max, e_dec_max, maj, e_maj, 
+            min, e_min, pa, e_pa, dc_maj, e_dc_maj, dc_min, e_dc_min,
+            dc_pa, e_dc_pa, code, assoc_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (src.src_id, src.isl_id, imgid, f(src.ra), f(src.e_ra),
+             f(src.dec), f(src.e_dec), f(src.total_flux), f(src.e_total_flux),
+             f(src.peak_flux), f(src.e_peak_flux), f(src.ra_max),
+             f(src.e_ra_max), f(src.dec_max), f(src.e_dec_max), f(src.maj),
+             f(src.e_maj), f(src.min), f(src.e_min), f(src.pa), f(src.e_pa),
+             f(src.dc_maj), f(src.e_dc_maj), f(src.dc_min), f(src.e_dc_min),
+             f(src.dc_pa), f(src.e_dc_pa), src.code, src.assoc_id))
 
-    # Pass the objects to table writing function
-    addSources(dbname, img, sources)
+    conn.commit()
+    cur.close()
 
-    # Return ImageTable & DetectedSource objects for use in cross-matching
-    return img, sources
+
+def addAssoc(dbname, sources):
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+
+    for src in sources:
+        cur.execute('''INSERT INTO AssocSource (
+            ra, e_ra, dec, e_dec, maj, e_maj, min, e_min, pa, e_pa, beam,
+            num_detect, num_null, catalog_id, match_id, min_deRuiter)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (f(src.ra), f(src.e_ra), f(src.dec), f(src.e_dec),
+                     f(src.maj), f(src.e_maj), f(src.min), f(src.e_min),
+                     f(src.pa), f(src.e_pa), src.beam, src.num_detect,
+                     src.num_null, src.catalog_id, src.match_id,
+                     src.min_deRuiter))  
+
+    conn.commit()
+    cur.close()
+
+
+def updateAssocid(dbname, sources):
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+
+    for src in sources:
+        cur.execute('UPDATE rawSource SET assoc_id = ? WHERE src_id = ?',
+                    (src.assoc_id, src.src_id))
+
+    conn.commit()
+    cur.close()
 
 
 def pybdsf_fail(dbname, img):

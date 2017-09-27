@@ -69,12 +69,18 @@ class Image(object):
         try:
             imsize = float(self.imsize[1:].split(',')[0])
             pixscale = self.pixel_scale / 3600. # degrees
-            radius = Angle(imsize * pixscale * u.deg) / 2.
-            return radius.degree
-        except: # Could be TypeError or AttributeError
-            data, hdr = self.read()
-            radius = Angle(hdr['NAXIS1'] * hdr['CDELT2'] * u.deg) / 2.
-            return radius.degree
+            radius = (imsize * pixscale) / 2.
+        except TypeError:
+            try:
+                data, hdr = self.read()
+                self.header_attrs(hdr)
+                imsize = float(self.imsize[1:].split(',')[0])
+                pixscale = self.pixel_scale / 3600. # degrees
+                radius = (imsize * pixscale) / 2.
+            except TypeError:
+                radius = 5. # defaults to 5 deg if missing header keywords
+        
+        return radius
 
 
     def header_attrs(self, hdr):
@@ -242,12 +248,13 @@ class DetectedSource(object):
         self.resid_rms = None
         self.resid_mean = None
         self.code = None
-        self.catalog_id = None
-        self.match_id = None
-        self.min_deRuiter = None
-        #self.sig = None
-	#self.alpha = None
-	#self.phi = None
+        self.assoc_id = None
+        self.beam = None # AssocSource only
+        self.num_detect = None # AssocSource only
+        self.num_null = None # AssocSource only
+        self.catalog_id = None # AssocSource only
+        self.match_id = None # AssocSource only
+        self.min_deRuiter = None # AssocSource only
 
 
     def cast(self, origsrc):
@@ -287,4 +294,3 @@ class DetectedSource(object):
         self.resid_rms = origsrc.gresid_rms * 1000. # mJy/beam
         self.resid_mean = origsrc.gresid_mean * 1000. # mJy/beam
         self.code = origsrc.code
-        #self.sig = self.peak_flux / self.rms_isl

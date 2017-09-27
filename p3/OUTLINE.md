@@ -5,15 +5,15 @@
 *Note: Italics indicates functionality that has not yet been implemented.*
 
 ##### Pre-requisites:
-- [run configuration file] (https://github.com/erichards/VLITE/blob/develop/p3/example_config.yaml)
+- [run configuration file](../example_config.yaml)
 - SkyCatalogs database -- separate table for each sky survey catalog
-- [VLITE database] (https://docs.google.com/spreadsheets/d/e/2PACX-1vR20qGzJ7U3hFBNYZ1IUJWcFpdlOmfjQKv_8pk6aRW7BuljZ6VGNWyagHnsMVkZ6_Y9-Dl1vEwNv8Bg/pubhtml) -- all observations at all configurations
+- [VLITE database](https://docs.google.com/spreadsheets/d/e/2PACX-1vR20qGzJ7U3hFBNYZ1IUJWcFpdlOmfjQKv_8pk6aRW7BuljZ6VGNWyagHnsMVkZ6_Y9-Dl1vEwNv8Bg/pubhtml "Database Schema") -- all observations at all configurations
 
 #### Stage 0: Pre-Run Checks
 1. Read in run configuration file
 2. Check path to database/create it if it doesn't exist yet
 3. Check if images exist/path is correct
-4. *Check if path to SkyCatalogs database is correct*
+4. Check if path to SkyCatalogs database is correct
 5. Make sure requested cross-match catalogs exist in the SkyCatalogs database
 
 #### Stage 1: Image Cataloging, Organization, & *First Quality Check*

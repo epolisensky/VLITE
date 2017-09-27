@@ -44,18 +44,14 @@ into sky regions to narrow down the search range.
 **Disadvantages:** Time it will take me to fully understand this problem and
 figure out how to implement it.
 
-**Tests:** Maybe it's enough, at least for now, to narrow down the search
-field in the way that is already implemented and then apply the SQL cone search
-function. I need to see how slow this is and then do more research.
+**Tests:** Not sure.
 
 
 # To Do List
 
 - [x] Implement configuration file functionality
-- [ ] Implement cone search in SQL for extracting sources from tables within
-circular region. Or implement alpha function in SQL for extraction from
-square region on the sky. Since an SQL function needs to be defined either way,
-the circular region is preferred.
+- [x] Implement cone search in SQL for extracting sources from tables within
+circular region. 
 - [x] Update database schema
 - [ ] Implement source association
 - [ ] Update catalog cross-matching

@@ -17,17 +17,22 @@ import sqlite3
 import numpy as np
 from astropy.coordinates import Angle
 import astropy.units as u
-import catalogio
-import crossmatch
+from skycatalog import catalogio
+import matchfuncs
 
 
-def dbconnect(dbname):
+def dbconnect(dbname, load_ext=False):
     """Creates an sqlite3 cursor object and specifies
     row_factory so that fetch commands return the rows
     as dictionaries."""
     conn = sqlite3.connect(dbname)
+    if load_ext:
+        conn.enable_load_extension(True)
+        conn.load_extension("./extension-functions.so")
+        conn.enable_load_extension(False)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
+
     return cur, conn
 
 
@@ -55,7 +60,7 @@ def update_database(database, imname, matches, non_matches):
     img_id = cur.fetchone()[0]
 
     for src in matches + non_matches:
-        cur.execute('''UPDATE Source SET catalog_id = ?, match_id = ?,
+        cur.execute('''UPDATE AssocSource SET catalog_id = ?, match_id = ?,
             min_deRuiter = ? WHERE src_id = ? AND image_id = ?''',
                     (src['catalog_id'], src['match_id'], src['min_deRuiter'],
                      src['src_id'], img_id))
@@ -63,92 +68,57 @@ def update_database(database, imname, matches, non_matches):
     cur.close()
 
 
-def search_range(image):
-    """Returns the minimum & maximum RA, Dec of an image (in degrees).
-    Used to limit the number of catalog sources extracted for 
-    cross-matching."""
-    try:
-        # image must be a dictionary
-        imsize = float(image['imsize'][1:].split(',')[0])
-        fov = (image['pixel_scale'] * imsize) / 3600.
-        fov = Angle(((image['pixel_scale'] * imsize) / 3600.) * u.deg)
-    except TypeError:
-        # imsize and/or pixel_scale are None
-        fov = Angle(10. * u.deg) # default to 10 degrees
-    try:      
-        ra_ang = Angle(image['obs_ra'] * u.deg)
-        ramin = (ra_ang - fov).wrap_at(360 * u.deg).degree
-        ramax = (ra_ang + fov).wrap_at(360 * u.deg).degree
-    except TypeError:
-        # obs_ra is None
-        ramin = None
-        ramax = None
-    try:
-        dec_ang = Angle(image['obs_dec'] * u.deg)
-        # ignore +/- 90 deg limit - won't matter
-        decmin = (dec_ang - fov).degree
-        decmax = (dec_ang + fov).degree
-    except TypeError:
-        # obs_dec is None
-        decmin = None
-        decmax = None
-            
-    search_range = (ramin, ramax, decmin, decmax)
-    return search_range
+def cone_search(dbname, tables, center_coords, search_radius,
+                same_res=False, **kwargs):
+    cur, conn = dbconnect(dbname, load_ext=True)
+    cra = center_coords[0]
+    cdec = center_coords[1]
+    r = np.radians(search_radius)
+    d2r = np.pi / 180.
+    print('\nExtracting sources from {} within {} degrees of {:.3f}, '
+          '{:.3f}'.format(tables, int(round(search_radius)), cra, cdec))
+    tabdict = {}
+    if same_res:
+        try:
+            beam = kwargs['beam']
+            res_tol = kwargs['res_tol']
+            bmup = beam + res_tol
+            bmlo = beam - res_tol
+            print('\nLimiting to sources with resolution = {:.1f}+/-{}"'.format(
+                beam, res_tol))
+            for table in tables:
+                query = '''SELECT * FROM %s WHERE beam BETWEEN ? AND ? AND
+                    2 * ASIN(SQRT(SIN(((?-dec)/2)*?) * SIN(((?-dec)/2)*?) 
+                    + COS(?*?) * COS(dec*?) * SIN(((?-ra)/2)*?) 
+                    * SIN(((?-ra)/2)*?))) <= ?''' % table
+                cur.execute(query, (bmlo, bmup, cdec, d2r, cdec, d2r, cdec,
+                                    d2r, d2r, cra, d2r, cra, d2r, r))
+                tabdict[table] = cur.fetchall()
+        except KeyError:
+            print('\nNo beam or resolution tolerance provided.')
+            print('Overriding resolution constraint.')
+            same_res = False
+
+    if not same_res:
+        for table in tables:
+            query = '''SELECT * FROM %s WHERE 
+                2 * ASIN(SQRT(SIN(((?-dec)/2)*?) * SIN(((?-dec)/2)*?) 
+                + COS(?*?) * COS(dec*?) * SIN(((?-ra)/2)*?) 
+                * SIN(((?-ra)/2)*?))) <= ?''' % table
+            cur.execute(query, (cdec, d2r, cdec, d2r, cdec, d2r, d2r, cra, d2r,
+                                cra, d2r, r))
+            tabdict[table] = cur.fetchall()
+
+    cur.close()
+
+    return tabdict
 
 
-def catalog_extract(cursor, catalogs, limits):
-    """Returns a dictionary containing catalogs and their sources
-    which lie in the specified range of RA, Dec."""
-    ramin, ramax, decmin, decmax = limits
-    print('\nExtracting sources from sky survey catalogs with RA between '
-          '{} and {} and Dec between {} and {}.'.format(ramin, ramax,
-                                                        decmin, decmax))
-    catdict = {}
-    for catalog in catalogs:
-        if np.all(limits) is not None: # use both RA & Dec limits
-            if ramin > ramax: # passes through 0
-                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND dec '\
-                        'BETWEEN ? AND ? OR ra BETWEEN ? AND ? AND dec '\
-                        'BETWEEN ? AND ?' % catalog
-                cursor.execute(query, (ramin, 360., decmin, decmax,
-                                       0., ramax, decmin, decmax))
-            else:
-                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND dec '\
-                        'BETWEEN ? AND ?' % catalog
-                cursor.execute(query, (ramin, ramax, decmin, decmax))
-            catdict[catalog] = cursor.fetchall()
-        elif ramin is not None: # use only RA limits
-            if ramin > ramax:
-                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ? AND ra '\
-                        'BETWEEN ? AND ?' % catalog
-                cursor.execute(query, (ramin, 360., 0., ramax))
-            else:
-                query = 'SELECT * FROM %s WHERE ra BETWEEN ? AND ?' % catalog
-                cursor.execute(query, (ramin, ramax))
-            catdict[catalog] = cursor.fetchall()
-        else: # use only Dec limits
-            query = 'SELECT * FROM %s WHERE dec BETWEEN ? AND ?' % catalog
-            cursor.execute(query, (decmin, decmax))
-            catdict[catalog] = cursor.fetchall()
-
-    return catdict
+#def match(image, sources, tabdict):
 
 
-def match(image, sources, catalogs):              
-    """Performs the steps necessary to cross-match a 
-    provided list of sources from the specified image
-    to a given list of catalogs. The list of catalog
-    names specifies which tables of the SkyCatalogs
-    database to look in and in which order. The image
-    is used to define a search range when extracting
-    sources from the SkyCatalog database tables. The
-    sources are cross-matched using the deRuiter
-    radius criterion. A list of matched sources,
-    non-matched sources, and the matched catalog
-    sources is returned."""
+def catalogmatch(image, sources, skycat, catalogs):
     # Connect the sky catalog database
-    skycat = os.path.join(catalogio.catalogdir, 'SkyCatalogs.sqlite')
     catcur, catconn = dbconnect(skycat)
 
     # Extract catalog sources
@@ -164,12 +134,12 @@ def match(image, sources, catalogs):
     cat_matches = []
     for src in sources:
         idx = 0
-        match, catsrc = crossmatch.deRuitermatch(
+        match, catsrc = matchfuncs.deRuitermatch(
             src, catdict[catalogs[idx]], bmaj)
         while match != 1:
             idx += 1
             if idx < len(catalogs):
-                match, catsrc = crossmatch.deRuitermatch(
+                match, catsrc = matchfuncs.deRuitermatch(
                     src, catdict[catalogs[idx]], bmaj)
             else:
                 # Ran out of catalogs to search -- no match found
@@ -190,7 +160,7 @@ def match(image, sources, catalogs):
     return matches, non_matches, cat_matches
 
 
-def main(catalogs=['NVSS'], **kwargs):
+def prep(catalogs=['NVSS'], **kwargs):
     """Prepares all possible inputs for catalog cross-matching.
     Input options are either a database of images and their sources
     (like the one written by database.py) or an ImageTable object
@@ -213,9 +183,8 @@ def main(catalogs=['NVSS'], **kwargs):
             dbname = kwargs['file']
             if not os.path.exists(dbname):
                 print('ERROR: File or path {} does not exist!'.format(dbname))
-                sys.exit(0)
-            else: pass
-            srccur, srcconn = dbconnect(dbname)
+                sys.exit()
+            srccur, srcconn = dbconnect(dbname, load_ext=True)
         except KeyError:
             print('If database is True, a file must be provided.')
         try:
@@ -257,7 +226,3 @@ def main(catalogs=['NVSS'], **kwargs):
                   'DetectedSource objects must be provided.')
 
     return matches, non_matches, cat_matches
-
-
-if __name__ == '__main__':
-         main()

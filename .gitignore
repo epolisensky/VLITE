@@ -8,12 +8,3 @@
 old/
 obsolete/
 testing/
-.ipynb_checkpoints/
-ormdatabase/
-test/
-quality/
-
-# miscellaneous
-test.py
-driver_example.py
-
