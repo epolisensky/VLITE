@@ -1,20 +1,102 @@
+"""This module defines classes and their methods for
+Image, DetectedSource, and AssociatedSource objects.
+These objects correspond to the image, raw_source, and
+assoc_source database tables, respectively. 
+
+"""
 import sys
 import os
 import re
 from astropy.io import fits
-from astropy.coordinates import Angle
-import astropy.units as u
+import pybdsfcat
 
 
 class Image(object):
-    """Creates a database Image object that can be easily 
-    passed to SQL table insertion functions. Object attributes
-    correspond to the Image table column values."""
+    """Creates an Image object that can be easily 
+    passed to SQL table insertion functions. Object 
+    attributes correspond to the database image table 
+    column values.
 
+    Parameters
+    ----------
+    image : str
+        Directory path to the fits image file.
+
+    Attributes
+    ----------
+    id : int
+        Numerical index. Incremented by `PostgreSQL` upon insertion.
+    filename : str
+        Full path name for the image fits file.
+    imsize : str
+        Image size in pixels -- (NAXIS1, NAXIS2).
+    obs_ra : float
+        Right ascension of image pointing center in degrees.
+    obs_dec : float
+        Declination of image pointing center in degrees.
+    pixel_scale : float
+        Spatial conversion from pixel to angular size.
+        Units are arcseconds / pixel.
+    obj : str
+        Name of observed object.
+    obs_date : str
+        Date when observations were taken.
+    map_date : str
+        Date when data was imaged.
+    obs_freq : float
+        Frequency of the observations in MHz (actual
+        frequency of the image).
+    pri_freq : float
+        Frequency of the simultaneously acquired primary
+        band data in GHz (NOT the frequency of the image
+        on hand).
+    bmaj : float
+        Size of the beam semi-major axis in arcseconds.
+    bmin : float
+        Size of the beam semi-minor axis in arcseconds.
+    bpa : float
+        Beam position angle in degrees.
+    noise : float
+        Estimate of the image noise in mJy/beam.
+    peak : float
+        Peak brightness in the image in mJy/beam.
+    config : str
+        Very Large Array configuration.
+    nvis : int
+        Number of visibilities in the data before imaging.
+    mjdtime : float
+        Modified Julian Date (days since 0h Nov 17, 1858).
+    tau_time : float
+        Integration time on source in seconds.
+    duration : float
+        Total time spanned by the observations in seconds.
+    nsrc : int
+        Number of sources extracted during source finding.
+    rms_box : str
+        `PyBDSF` parameter used during source finding.
+        From `PyBDSF` docs: "The first integer, boxsize, is the 
+        size of the 2-D sliding box [in pixels] for calculating 
+        the rms and mean over the entire image. The second, stepsize, 
+        is the number of pixels by which this box is moved for the next 
+        measurement."
+    error_id : int
+        Numerical code assigned when an image fails a quality
+        check. Each number has a corresponding explanation in
+        the database error table.
+    stage : int
+        Highest processing stage completed. 1 = Image object initialized,
+        2 = source finding, 3 = source association, 4 = catalog matching.
+    """
     # A class variable to count the number of images
     num_images = 0
     
     def __init__(self, image):
+        pri = re.findall('\/([0-9.]+[A-Z])', image)
+        if pri[0][-1:] == 'M':
+            pri_freq = float(pri[0][:-1]) / 1000. # GHz
+        else:
+            pri_freq = float(pri[0][:-1]) # GHz
+        self.id = None
         self.filename = image
         self.imsize = None
         self.obs_ra = None
@@ -23,7 +105,8 @@ class Image(object):
         self.obj = None
         self.obs_date = None
         self.map_date = None
-        self.freq = None
+        self.obs_freq = None
+        self.pri_freq = pri_freq
         self.bmaj = None
         self.bmin = None
         self.bpa = None
@@ -37,6 +120,7 @@ class Image(object):
         self.nsrc = None
         self.rms_box = None
         self.error_id = None
+        self.stage = 1
 
         # Increase the image count by one
         Image.num_images += 1
@@ -66,6 +150,7 @@ class Image(object):
 
 
     def search_radius(self):
+        """Calculates (half) the image size."""
         try:
             imsize = float(self.imsize[1:].split(',')[0])
             pixscale = self.pixel_scale / 3600. # degrees
@@ -84,11 +169,13 @@ class Image(object):
 
 
     def header_attrs(self, hdr):
-        """This method does all the heavy lifting of extracting and
-        assigning the desired object attributes (table column values)
-        from the fits image header and assigns 'None' if the keyword
-        is missing in the header."""
-        
+        """This method does all the heavy lifting of 
+        extracting and assigning the object attributes 
+        (and table column values) from the fits image 
+        header and assigns ``None`` if the keyword
+        is missing in the header.
+
+        """
         try:
             naxis1 = hdr['NAXIS1']
             naxis2 = hdr['NAXIS2']
@@ -123,15 +210,15 @@ class Image(object):
         except KeyError:
             self.map_date = None
         try:
-            self.freq = hdr['RESTFREQ'] / 10**6. # MHz
+            self.obs_freq = hdr['RESTFREQ'] / 10**6. # MHz
         except KeyError:
             try:
                 if hdr['CTYPE3'] == 'FREQ':
-                    self.freq = hdr['CRVAL3'] / 10**6. # MHz
+                    self.obs_freq = hdr['CRVAL3'] / 10**6. # MHz
                 else:
-                    self.freq = hdr['CRVAL4'] / 10**6. # MHz
+                    self.obs_freq = hdr['CRVAL4'] / 10**6. # MHz
             except KeyError:
-                self.freq = None
+                self.obs_freq = None
         try:
             self.bmaj = hdr['BMAJ'] * 3600. # arcsec
             self.bmin = hdr['BMIN'] * 3600. # arcsec
@@ -193,6 +280,33 @@ class Image(object):
 
 
     def log_attrs(self, pybdsfdir):
+        """Image class method to assign values to object 
+        attributes which come from source finding using info 
+        in the `PyBDSF` output log file. This is useful when 
+        source finding has already been run on an image and the 
+        results are being recorded after the fact using the 
+        `PyBDSF` output files.
+
+        Parameters
+        ----------
+        pybdsfdir : str
+            Directory path to the `PyBDSF` output files.
+
+        Returns
+        -------
+        rms_box : str
+            `PyBDSF` parameter used during source finding.
+            From `PyBDSF` docs: "The first integer, boxsize, is the 
+            size of the 2-D sliding box [in pixels] for calculating 
+            the rms and mean over the entire image. The second, stepsize, 
+            is the number of pixels by which this box is moved for the next 
+            measurement."
+        gresid_std : float
+            Standard deviation of the background in the residual 
+            image after removing gaussian fitted sources.
+        raw_rms : float
+            Estimated noise in the image before source extraction.
+        """
         prefix = re.findall('.*\/(.*)', img.filename)[0]
         logname = prefix + '.pybdsf.log'
         log = os.path.join(pybdsfdir, logname)
@@ -208,11 +322,18 @@ class Image(object):
 
 
 class DetectedSource(object):
-    """This is basically just a convenience class created
-    to allow consistent naming and access of properties of
-    sources detected by PyBDSF across all data input types 
-    (i.e. inside from a bdsf.process_image output object or 
-    outside from a database table or text file)."""
+    """Class of objects to store properties of sources extracted
+    from an image by `PyBDSF`. Attributes are translated from
+    attributes of the class of objects output by `PyBDSF`.
+
+    References
+    ----------
+    Refer to the `PyBDSF` documentation ([1]_) for definitions 
+    of their output columns, which are essentially the same as 
+    the attributes.
+
+    .. [1] http://www.astron.nl/citt/pybdsm/write_catalog.html#definition-of-output-columns
+    """
     def __init__(self):
         self.src_id = None
         self.isl_id= None
@@ -249,18 +370,14 @@ class DetectedSource(object):
         self.resid_mean = None
         self.code = None
         self.assoc_id = None
-        self.beam = None # AssocSource only
-        self.num_detect = None # AssocSource only
-        self.num_null = None # AssocSource only
-        self.catalog_id = None # AssocSource only
-        self.match_id = None # AssocSource only
-        self.min_deRuiter = None # AssocSource only
 
 
     def cast(self, origsrc):
-        """Attributes of a bdsf.gaul2srl.Source object
-        output from bdsf.process_image are 'cast' to define
-        attributes of a DetectedSource object."""
+        """Attributes of a `bdsf.gaul2srl.Source` object
+        output from `bdsf.process_image` are cast to define
+        attributes of a DetectedSource object.
+
+        """
         self.src_id = origsrc.source_id
         self.isl_id= origsrc.island_id
         self.ra = origsrc.posn_sky_centroid[0] # deg
@@ -294,3 +411,122 @@ class DetectedSource(object):
         self.resid_rms = origsrc.gresid_rms * 1000. # mJy/beam
         self.resid_mean = origsrc.gresid_mean * 1000. # mJy/beam
         self.code = origsrc.code
+
+
+class AssociatedSource(DetectedSource):
+    """Class of objects to store properties specific to
+    source association. Inherits from the DetectedSource
+    class.
+
+    Attributes
+    ----------
+    beam : float
+        Size of the beam semi-major axis in arcseconds.
+    ndetect : int
+        Number of times the source has been detected in images.
+    nopp : int
+        Number of opportunities for the soure to be detected.
+        For a source to be considered a missed opportunity, or a 
+        source that could have been detected in an image but wasn't, 
+        it must be in the image's field-of-view and have an average
+        peak intensity 5 sigma above the image's average noise.
+    catalog_id : int
+        Identifies from which sky survey a catalog match originates.
+    match_id : int
+        Identifies the matched sky survey source.
+    min_deRuiter : float
+        Value of the minimum deRuiter radius calculated during
+        catalog matching.
+    """    
+    def __init__(self):
+        super(AssociatedSource, self).__init__()
+        self.beam = None
+        self.ndetect = None
+        self.nopp = None
+        self.catalog_id = None
+        self.match_id = None
+        self.min_deRuiter = None
+        
+
+def dict2attr(obj, dictionary):
+    """Sets dictionary key, value pairs to object attributes."""
+    for key in dictionary.keys():
+        setattr(obj, key, dictionary[key])
+
+
+def bdsfcat_translate(img, pybdsfdir):
+    """Creates a list of 'DetectedSource' objects
+    from reading in a source list text file output
+    by `PyBDSF`."""
+    # Set the file path
+    prefix = re.findall('.*\/(.*)\.', img.filename)[0]
+    srl = prefix + '.pybdsm.srl'
+    catalog = os.path.join(pybdsfdir, srl)
+    # Read the catalog
+    print('\nExtracting sources from {}'.format(srl))
+    sources = pybdsfcat.read_catalog(catalog)
+
+    # Count the number of sources
+    img.nsrc = len(sources)
+
+    # Extract rms_box size and noise from log file
+    img.rms_box, img.noise, raw_rms = img.log_attrs(pybdsfdir)
+
+    return img, sources
+
+
+def pipe_translate(img, out):
+    """Method to translate `PyBDSF` output within the
+    pipeline to `DetectedSource` objects and update 
+    the `Image` object.
+
+    Parameters
+    ----------
+    img : database.dbclasses.Image instance
+        Initialized `Image` object with attribute values
+        set from header info.
+    out : bdsf.image.Image instance
+        The object output by `PyBDSF` after running its
+        source finding task `process_image()`. Contains
+        a list of `bdsf.gaul2srl.Source` objects which
+        are translated into `DetectedSource` objects.
+
+    Returns
+    -------
+    img : database.dbclasses.Image instance
+        Initialized `Image` object with attribute values
+        set from header info & updated with source finding results.
+    newsrcs : list
+        List of `database.dbclasses.DetectedSource` objects.
+        Attributes of each object are set from the `PyBDSF`
+        output object.    
+    """
+    # Update image stage
+    img.stage = 2
+    # Add PyBDSF defined attributes
+    img.nsrc = out.nsrc
+    img.rms_box = str(out.rms_box)
+    # Try updating any missing attributes from header info
+    # using PyBDSF's output object
+    if img.imsize is None:
+        img.imsize = str(out._original_shape) # pixels
+    if img.obs_freq is None:
+        img.obs_freq = out.frequency / 10**6. # MHz
+    if img.bmaj is None:
+        img.bmaj = out.beam[0] * 3600. # arcsec
+    if img.bmin is None:
+        img.bmin = out.beam[1] * 3600. # arcsec
+    if img.bpa is None:
+        img.bpa = out.beam[2] # deg
+    if img.noise is None:
+        img.noise = np.std(out.resid_gaus_arr) * 1000. # mJy/beam
+
+    # Translate PyBDSF output source objects to our own
+    # DetectedSource objects
+    newsrcs = []
+    for oldsrc in out.sources:
+        newsrcs.append(DetectedSource())
+        newsrcs[-1].cast(oldsrc)
+        newsrcs[-1].image_id = img.id
+
+    return img, newsrcs

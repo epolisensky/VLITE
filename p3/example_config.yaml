@@ -1,22 +1,28 @@
 # p3 configuration file
 
-stages: # optional processing steps; yes | no  or  True | False
-  save_to_database: yes       # add image(s) and sources to database?
-        # if yes, provide database name/path
-  quality_checks: no          # run image quality checks?
-  source_finding: yes         # if yes, provide pybdsf_params
-  source_association: yes     # if yes, provide database name/path
-  catalog_matching: no        # cross-match with sky survey catalogs?
+stages:
+                              # processing steps; yes | no  or  True | False
+  source finding: yes         # if yes, provide pybdsf_params
+  source association: no      # if yes, provide database name/path below
+  catalog matching: no        # cross-match with sky survey catalogs?
         # if yes, provide sky catalog database name and list of catalogs to use
 
+options:
+                              # processing options; yes | no or True | False
+  save to database: yes       # save results to database?
+  quality checks: no          # run image & source count quality checks?
+  overwrite: no               # overwrite database if exists?
+  reprocess: no               # redo selected stages even if done previously?
+  redo match: no              # redo catalog matching for all sources?
+        # applies only to sources in AssocSource DB table
+
 setup:
-  rootdir: /data3/erichards/codes/p3/test/
+  rootdir: /home/erichards/work/p3/test/
   year: 2017
   month: 08
   day: ['30']                 # list of days to process; [] = all
-  dbname: /data3/erichards/codes/p3/test/test.sqlite
-  overwrite: no               # overwrite database if exists?
-  reprocess: yes              # redo source finding on image if done before?
+  dbname: test
+  dbuser: postgres
   catdb: SkyCatalogs.sqlite   # sky catalog database name
   catalogs: ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS']  # list of sky catalogs
 
@@ -24,10 +30,9 @@ pybdsf_params:
   mode: default               # default | minimize_islands
   # Specify all PyBDSF parameters here
   thresh: hard
-  #trim_box: !!python/tuple [400, 1300, 400, 1300]  # need to force tuple
+  trim_box: !!python/tuple [400, 1300, 400, 1300]  # need to force tuple
   #rms_box: !!python/tuple [30, 10]
 
 matching:
-  res_tol: 1.0                # (in arcsec) allowed difference in beam sizes
-         # for images to be considered as having similar spatial resolutions
-  catalog_match: new          # new | all sources in AssocSource table
+  resolution tolerance: 5.0   # (in arcsec) allowed difference in beam sizes
+        # for images to be considered as having similar spatial resolutions

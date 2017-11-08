@@ -1,26 +1,22 @@
-"""runPyBDSF.py contains all the functionality to run a fits image
-through the LOFAR source finding software PyBDSF 
+"""This module contains all the functionality to run a fits image
+through the LOFAR source finding software `PyBDSF` 
 (https://github.com/lofar-astron/PyBDSF). The class
-BDSFImage creates an object whose attributes can be any number
-of PyBDSF parameters and are specified through keyword arguments 
-at initialization. Source finding is performed by calling the
-object method find_sources(), which calls the PyBDSF function
-process_image() and returns the output object. See sourcedb.py 
-to see how to access results of the source finding as attributes 
-of the bdsf output object.
+BDSFImage() creates an object whose attributes can be any number
+of `PyBDSF` parameter. Source finding is performed by calling the
+object method find_sources(), which calls the `PyBDSF` function
+process_image() and returns the output object. 
 
-Post-Processing Pipeline (P3) Stage 1"""
-
-
+"""
 from astropy.io import fits
 import numpy as np
 import warnings
+from datetime import datetime
 import bdsf
 from database.dbclasses import Image
 
 
 def write_sources(out):
-    """Calls PyBDSF functions write_catalog() & export_image()
+    """Calls `PyBDSF` functions write_catalog() & export_image()
     to record results from source finding on a single image."""
     # Write the source list catalog, ascii and ds9 regions file
     out.write_catalog(format='ds9', catalog_type='srl', clobber=True)
@@ -37,13 +33,13 @@ class BDSFImage(Image):
     Inherits all methods defined for Image class, but
     overrides initialization."""
  
-    def __init__(self, image, box_incr=10, max_iter=10, **kwargs):
+    def __init__(self, image, **kwargs):
         """Initializes the Image subclass object. PyBDSF will 
         use any arguments it recognizes and ignore the rest."""
         self.filename = image
-        self.box_incr = box_incr # used in minimize_islands
-        self.max_iter = max_iter # used in minimize_islands
         self.quiet = True
+        self.box_incr = 10
+        self.max_iter = 10
         for key, value in kwargs.items():
             setattr(self, key, value)
         
@@ -75,11 +71,14 @@ class BDSFImage(Image):
     def find_sources(self):
         """Run PyBDSF process_image() task using object attributes
         as parameter inputs. Returns None if PyBDSF fails."""
+        start = datetime.now()
         opts = self.get_attr()
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', r'invalid value')
             try:
                 out = bdsf.process_image(opts)
+                print('\nFound {} sources in {:.2f} seconds\n'.format(
+                    out.nsrc, (datetime.now() - start).total_seconds()))
                 return out
             except:
                 return None  
