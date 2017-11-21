@@ -2,7 +2,6 @@
 *.pyc
 *.txt
 *.sh
-*.ipynb
 
 # ignore certain directories
 old/
