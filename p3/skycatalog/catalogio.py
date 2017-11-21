@@ -1,32 +1,63 @@
-"""catalogio.py contains all the messy I/O functionality
-for reading in all the different sky survey catalogs.
-Each catalog source is initialized as a catalog_source
-object, which is later used for insertion into database 
-tables (see cat_to_db.py)."""
+"""This module contains all the messy I/O functionality
+for reading in the different sky survey catalogs.
+Each catalog source is initialized as a CatalogSource
+object to create a uniform set of properties for each
+sky survey's sources. When reading the catalogs for the
+first time, sources with the uniform set of attributes
+are written to text files called '[catalog_name]_psql.txt'
+which is used to insert the sources into the `PostgreSQL`
+database in an efficient way. 
 
-
-import sys
+"""
 import os
+import pandas as pd
 
 
-catalogdir = '/data3/erichards/data/SkyCatalogs'
+catalogdir = '/home/erichards/work/data/SkyCatalogs'
+
+# If adding a new catalog, don't forget to add it to this list!
+catalog_list = sorted(['tgss', 'nvss', 'first', 'sumss', 'wenss', 'gleam'])
+
+catid_dict = {}
+id = 1
+for catalog in catalog_list:
+    catid_dict[catalog] = id
+    id += 1
 
 
 def dms2deg(d, m, s):
     """Translates coordinates from deg:min:sec to decimal degrees.
-    Multiply by 15. for RA."""
-    dec = abs(float(d)) + abs(float(m))/60.0 + abs(float(s))/3600.0
+    If computing RA, the result needs to be multiplied by 15.
+
+    """
+    dec = abs(float(d)) + abs(float(m))/60. + abs(float(s))/3600.
     d = str(d)
     if d.__contains__("-"):
         dec = -dec
     return dec
 
 
-class catalog_source(object):
-    """Initializes all sources read in from a sky catalog with
-    the same attributes. Default is 'None' if the 
-    catalog does not provide a particular attribute."""
+def set_error(catalog, attrs):
+    """Sets missing values for specified attributes to
+    the median value of the distribution.
+
+    """
+    for attr in attrs:
+        s = pd.Series([getattr(src, attr) for src in catalog])
+        s.loc[s.notnull() == False] = s.median()
+        for idx in range(len(catalog)):
+            setattr(catalog[idx], attr, s[idx])
+    return catalog
+
+
+class CatalogSource(object):
+    """Class for the sky survey sources. Their
+    catalog origin is identified by the catalog_id
+    attribute.
+    
+    """
     def __init__(self):
+        self.id = None
         self.name = None
         self.ra = None # deg
         self.e_ra = None # deg
@@ -47,20 +78,36 @@ class catalog_source(object):
         self.catalog_id = None
 
 
-def readTGSS():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_tgss(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the TGSS survey catalog and writes them into a file in the 
+    same directory called tgss_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: GMRT 150 MHz
-    Resolution: 25'' """
+    Spatial resolution: 25'' 
+
+    """
+    psqlf = os.path.join(catalogdir, 'tgss_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     fname = os.path.join(catalogdir, 'TGSSADR1_7sigma_catalog.tsv')
     f = open(fname, 'r')
     b = f.readlines()
     f.close()    
     n = len(b)
+    cnt = 1
     sources = []
     for i in range(1, n):
-        sources.append(catalog_source())
+        sources.append(CatalogSource())
         d = b[i].split() # Data Line
+        sources[-1].id = cnt
+        cnt += 1
         sources[-1].name = d[0]+'_'+d[1]
         sources[-1].ra = float(d[2]) # deg
         sources[-1].e_ra = float(d[3])/3600.0 # deg
@@ -79,15 +126,38 @@ def readTGSS():
         sources[-1].rms = float(d[16]) # mJy/beam
         sources[-1].Code = d[17]
         sources[-1].field = d[18]
-    print 'read %d TGSS sources' % len(sources)
+        sources[-1].catalog_id = catid_dict['tgss']
+    print 'Read %d TGSS sources' % len(sources)
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%i %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources
 
 
-def readFIRST():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_first(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the FIRST survey catalog and writes them into a file in the 
+    same directory called first_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: VLA 1.4 GHz
-    Resolution: 5'' """
+    Spatial resolution: 5'' 
+
+    """
+    psqlf = os.path.join(catalogdir, 'first_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     sources = []
     fname = os.path.join(catalogdir, 'FIRST_catalog_14dec17.txt')
     fread = open(fname, 'r')
@@ -98,7 +168,8 @@ def readFIRST():
         if line[0] != '#':
             line = line.split()
             if float(line[6]) < (0.15):
-                sources.append(catalog_source())
+                sources.append(CatalogSource())
+                sources[-1].id = cnt
                 sources[-1].name = 'FIRST_'+str(cnt)
                 cnt += 1
                 sources[-1].ra = float(15*dms2deg(line[0],
@@ -126,16 +197,39 @@ def readFIRST():
                 # fpa = float(line[15]) # deg
                 sources[-1].e_ra = dfMin # deg
                 sources[-1].e_dec = dfMaj # deg
+                sources[-1].catalog_id = catid_dict['first']
     fread.close()
-    print 'read %d FIRST sources' % len(sources)
+    print 'Read %d FIRST sources' % len(sources)
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%i %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources
 
 
-def readSUMSS():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_sumss(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the SUMSS survey catalog and writes them into a file in the 
+    same directory called sumss_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: MOST 843 MHz
-    Resolution: 45'' """
+    Spatial resolution: 45'' 
+
+    """
+    psqlf = os.path.join(catalogdir, 'sumss_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     sources = []
     fname = os.path.join(catalogdir, 'SUMSS.txt')
     fread = open(fname, 'r')
@@ -144,7 +238,8 @@ def readSUMSS():
         line = fread.readline()
         if not line: break
         if line[0] != ';':
-            sources.append(catalog_source())
+            sources.append(CatalogSource())
+            sources[-1].id = cnt
             sources[-1].name = 'SUMSS_'+str(cnt)
             cnt += 1
             line = line.split()
@@ -161,16 +256,39 @@ def readSUMSS():
             sources[-1].maj = float(line[12]) # arcsec
             sources[-1].min = float(line[13]) # arcsec
             sources[-1].pa = float(line[14])
+            sources[-1].catalog_id = catid_dict['sumss']
     fread.close()
-    print 'read %d SUMSS sources' % len(sources)
+    print 'Read %d SUMSS sources' % len(sources)
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%i %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources
 
 
-def readWENSS():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_wenss(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the WENSS survey catalog and writes them into a file in the 
+    same directory called wenss_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: WSRT 325 MHz
-    Resolution: 54'' """    
+    Spatial resolution: 54'' 
+    
+    """
+    psqlf = os.path.join(catalogdir, 'wenss_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     sources = []
     fname = os.path.join(catalogdir, 'WENS.COMPLETE.txt')
     fread = open(fname, 'r')
@@ -179,8 +297,9 @@ def readWENSS():
         line = fread.readline()
         if not line: break
         if line[0] != ';':
-            sources.append(catalog_source())
+            sources.append(CatalogSource())
             line = line.split()
+            sources[-1].id = cnt
             sources[-1].name = 'WENSS_'+str(cnt)
             cnt += 1
             sources[-1].ra = float(line[0]) # deg
@@ -195,16 +314,39 @@ def readWENSS():
             sources[-1].maj = float(line[9]) # arcsec
             sources[-1].min = float(line[10]) # arcsec
             sources[-1].pa = float(line[11])
-    print 'read %d WENSS sources' % len(sources)
+            sources[-1].catalog_id = catid_dict['wenss']
     fread.close()
+    print 'Read %d WENSS sources' % len(sources)
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%i %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources
 
 
-def readNVSS():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_nvss(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the NVSS survey catalog and writes them into a file in the 
+    same directory called nvss_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: VLA 1.4 GHz
-    Resolution: 45'' """    
+    Spatial resolution: 45'' 
+
+    """
+    psqlf = os.path.join(catalogdir, 'nvss_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     sources = []
     fname = os.path.join(catalogdir, 'NVSSCatalog.text')
     fread = open(fname, 'r')
@@ -216,7 +358,8 @@ def readNVSS():
         beginning = line[0:1]
         later = line[7:8]
         if beginning.isdigit() == True:
-            sources.append(catalog_source())
+            sources.append(CatalogSource())
+            sources[-1].id = cnt
             sources[-1].name = 'NVSS_'+str(cnt)
             cnt += 1
             if line[6] == ' ': # ra
@@ -267,17 +410,40 @@ def readNVSS():
             else:
                 sources[-1].e_dec = float(dms2deg(0,0,line[19:23]))
             sources[-1].e_total_flux = float(line[27:30]) # error flux (mJy)
-
-    print 'read %d sources from NVSS' % len(sources)
+            sources[-1].catalog_id = catid_dict['nvss']
     fread.close()
+    print 'Read %d NVSS sources' % len(sources)
+    sources = set_error(sources, ['e_ra', 'e_dec'])
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %s\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources
 
 
-def readGLEAM():
-    """Generates a list of catalog_source objects to be
-    input into a SkyCatalogs database table.
+def read_gleam(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the GLEAM survey catalog and writes them into a file in the 
+    same directory called gleam_psql.txt if the file does
+    not already exist.
+
     Telescope/frequency: MWA 74-231 MHz
-    Resolution: ~100'' """    
+    Spatial resolution: ~100'' 
+
+    """
+    psqlf = os.path.join(catalogdir, 'gleam_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
     fname = os.path.join(catalogdir, 'gleamegc.dat')
     f = open(fname, 'r')
     b = f.readlines()
@@ -285,10 +451,13 @@ def readGLEAM():
     n = len(b)
     #print 'reading %s' % fname
     #print ' read %d lines' % n
+    cnt = 1
     sources = []
     for i in range(0, n):
-        sources.append(catalog_source())
+        sources.append(CatalogSource())
         d = b[i].split() # Data Line
+        sources[-1].id = cnt
+        cnt += 1
         sources[-1].name = d[0]+'_'+d[1]
         sources[-1].ra = float(d[10]) # deg
         if d[11].replace('.','',1).isdigit():
@@ -307,5 +476,16 @@ def readGLEAM():
         sources[-1].pa = float(d[22]) # deg
         sources[-1].e_pa = float(d[23]) # deg
         # sources[-1].rms = float(d[16]) # mJy/beam
-    print 'read %d GLEAM sources' % len(sources)
+        sources[-1].catalog_id = catid_dict['gleam']
+    print 'Read %d GLEAM sources' % len(sources)
+    sources = set_error(sources, ['e_ra', 'e_dec'])
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%i %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
     return sources

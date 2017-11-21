@@ -1,6 +1,6 @@
 """This is the main script for the VLITE Post-Processing 
 Pipeline (P3). It is responsible for reading in the
-configuration file, connecting to the the PostgreSQL database,
+configuration file, connecting to the the `PostgreSQL` database,
 and calling the appropriate processing stages in the correct order.
 
 """
@@ -10,10 +10,10 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
 from errors import ConfigError
-from database import createdb, dbclasses, filldb
-from sourcefinding import runPyBDSF
-from matching import radioXmatch
-from skycatalog import catalogio
+from database import createdb, dbclasses, dbio
+from sourcefinding import runbdsf
+from matching import radioxmatch
+from skycatalog import catalogio, skycatdb
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -21,26 +21,20 @@ except ImportError:
     from yaml import Loader
 
 
-def print_run_stats(start_time, outdir):
+def print_run_stats(start_time):
     """Prints general information about the just completed run 
     of the Post-Processing Pipeline, including the number of
-    images initialized, the number of `PyBDSF` catalogs created,
-    and the total runtime.
+    images initialized and the total runtime.
     
     Parameters
     ----------
     start_time : datetime.datetime instance
         Time when the run was started.
-    outdir : str
-        Path to directory where `PyBDSF` output is written.
     """
     print('\n======================================\n')
     print('Run statistics:')
     # Count the number of images processed
     dbclasses.Image.image_count()
-    # Count the number of catalogs written
-    catnum = len([f for f in os.listdir(outdir) if f[-4:] == '.srl'])
-    print ('\nWrote {} catalogs.'.format(catnum))
     # Print the runtime
     print('\nTotal runtime: {}\n'.format(datetime.now() - start_time))
 
@@ -71,11 +65,9 @@ def cfgparse(cfgfile):
         Name of the `PostgreSQL` database.
     dbusr : str
         Username for the `PostgreSQL` database connection.
-    skycat : str
-        Name of the `PostgreSQL` database containing the sky 
-        survey catalogs.
     catalogs : list of str
         List of sky survey tables to use when running catalog matching.
+        They are cross-matched in the order they are listed.
     params : dict
         Specifies any non-default `PyBDSF` parameters to be used in source
         finding. 
@@ -100,7 +92,6 @@ def cfgparse(cfgfile):
         days = (data['setup'])['day']
         dbname = (data['setup'])['dbname']
         dbusr = (data['setup'])['dbuser']
-        catdb = (data['setup'])['catdb']
         catalogs = (data['setup'])['catalogs']
         params = data['pybdsf_params']
         res_tol = (data['matching'])['resolution tolerance']
@@ -161,33 +152,23 @@ def cfgparse(cfgfile):
     if dbname is None or dbusr is None:
         raise ConfigError('Please provide a database/user name.')
 
-    # SkyCatalog checks
-    try:
-        # Create path to sky catalogs database
-        skycat = os.path.join(catalogio.catalogdir, catdb)
-    except AttributeError:
-        skycat = None
-
     if cm:
-        if skycat is None or not os.path.isfile(skycat):
-            raise ConfigError('Sky catalogs database does not exist: {}'.format(
-            skycat))
-
         # Make sure requested catalogs exist
-        catalog_opts = ['FIRST', 'GLEAM', 'NVSS', 'SUMSS', 'TGSS', 'WENSS']
+        catalog_opts = catalogio.catalog_list
         try:
             if len(catalogs) < 1:
                 catalogs = None
             for cat in catalogs:
                 if type(cat) != 'string':
                     cat = str(cat)
+                cat = cat.lower()
                 if cat not in catalog_opts:
                     print('\nCurrently available catalogs: {}\n'.format(
                         catalog_opts))
                     raise ConfigError('Catalog {} is not a valid option'.format(
                         cat))
         except TypeError:
-            raise ConfigError('Please provide valid sky catalog(s).')
+            raise ConfigError('Please provide a list of valid sky catalogs.')
 
     # Check res_tol input if running source association or catalog matching
     if sa or cm:
@@ -200,7 +181,7 @@ def cfgparse(cfgfile):
         except TypeError: # None -- will assign default value later
             pass
       
-    return stages, opts, dirs, dbname, dbusr, skycat, catalogs, params, res_tol
+    return stages, opts, dirs, dbname, dbusr, catalogs, params, res_tol
 
 
 def dbinit(dbname, user, overwrite, safe_override=False):
@@ -235,18 +216,27 @@ def dbinit(dbname, user, overwrite, safe_override=False):
     try:
         # DB exists
         conn = psycopg2.connect(host='localhost', database=dbname, user=user)
+        print('\nConnected to database {}.'.format(dbname))
+        # Check for sky catalogs by verifying schema exists
+        cur = conn.cursor()
+        cur.execute('''SELECT EXISTS(SELECT 1 FROM pg_namespace 
+            WHERE nspname = 'skycat');''')
+        if not cur.fetchone()[0]:
+            cur.close()
+            print('\nNo sky catalogs found in database. '
+                  'Creating them now...')
+            skycatdb.create(conn)
+        else:
+            cur.close()
         if not overwrite:
-            print('\nUsing existing database {}'.format(dbname))
+            print('\nUsing existing database {}.'.format(dbname))
         else:
             print('\nOverwriting existing database tables.')
-            cur = conn.cursor()
             if safe_override:
-                createdb.create(cur, safe=True)
+                createdb.create(conn, safe=True)
             else:
                 # This will prompt warning in create func
-                createdb.create(cur, safe=False)
-            conn.commit()
-            cur.close()
+                createdb.create(conn, safe=False)
     except psycopg2.OperationalError:
         # DB does not yet exist
         makenew = raw_input('\nCreate new database {}? '.format(dbname))
@@ -260,10 +250,8 @@ def dbinit(dbname, user, overwrite, safe_override=False):
             conn.close()
             conn = psycopg2.connect(host='localhost', database=dbname,
                                     user=user)
-            cur = conn.cursor()
-            createdb.create(cur, safe=True)
-            conn.commit()
-            cur.close()
+            print('\nConnected to new database {}.'.format(dbname))
+            createdb.create(conn, safe=True)
         else:
             print('\nNo new database created.\n')
             raise ConfigError('Cannot access database {}'.format(dbname))
@@ -309,17 +297,17 @@ def iminit(conn, impath, save, qa, reproc, stages):
     # STAGE 1 -- Initialize image object, add to table, 1st quality check
 
     # Is the image in the database?
-    status = filldb.statusCheck(conn, impath)
+    status = dbio.status_check(conn, impath)
 
     # Only adding image to DB - add or update w/o deleting sources
     if not any(stages):
         if status is None:
             # image not in DB
-            imobj = filldb.addImage(conn, impath, status)
+            imobj = dbio.add_image(conn, impath, status)
         else:
             if reproc:
                 # already processed, but re-doing -- sources NOT deleted
-                imobj = filldb.addImage(conn, impath, status)
+                imobj = dbio.add_image(conn, impath, status)
             else:
                 # already processed & not re-doing
                 print('\nImage {} already in database. Moving on...'.format(
@@ -330,10 +318,10 @@ def iminit(conn, impath, save, qa, reproc, stages):
             if stages[0]:
                 if save:
                     # image not in DB; planning to source find & write to DB
-                    imobj = filldb.addImage(conn, impath, status)
+                    imobj = dbio.add_image(conn, impath, status)
                 else:
                     # just initialize if not writing to DB
-                    imobj = filldb.initImage(impath)
+                    imobj = dbio.init_image(impath)
             else:
                 # image not in DB, but not running source finding --> quit
                 print('\nERROR: Image {} not yet processed. Source finding '
@@ -344,11 +332,11 @@ def iminit(conn, impath, save, qa, reproc, stages):
                 if reproc:
                     if save:
                         # image in DB; re-doing SF, so old sources are removed
-                        imobj = filldb.addImage(conn, impath,
+                        imobj = dbio.add_image(conn, impath,
                                                 status, delete=True)
                     else:
                         # just initialize if not writing to DB
-                        imobj = filldb.initImage(impath)
+                        imobj = dbio.init_image(impath)
                 else:
                     # image already in DB & not re-processing
                     print('\nImage {} already processed. Moving on...'.format(
@@ -357,7 +345,7 @@ def iminit(conn, impath, save, qa, reproc, stages):
             else:
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
-                    imobj = filldb.initImage(impath)
+                    imobj = dbio.init_image(impath)
                 else:
                     print('\nERROR: Image {} does not have sources extracted '
                           'yet. Source finding must be run before other '
@@ -376,15 +364,15 @@ def iminit(conn, impath, save, qa, reproc, stages):
 
 def srcfind(conn, imobj, params, save, qa):
     """Runs `PyBDSF` source finding, writes out results,
-    and inserts sources into database raw_source and
-    raw_island tables, if the save to database option is on.
+    and inserts sources into database detected_source and
+    detected_island tables, if the save to database option is on.
     This function represents the second stage of the
     Post-Processing Pipeline.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
-        The `PostgreSQL database connection object.
+        The `PostgreSQL` database connection object.
     imobj : database.dbclasses.Image instance
         Initialized `Image` object with attribute values
         set from header info.
@@ -393,7 +381,7 @@ def srcfind(conn, imobj, params, save, qa):
         used in source finding.
     save : bool
         If ``True``, the extracted sources are written and saved
-        to the database raw_island and raw_source tables. The
+        to the database detected_island and detected_source tables. The
         `PyBDSF` files are always written out.
     qa : bool
         Turns on and off quality assurance. If ``True``, quality
@@ -412,7 +400,7 @@ def srcfind(conn, imobj, params, save, qa):
     # STAGE 2 -- Source finding + 2nd quality check
     print('\nExtracting sources from {}'.format(imobj.filename))
     # Initialize source finding image object
-    bdsfim = runPyBDSF.BDSFImage(imobj.filename, **params)
+    bdsfim = runbdsf.BDSFImage(imobj.filename, **params)
     # Run PyBDSF source finding
     if params['mode'] == 'minimize_islands':
         out = bdsfim.minimize_islands()
@@ -421,10 +409,10 @@ def srcfind(conn, imobj, params, save, qa):
 
     if out is not None:
         # Write PyBDSF(M) files to daily directory
-        runPyBDSF.write_sources(out)
-        imobj, sources = dbclasses.pipe_translate(imobj, out)
+        runbdsf.write_sources(out)
+        imobj, sources = dbclasses.translate(imobj, out)
         if save:
-            filldb.addSources(conn, imobj, sources)
+            dbio.add_sources(conn, imobj, sources)
         # run more quality checks
         if qa:
             pass
@@ -436,41 +424,23 @@ def srcfind(conn, imobj, params, save, qa):
     return imobj, sources
 
 
-def srcassoc(dbname, imobj, sources, res_tol):
+def srcassoc(conn, imobj, sources, res_tol, save):
     # STAGE 3 - Source association
-    radius = imobj.search_radius()
-    center = (imobj.obs_ra, imobj.obs_dec)
-    dassoc = radioXmatch.cone_search(dbname, ['AssocSource'], center, radius)
-    prevobs = dassoc['AssocSource']
-    assocsrcs = radioXmatch.limit_res(prevobs, imobj.bmaj, res_tol)
-    if not assocsrcs: # all sources are new
-        assocsrcs = sources
-        for asrc in assocsrcs:
-            asrc.beam = imobj.bmaj
-            asrc.num_detect = 1
-            asrc.num_null = 0
-        filldb.addAssoc(dbname, assocsrcs)
-    else:
-        # Translate to DetectedSource objects (the Row objects are immutable)
-        assocobjs = []
-        for asrc in assocsrcs:
-            assocobjs.append(dbclasses.AssociatedSource())
-            dbclasses.dict2attr(assocobjs[-1], asrc)
-        # Cross-match current image sources to previously detected sources
-        rawmatch, rawnew, assocmatch, assocnull = radioXmatch.associate(
-            sources, assocobjs, imobj.bmaj)
-        # Update assoc_id for rawSources matched to existing AssocSource
-        if rawmatch: # make sure the list is not empty
-            filldb.updateRawAssocid(dbname, rawmatch)
-        # Add unmatched rawSources to AssocSource table as new sources
-        if rawnew:
-            filldb.addAssoc(dbname, rawnew)
-        # Update matched AssocSource info with new averages
-        if assocmatch:
-            filldb.updateMatchedAssoc(dbname, assocmatch)
-        # Update null detection count for unmatched AssocSource
-        if assocnull:
-            filldb.updateNullAssoc(dbname, assocnull, imobj.id)
+    search_box = imobj.box_pix2world(imobj.trim_box)
+    detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
+        = radioxmatch.associate(conn, search_box, sources, imobj, res_tol)
+    if save:
+        # Update assoc_id col for matched detected source
+        if detected_matched:
+            dbio.update_detected_associd(conn, detected_matched)
+        # Add new (unmatched) detected sources to assoc_source table
+        if detected_unmatched:
+            dbio.add_assoc(conn, detected_unmatched)
+        # Update matched assoc_source entries
+        if assoc_matched:
+            dbio.update_matched_assoc(conn, assoc_matched)
+
+    return detected_unmatched
 
 
 def catmatch(imobj, sources, catalogs):
@@ -481,7 +451,7 @@ def catmatch(imobj, sources, catalogs):
     return matched_srcs, non_matched_srcs, matched_catsrcs
 
             
-def process(conn, stages, opts, dirs, skycat, catalogs, params, res_tol):
+def process(conn, stages, opts, dirs, catalogs, params, res_tol):
     """
     This function handles the data flow logic and transitions
     between processing stages. All individual processing functions
@@ -527,9 +497,9 @@ def process(conn, stages, opts, dirs, skycat, catalogs, params, res_tol):
             os.system('mkdir '+pybdsfdir)
 
         # Select only the images that end with 'IPln1.fits'
-        #imglist = [f for f in os.listdir(imgdir) if \
-        #           f.endswith('.0217+738.IPln1.fits')]
-        imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
+        imglist = [f for f in os.listdir(imgdir) if \
+                   f.endswith('.0217+738.IPln1.fits')]
+        #imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
         imglist.sort()
         #imglist = imglist[:15]
 
@@ -546,8 +516,6 @@ def process(conn, stages, opts, dirs, skycat, catalogs, params, res_tol):
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, params, save, qa)
-                os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
-                os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 if sources is None:
                     # Image failed to process
                     with open(pybdsfdir+'failed.txt', 'a') as f:
@@ -555,13 +523,97 @@ def process(conn, stages, opts, dirs, skycat, catalogs, params, res_tol):
                     if save:
                         filldb.pybdsf_fail(conn, imobj)
                     continue
-
-            '''
+                else:
+                    os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
+                    os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
+                # STAGE 3 -- Source association
+                if sa:
+                    new_sources = srcassoc(conn, imobj, sources, res_tol, save)
+                    # STAGE 4 -- Sky survey catalog cross-matching
+                    if cm: # sf + sa + cm
+                        if rematch:
+                            print('\nSF+SA+CM with rematch')
+                            pass
+                            #catalogmatch()
+                        else:
+                            print('\nSF+SA+CM no rematch')
+                            pass
+                            #catalogmatch() nulls
+                    else: # sf + sa
+                        print('\nSF+SA')
+                        continue
+                else:
+                    # STAGE 4 -- Sky survey catalog cross-matching
+                    if cm: # sf + cm
+                        if rematch:
+                            print('\nSF+CM with rematch')
+                            pass
+                            #catalogmatch()
+                        else:
+                            print('\nSF+CM no rematch')
+                            pass
+                            #catalogmatch() nulls
+                    else: # sf only
+                        print('\nSF only')
+                        continue
             # STAGE 3 -- Source association
-            if stages[3]:
-                stage3(dbname, imobj, sources, res_tol)
+            else:
+                # no sf, so get sources out of DB
+                if sa:
+                    # already caught case of no sf but stage < 2
+                    if imobj.stage == 2:
+                        # run sa for first time on sources
+                        pass
+                        #sources = some_function()
+                        #srcassoc(conn, imobj, sources, res_tol)
+                    else: # stage > 2
+                        if reproc:
+                            # redo sa on sources
+                            pass
+                            #sources = some_function()
+                            #stage3(conn, imobj, sources, res_tol)
+                        else:
+                            print('\nImage {} already processed. '
+                                  'Moving on...'.format(impath))
+                            continue
+                    # STAGE 4 -- Sky survey catalog cross-matching
+                    if cm: # sa + cm
+                        #asources = some_other_function()
+                        if rematch:
+                            print('\nSA+CM with rematch')
+                            pass
+                            #catalogmatch()
+                        else:
+                            print('\nSA+CM no rematch')
+                            pass
+                            #catalogmatch() nulls
+                    else: # sa only
+                        print('\nSA only')
+                        continue
+                # STAGE 4 -- Sky survey catalog cross-matching
+                else: # cm only
+                    if imobj.stage > 2:
+                        pass
+                        #sources = some_function()
+                        #asources = some_other_function()
+                        if rematch:
+                            print('\nCM only with rematch')
+                            pass
+                            #catalogmatch()
+                        else:
+                            print('\nCM only no rematch')
+                            pass
+                            #catalogmatch() nulls
+                    else:
+                        print('\nERROR: Source association for image {} must '
+                              'be run before catalog cross-matching. '
+                              'Alternatively, run source finding first and '
+                              'cross-match extracted sources with sky survey '
+                              'catalogs.'.format(impath))
+                        continue
+                        
 
-
+                '''
                 # 4.) Catalog cross-matching
                 if matchfor == 'new':
                     # extract only new sources from stage 3
@@ -577,7 +629,8 @@ def process(conn, stages, opts, dirs, skycat, catalogs, params, res_tol):
                 # Update the database Source table with match info
                 radioXmatch.update_database(dbname, imobj.filename, matched,
                                             not_matched)
-            '''        
+            '''
+    return
 
             
 def main():
@@ -589,18 +642,17 @@ def main():
     except IndexError:
         raise ConfigError('Please provide a configuration file.')
     # Parse config file
-    stages, opts, dirs, dbname, dbusr, skycat, catalogs, \
-        params, rtol = cfgparse(cf)
+    stages, opts, dirs, dbname, dbusr, catalogs, params, rtol = cfgparse(cf)
 
     # Find existing/create/overwrite database
     conn = dbinit(dbname, dbusr, opts[2])
 
     # Process images
-    process(conn, stages, opts, dirs, skycat, catalogs, params, rtol)
+    process(conn, stages, opts, dirs, catalogs, params, rtol)
 
     conn.close()
 
-    print('\nTotal runtime: {}\n'.format(datetime.now() - start_time))
+    print_run_stats(start_time)
 
 
 if __name__ == '__main__':

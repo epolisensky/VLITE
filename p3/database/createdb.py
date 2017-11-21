@@ -1,7 +1,7 @@
 """Functions to create database tables, functions, and triggers."""
 
 
-def makeError(cursor):
+def make_error(cursor):
     """Inserts values into the database error table."""
     reason_dict = {'short duration' : 1,
                    'close to bright radio source' : 2,
@@ -13,7 +13,7 @@ def makeError(cursor):
         cursor.execute(sql, (reason_dict[key], key))
 
 
-def create(cur, safe=False):
+def create(conn, safe=False):
     """
     Creates new tables and triggers for the connected `PostgreSQL` 
     database by dropping tables if they exist. The current user
@@ -22,8 +22,8 @@ def create(cur, safe=False):
 
     Parameters
     ----------
-    cur : psycopg2.extensions.cursor instance
-        Cursor object created from the database connection object.
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL database connection object.
     safe : bool, optional
         If ``False``, the user will be warned that existing data
         is about to be deleted and prompted to continue. Default
@@ -37,15 +37,16 @@ def create(cur, safe=False):
         cont = 'yes'
     if cont == 'y' or cont == 'yes':
         print('\nDropping tables if they exist...')
+        cur = conn.cursor()
         sql = (
             '''
-            DROP TABLE IF EXISTS null_detections;
-            DROP TABLE IF EXISTS raw_source;
-            DROP TABLE IF EXISTS raw_island;
+            DROP TABLE IF EXISTS catalog_match;
+            DROP TABLE IF EXISTS corrected_flux;
+            DROP TABLE IF EXISTS detected_source;
+            DROP TABLE IF EXISTS detected_island;
             DROP TABLE IF EXISTS image;
             DROP TABLE IF EXISTS assoc_source;
             DROP TABLE IF EXISTS error;
-            DROP FUNCTION IF EXISTS update_nopp_func;
             DROP FUNCTION IF EXISTS update_assoc_func
             ''')
         cur.execute(sql)
@@ -53,6 +54,8 @@ def create(cur, safe=False):
         print('\nCreating new tables...')
         sql = (
             '''
+            CREATE EXTENSION IF NOT EXISTS q3c;
+
             CREATE TABLE error (
                 id INTEGER NOT NULL,
                 reason TEXT,
@@ -73,12 +76,10 @@ def create(cur, safe=False):
                 e_pa REAL,
                 beam REAL,
                 ndetect INTEGER,
-                nopp INTEGER,
-                catalog_id INTEGER,
-                match_id INTEGER,
-                min_deRuiter REAL,
+                nmatches INTEGER,
                 PRIMARY KEY (id)
-            );
+            )
+            WITH (fillfactor=90);
 
             CREATE TABLE image (
                 id SERIAL NOT NULL UNIQUE,
@@ -104,17 +105,17 @@ def create(cur, safe=False):
                 duration REAL,
                 nsrc INTEGER,
                 rms_box VARCHAR(14),
-                error_id INTEGER,
                 stage INTEGER,
+                error_id INTEGER,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
-                    REFERENCES error (id) 
-                    ON UPDATE CASCADE
+                  REFERENCES error (id) 
+                  ON UPDATE CASCADE
             );
 
-            CREATE TABLE raw_island (
+            CREATE TABLE detected_island (
                 isl_id INTEGER NOT NULL,
-                image_id INTEGER,
+                image_id INTEGER NOT NULL,
                 total_flux REAL,
                 e_total_flux REAL,
                 rms REAL,
@@ -127,10 +128,10 @@ def create(cur, safe=False):
                     ON DELETE CASCADE
             );
 
-            CREATE TABLE raw_source (
+            CREATE TABLE detected_source (
                 src_id INTEGER NOT NULL,
-                isl_id INTEGER,
-                image_id INTEGER,
+                isl_id INTEGER NOT NULL,
+                image_id INTEGER NOT NULL,
                 ra REAL,
                 e_ra REAL,
                 dec REAL,
@@ -159,55 +160,62 @@ def create(cur, safe=False):
                 assoc_id INTEGER,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (isl_id, image_id)
-                    REFERENCES raw_island (isl_id, image_id)
-                    ON DELETE CASCADE,
+                  REFERENCES detected_island (isl_id, image_id)
+                  ON DELETE CASCADE,
                 FOREIGN KEY (assoc_id)
-                    REFERENCES assoc_source (id)
+                  REFERENCES assoc_source (id)
             );
 
-            CREATE TABLE null_detections (
+            CREATE TABLE corrected_flux (
+                src_id INTEGER NOT NULL,
+                isl_id INTEGER NOT NULL,
+                image_id INTEGER NOT NULL,
+                total_flux REAL,
+                e_total_flux REAL,
+                peak_flux REAL,
+                e_peak_flux REAL,
+                isl_total_flux REAL,
+                isl_e_total_flux REAL,
+                isl_rms REAL,
+                isl_mean REAL,
+                isl_resid_rms REAL,
+                isl_resid_mean REAL,
+                PRIMARY KEY (src_id, image_id),
+                FOREIGN KEY (src_id, image_id)
+                  REFERENCES detected_source (src_id, image_id)
+                  ON DELETE CASCADE,
+                FOREIGN KEY (isl_id, image_id)
+                  REFERENCES detected_island (isl_id, image_id)
+                  ON DELETE CASCADE
+            );
+
+            CREATE TABLE catalog_match (
                 id SERIAL NOT NULL,
+                catalog_id INTEGER,
+                src_id INTEGER,
                 assoc_id INTEGER,
-                image_id INTEGER,
+                min_deRuiter REAL,
                 PRIMARY KEY (id),
                 FOREIGN KEY (assoc_id)
-                    REFERENCES assoc_source (id)
-                    ON DELETE CASCADE,
-                FOREIGN KEY (image_id)
-                    REFERENCES image (id)
-                    ON DELETE CASCADE
+                  REFERENCES assoc_source (id)
+                  ON DELETE CASCADE
             );
+
+            CREATE INDEX ON detected_source (q3c_ang2ipix(ra, dec))
+                WITH (fillfactor = 90);
+            CREATE INDEX ON assoc_source (q3c_ang2ipix(ra, dec))
+                WITH (fillfactor = 90);
             ''')
         cur.execute(sql)
         
-        # Make Error table
-        makeError(cur)
+        # Make error table
+        make_error(cur)
 
-        # Triggers
-        # Decrement assoc_source.nopp when a null_detection source
-        # is removed after an image is deleted
-        sql = (
-            '''
-            CREATE OR REPLACE FUNCTION update_nopp_func()
-              RETURNS trigger AS
-            $$
-            BEGIN
-              UPDATE assoc_source SET nopp = nopp - 1
-              WHERE id = OLD.assoc_id;
-            RETURN NEW;
-            END; $$
-            LANGUAGE plpgsql;
+        conn.commit()
 
-            CREATE TRIGGER update_nopp
-              AFTER DELETE ON null_detections
-              FOR EACH ROW
-              EXECUTE PROCEDURE update_nopp_func();
-            ''')
-
-        cur.execute(sql)
-        
+        # Triggers       
         # Re-compute averages or remove assoc_source after
-        # raw_source is deleted
+        # detected_source is deleted
         sql = (
             '''
             CREATE OR REPLACE FUNCTION update_assoc_func()
@@ -217,24 +225,30 @@ def create(cur, safe=False):
               DELETE FROM assoc_source
               WHERE id = OLD.assoc_id AND ndetect = 1;
               UPDATE assoc_source SET ra = (ra*ndetect-OLD.ra)/(ndetect-1),
+                e_ra = (e_ra*ndetect-OLD.e_ra)/(ndetect-1),
                 dec = (dec*ndetect-OLD.dec)/(ndetect-1),
+                e_dec = (e_dec*ndetect-OLD.e_dec)/(ndetect-1),
                 maj = (maj*ndetect-OLD.maj)/(ndetect-1),
+                e_maj = (e_maj*ndetect-OLD.e_maj)/(ndetect-1),
                 min = (min*ndetect-OLD.min)/(ndetect-1),
+                e_min = (e_min*ndetect-OLD.e_min)/(ndetect-1),
                 pa = (pa*ndetect-OLD.pa)/(ndetect-1),
-                ndetect = ndetect - 1,
-                nopp = nopp - 1
+                e_pa = (e_pa*ndetect-OLD.e_pa)/(ndetect-1),
+                ndetect = ndetect - 1
               WHERE id = OLD.assoc_id;
             RETURN NEW;
             END; $$
             LANGUAGE plpgsql;
 
             CREATE TRIGGER update_assoc
-              AFTER DELETE ON raw_source
+              AFTER DELETE ON detected_source
               FOR EACH ROW
               EXECUTE PROCEDURE update_assoc_func();
             ''')
 
         cur.execute(sql)
+        conn.commit()
+        cur.close()
 
     else:
         print('\nAborting... database {} left unchanged.'.format(dbname))

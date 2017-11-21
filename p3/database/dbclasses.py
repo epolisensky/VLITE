@@ -4,10 +4,11 @@ These objects correspond to the image, raw_source, and
 assoc_source database tables, respectively. 
 
 """
-import sys
 import os
 import re
+import numpy as np
 from astropy.io import fits
+from astropy.wcs import WCS
 import pybdsfcat
 
 
@@ -146,26 +147,45 @@ class Image(object):
         try:
             fits.writeto(self.filename, data, header, overwrite=True)           
         except:
-            print('\nNo image changes to write.')
+            print('\nNo image changes to write.')      
 
 
-    def search_radius(self):
-        """Calculates (half) the image size."""
+    def define_box(self, scale):
+        """Calculates image corner coordinates."""
+        data, hdr = self.read()
+        wcs = WCS(hdr).celestial
         try:
-            imsize = float(self.imsize[1:].split(',')[0])
-            pixscale = self.pixel_scale / 3600. # degrees
-            radius = (imsize * pixscale) / 2.
-        except TypeError:
-            try:
-                data, hdr = self.read()
-                self.header_attrs(hdr)
-                imsize = float(self.imsize[1:].split(',')[0])
-                pixscale = self.pixel_scale / 3600. # degrees
-                radius = (imsize * pixscale) / 2.
-            except TypeError:
-                radius = 5. # defaults to 5 deg if missing header keywords
+            naxis1 = hdr['NAXIS1']
+            naxis2 = hdr['NAXIS2']
+        except KeyError:
+            naxis1 = data.shape[3] # RA/x/cols
+            naxis2 = data.shape[2] # Dec/y/rows
+
+        n1sc = int(naxis1 * scale)
+        n2sc = int(naxis2 * scale)
+        n1diff = naxis1 - n1sc
+        n2diff = naxis2 - n2sc
+        # pixel edges start at 0.5, center is at 1.0
+        # corners listed starting at BLC and go clockwise
+        corners = np.array([[n1diff + 0.5, n2diff + 0.5],
+                            [n1diff + 0.5, n2sc + 0.5],
+                            [n1sc + 0.5, n2sc + 0.5],
+                            [n1sc + 0.5, n2diff + 0.5]])
+        box = wcs.wcs_pix2world(corners, 1)
         
-        return radius
+        return corners, box
+
+
+    def box_pix2world(self, trim_box):
+        corners = np.array([[trim_box[0], trim_box[2]],
+                            [trim_box[0], trim_box[3]],
+                            [trim_box[1], trim_box[3]],
+                            [trim_box[1], trim_box[2]]])
+        data, hdr = self.read()
+        wcs = WCS(hdr).celestial
+        box = wcs.wcs_pix2world(corners, 1)
+
+        return box
 
 
     def header_attrs(self, hdr):
@@ -415,8 +435,8 @@ class DetectedSource(object):
 
 class AssociatedSource(DetectedSource):
     """Class of objects to store properties specific to
-    source association. Inherits from the DetectedSource
-    class.
+    source association. Inherits all attributes from the
+    DetectedSource class and then adds a few more.
 
     Attributes
     ----------
@@ -443,9 +463,7 @@ class AssociatedSource(DetectedSource):
         self.beam = None
         self.ndetect = None
         self.nopp = None
-        self.catalog_id = None
-        self.match_id = None
-        self.min_deRuiter = None
+        self.nmatches = None
         
 
 def dict2attr(obj, dictionary):
@@ -454,7 +472,7 @@ def dict2attr(obj, dictionary):
         setattr(obj, key, dictionary[key])
 
 
-def bdsfcat_translate(img, pybdsfdir):
+def translate_from_txtfile(img, pybdsfdir):
     """Creates a list of 'DetectedSource' objects
     from reading in a source list text file output
     by `PyBDSF`."""
@@ -475,7 +493,7 @@ def bdsfcat_translate(img, pybdsfdir):
     return img, sources
 
 
-def pipe_translate(img, out):
+def translate(img, out):
     """Method to translate `PyBDSF` output within the
     pipeline to `DetectedSource` objects and update 
     the `Image` object.
@@ -506,6 +524,7 @@ def pipe_translate(img, out):
     # Add PyBDSF defined attributes
     img.nsrc = out.nsrc
     img.rms_box = str(out.rms_box)
+    img.trim_box = out.trim_box # not in DB, but needed later
     # Try updating any missing attributes from header info
     # using PyBDSF's output object
     if img.imsize is None:

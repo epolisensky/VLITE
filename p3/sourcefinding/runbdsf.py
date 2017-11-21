@@ -7,8 +7,6 @@ object method find_sources(), which calls the `PyBDSF` function
 process_image() and returns the output object. 
 
 """
-from astropy.io import fits
-import numpy as np
 import warnings
 from datetime import datetime
 import bdsf
@@ -37,29 +35,30 @@ class BDSFImage(Image):
         """Initializes the Image subclass object. PyBDSF will 
         use any arguments it recognizes and ignore the rest."""
         self.filename = image
+        # These will be overwritten if in config file
         self.quiet = True
         self.box_incr = 10
         self.max_iter = 10
+        self.scale = 0.85
         for key, value in kwargs.items():
             setattr(self, key, value)
+        if not hasattr(self, 'trim_box'):
+            self.set_trim_box()
+
+
+    def set_trim_box(self):
+        """Sets the `PyBDSF` parameter trim_box so that
+        source finding only occurs within a box whose diagonal
+        length is the same as the diameter of the field-of-view
+        (scale=0.85). A different scale will result in a different
+        sized trim_box.
+
+        """
+        pix, world = Image.define_box(self, self.scale)
+        # (xmin, xmax, ymin, ymax)
+        self.trim_box = (pix[0,0], pix[2,0],
+                         pix[0,1], pix[2,1])
         
-
-    def fix_ctype3(self, data, header):
-        """Change Obit-generated header keyword CTYPE3 from
-        'SPECLNMF' to 'FREQ'."""
-        try:
-            if header['CTYPE3'] == 'SPECLNMF':
-                header['CTYPE3'] = 'FREQ'
-                self.write(data, header)
-        except:
-            try:
-                data, header = self.read()
-                if header['CTYPE3'] == 'SPECLNMF':
-                    header['CTYPE3'] = 'FREQ'
-                    self.write(data, header)
-            except:
-                print('\nERROR: Unable to update image header.\n')
-
 
     def get_attr(self):
         """Return all object attributes as a dictionary.

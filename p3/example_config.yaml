@@ -3,7 +3,7 @@
 stages:
                               # processing steps; yes | no  or  True | False
   source finding: yes         # if yes, provide pybdsf_params
-  source association: no      # if yes, provide database name/path below
+  source association: yes     # if yes, provide database name/path below
   catalog matching: no        # cross-match with sky survey catalogs?
         # if yes, provide sky catalog database name and list of catalogs to use
 
@@ -12,25 +12,25 @@ options:
   save to database: yes       # save results to database?
   quality checks: no          # run image & source count quality checks?
   overwrite: no               # overwrite database if exists?
-  reprocess: no               # redo selected stages even if done previously?
+  reprocess: yes              # redo selected stages even if done previously?
   redo match: no              # redo catalog matching for all sources?
         # applies only to sources in AssocSource DB table
 
 setup:
-  rootdir: /home/erichards/work/p3/test/
+  rootdir: /path/to/data/
   year: 2017
   month: 08
-  day: ['30']                 # list of days to process; [] = all
-  dbname: test
+  day: [30]                   # list of days to process; [] = all
+  dbname: vlite
   dbuser: postgres
-  catdb: SkyCatalogs.sqlite   # sky catalog database name
-  catalogs: ['TGSS', 'NVSS', 'FIRST', 'SUMSS', 'WENSS']  # list of sky catalogs
+  catalogs: [TGSS, NVSS, FIRST, SUMSS, WENSS]  # list of sky catalogs
 
 pybdsf_params:
   mode: default               # default | minimize_islands
+  scale: 0.85                # fraction of image size; default is 0.85
   # Specify all PyBDSF parameters here
   thresh: hard
-  trim_box: !!python/tuple [400, 1300, 400, 1300]  # need to force tuple
+  #trim_box: !!python/tuple [400, 1300, 400, 1300]  # need to force tuple
   #rms_box: !!python/tuple [30, 10]
 
 matching:

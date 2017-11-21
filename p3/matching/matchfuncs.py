@@ -11,29 +11,21 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
     match = 0
     match_catsrc = None
     for catsrc in catalog:
-        # If catalog is a list of catalog_source objects,
-        # cast to a dictionary so it's attributes can be
-        # accessed like the database row dictionary
-        try:
-            catsrc['dec']
-        except TypeError:
-            catsrc = catsrc.__dict__
-        # Start by checking if within 15' in declination
-        if quickcheck(src['dec'], catsrc['dec'], 0.25) == 1:
+       # Start by checking if within 15' in declination
+        if quickcheck(src.dec, catsrc.dec, 0.25) == 1:
             # Calculate deRuiter radius
-            der = deruiter(src['ra'], src['dec'], src['e_ra'], src['e_dec'],
-                           catsrc['ra'], catsrc['dec'],
-                           catsrc['e_ra'], catsrc['e_dec'])
+            der = deruiter(src.ra, src.dec, src.e_ra, src.e_dec,
+                           catsrc.ra, catsrc.dec, catsrc.e_ra, catsrc.e_dec)
             # Check if deRuiter radius < previous minimum
             if der < min_der:
                 min_der = der
-                src['min_deRuiter'] = min_der
+                src.min_deRuiter = min_der
                 match_catsrc = catsrc
             # Check if deRuiter radius < required match limit
             if der < match_der:
                 # Check if angular distance < 0.5*beam
-                if angdist(src['ra'], src['dec'],
-                           catsrc['ra'], catsrc['dec']) < (0.5 * bmaj):
+                if angdist(src.ra, src.dec,
+                           catsrc.ra, catsrc.dec) < (0.5 * bmaj):
                     match = 1
                     break
     return match, match_catsrc
