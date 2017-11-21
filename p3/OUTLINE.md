@@ -5,7 +5,7 @@
 *Note: Italics indicates functionality that has not yet been implemented.*
 
 #### Stage 0: Pre-Run Checks
-1. Read in [run configuration file](../example_config.yaml)
+1. Read in [run configuration file](https://github.com/erichards/VLITE/blob/develop/p3/example_config.yaml)
 2. Check if images exist/path is correct
 3. Make sure requested cross-match catalogs exist
 4. [Connect to database](https://docs.google.com/spreadsheets/d/e/2PACX-1vR20qGzJ7U3hFBNYZ1IUJWcFpdlOmfjQKv_8pk6aRW7BuljZ6VGNWyagHnsMVkZ6_Y9-Dl1vEwNv8Bg/pubhtml "database schema")
