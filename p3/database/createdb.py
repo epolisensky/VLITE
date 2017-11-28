@@ -40,6 +40,7 @@ def create(conn, safe=False):
         cur = conn.cursor()
         sql = (
             '''
+            DROP TABLE IF EXISTS vlite_unique;
             DROP TABLE IF EXISTS catalog_match;
             DROP TABLE IF EXISTS corrected_flux;
             DROP TABLE IF EXISTS detected_source;
@@ -196,6 +197,20 @@ def create(conn, safe=False):
                 assoc_id INTEGER,
                 min_deRuiter REAL,
                 PRIMARY KEY (id),
+                FOREIGN KEY (assoc_id)
+                  REFERENCES assoc_source (id)
+                  ON DELETE CASCADE
+            );
+
+            CREATE TABLE vlite_unique (
+                id SERIAL NOT NULL,
+                image_id INTEGER,
+                assoc_id INTEGER,
+                detected BOOLEAN,
+                PRIMARY KEY (id),
+                FOREIGN KEY (image_id)
+                  REFERENCES image (id)
+                  ON DELETE CASCADE,
                 FOREIGN KEY (assoc_id)
                   REFERENCES assoc_source (id)
                   ON DELETE CASCADE

@@ -107,11 +107,9 @@ def add_image(conn, impath, status, delete=False):
                 img.error_id, img.stage, img.id)
         cur.execute(sql, vals)
         if delete:
-            # Delete corresponding detected_island & detected_source table entries
+            # Delete corresponding sources
             print('\nRemoving previous sources...')
             cur.execute('DELETE FROM detected_island WHERE image_id = %s', (
-                img.id, ))
-            cur.execute('DELETE FROM unmatched_source WHERE image_id = %s', (
                 img.id, ))
 
     conn.commit()
@@ -188,13 +186,16 @@ def add_assoc(conn, sources):
                     (f(src.ra), f(src.e_ra), f(src.dec), f(src.e_dec),
                      f(src.maj), f(src.e_maj), f(src.min), f(src.e_min),
                      f(src.pa), f(src.e_pa), src.beam, src.ndetect))
-        src.assoc_id = cur.fetchone()[0]
+        src.id = cur.fetchone()[0]
+        src.assoc_id = src.id
         cur.execute('''UPDATE detected_source SET assoc_id = %s
             WHERE src_id = %s AND image_id = %s''',
                     (src.assoc_id, src.src_id, src.image_id))
 
     conn.commit()
     cur.close()
+    
+    return sources
 
 
 def update_matched_assoc(conn, sources):
@@ -219,6 +220,51 @@ def update_detected_associd(conn, sources):
         cur.execute('''UPDATE detected_source SET assoc_id = %s
             WHERE src_id = %s AND image_id = %s''',
                     (src.assoc_id, src.src_id, src.image_id))
+
+    conn.commit()
+    cur.close()
+
+
+def update_assoc_nmatches(conn, sources):
+    cur = conn.cursor()
+
+    for src in sources:
+        cur.execute('UPDATE assoc_source SET nmatches = %s WHERE id = %s',
+                    (src.nmatches, src.id))
+
+    conn.commit()
+    cur.close()
+
+
+def add_catalog_match(conn, sources):
+    cur = conn.cursor()
+
+    for src in sources:
+        cur.execute('''INSERT INTO catalog_match (
+            catalog_id, src_id, assoc_id, min_deruiter) VALUES (
+            %s, %s, %s, %s)''',
+                    (src.catalog_id, src.id, src.assoc_id, src.min_deruiter))
+
+    conn.commit()
+    cur.close()
+
+
+def add_vlite_unique(conn, src, image_id):
+    cur = conn.cursor()
+
+    cur.execute('''INSERT INTO vlite_unique (
+        image_id, assoc_id, detected) VALUES (%s, %s, %s)''',
+                (image_id, src.id, src.detected))
+
+    conn.commit()
+    cur.close()
+
+
+def update_stage(conn, imobj):
+    cur = conn.cursor()
+
+    cur.execute('UPDATE image SET stage = %s WHERE id = %s',
+                (imobj.stage, imobj.id))
 
     conn.commit()
     cur.close()

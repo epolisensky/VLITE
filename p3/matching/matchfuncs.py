@@ -7,7 +7,7 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
     radius to determine if there is a successful cross-match
     to a catalog source. A successful match must have a
     deRuiter radius < match_der, which defaults to 5.68, and
-    have an angular distance < 0.5 * image beam width."""
+    have an angular distance < 0.5 * image beam width in arcsec."""
     match = 0
     match_catsrc = None
     for catsrc in catalog:
@@ -19,7 +19,6 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
             # Check if deRuiter radius < previous minimum
             if der < min_der:
                 min_der = der
-                src.min_deRuiter = min_der
                 match_catsrc = catsrc
             # Check if deRuiter radius < required match limit
             if der < match_der:
@@ -28,7 +27,7 @@ def deRuitermatch(src, catalog, bmaj, match_der=5.68, min_der=99999.9):
                            catsrc.ra, catsrc.dec) < (0.5 * bmaj):
                     match = 1
                     break
-    return match, match_catsrc
+    return match, match_catsrc, min_der
 
 
 def quickcheck(dec1, dec2, deglim):
@@ -58,10 +57,10 @@ def cosd(angle):
 
 
 def angdist(ra1, dec1, ra2, dec2):
-    """Return the angular distance (in degrees) 
+    """Return the angular distance in arcsec 
     between two points (sources) given their RA & 
     Dec coordinates in degrees."""
     p1 = SkyCoord(ra1, dec1, unit="deg")
     p2 = SkyCoord(ra2, dec2, unit="deg")
     sep = p1.separation(p2)
-    return sep.degree
+    return sep.arcsecond

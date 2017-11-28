@@ -9,6 +9,7 @@ process_image() and returns the output object.
 """
 import warnings
 from datetime import datetime
+import numpy as np
 import bdsf
 from database.dbclasses import Image
 
@@ -39,11 +40,25 @@ class BDSFImage(Image):
         self.quiet = True
         self.box_incr = 10
         self.max_iter = 10
-        self.scale = 0.85
+        #self.scale = 0.85
         for key, value in kwargs.items():
             setattr(self, key, value)
-        if not hasattr(self, 'trim_box'):
-            self.set_trim_box()
+        self.crop()
+        #if not hasattr(self, 'trim_box'):
+        #    self.set_trim_box()
+
+
+    def crop(self):
+        data, hdr = Image.read(self)
+        #data = data.reshape(data.shape[2:])
+        n = len(data[0,0,:,:])
+        a, b = hdr['CRPIX1'], hdr['CRPIX2']
+        y, x = np.ogrid[-a:n-a, -b:n-b]
+        r = hdr['NAXIS2'] / 2.
+        mask = x*x + y*y >= r*r
+        data[0,0,mask] = np.nan
+        self.filename = self.filename[:-4]+'crop.fits'
+        Image.write(self, data, hdr, owrite=True)
 
 
     def set_trim_box(self):
@@ -80,8 +95,8 @@ class BDSFImage(Image):
                     out.nsrc, (datetime.now() - start).total_seconds()))
                 return out
             except:
-                return None  
-
+                return None
+            
 
     def minimize_islands(self):
         """Incrementally increase and decrease the bdsf.process_image()

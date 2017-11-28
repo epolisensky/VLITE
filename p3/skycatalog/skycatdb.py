@@ -32,7 +32,7 @@ def index(tblname, conn):
     # Just in case...
     tblname = tblname.lower()
         
-    cur.execute(psycopg2.sql.SQL('''CREATE INDEX IF NOT EXISTS ON skycat.{} 
+    cur.execute(psycopg2.sql.SQL('''CREATE INDEX ON skycat.{} 
         (q3c_ang2ipix(ra, dec))''').format(psycopg2.sql.Identifier(tblname)))
     cur.execute(psycopg2.sql.SQL('CLUSTER {} ON skycat.{}').format(
         psycopg2.sql.Identifier(tblname + '_q3c_ang2ipix_idx'),

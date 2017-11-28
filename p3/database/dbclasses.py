@@ -142,12 +142,9 @@ class Image(object):
             print('\nERROR: Problem reading image.\n')
 
 
-    def write(self, data, header):
+    def write(self, data, header, owrite=False):
         """Writes new fits image data and header."""
-        try:
-            fits.writeto(self.filename, data, header, overwrite=True)           
-        except:
-            print('\nNo image changes to write.')      
+        fits.writeto(self.filename, data, header, clobber=owrite)
 
 
     def define_box(self, scale):
@@ -390,6 +387,14 @@ class DetectedSource(object):
         self.resid_mean = None
         self.code = None
         self.assoc_id = None
+        # assoc_source attributes
+        self.id = None
+        self.beam = None
+        self.ndetect = None
+        self.nfields = None
+        self.nmatches = None
+        # vlite_unique attribute
+        self.detected = None
 
 
     def cast(self, origsrc):
@@ -433,6 +438,7 @@ class DetectedSource(object):
         self.code = origsrc.code
 
 
+'''
 class AssociatedSource(DetectedSource):
     """Class of objects to store properties specific to
     source association. Inherits all attributes from the
@@ -460,11 +466,13 @@ class AssociatedSource(DetectedSource):
     """    
     def __init__(self):
         super(AssociatedSource, self).__init__()
+        self.id = None
         self.beam = None
         self.ndetect = None
-        self.nopp = None
+        self.nfields = None
         self.nmatches = None
-        
+'''
+
 
 def dict2attr(obj, dictionary):
     """Sets dictionary key, value pairs to object attributes."""
@@ -524,7 +532,10 @@ def translate(img, out):
     # Add PyBDSF defined attributes
     img.nsrc = out.nsrc
     img.rms_box = str(out.rms_box)
-    img.trim_box = out.trim_box # not in DB, but needed later
+    try:
+        img.trim_box = out.trim_box # not in DB, but needed later
+    except AttributeError:
+        pass
     # Try updating any missing attributes from header info
     # using PyBDSF's output object
     if img.imsize is None:

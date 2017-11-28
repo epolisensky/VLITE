@@ -76,6 +76,8 @@ class CatalogSource(object):
         self.rms = None # mJy/beam
         self.field = None
         self.catalog_id = None
+        self.assoc_id = None
+        self.min_deruiter = None
 
 
 def read_tgss(return_sources=False):

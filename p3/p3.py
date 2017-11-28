@@ -6,6 +6,7 @@ and calling the appropriate processing stages in the correct order.
 """
 import os
 import sys
+import glob
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
@@ -252,6 +253,8 @@ def dbinit(dbname, user, overwrite, safe_override=False):
                                     user=user)
             print('\nConnected to new database {}.'.format(dbname))
             createdb.create(conn, safe=True)
+            print('\nCreating new sky catalog tables...')
+            skycatdb.create(conn)
         else:
             print('\nNo new database created.\n')
             raise ConfigError('Cannot access database {}'.format(dbname))
@@ -425,30 +428,105 @@ def srcfind(conn, imobj, params, save, qa):
 
 
 def srcassoc(conn, imobj, sources, res_tol, save):
-    # STAGE 3 - Source association
-    search_box = imobj.box_pix2world(imobj.trim_box)
+    """Associates sources extracted from current image with
+    previously detected VLITE sources stored in the
+    assoc_source database table.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    imobj : database.dbclasses.Image instance
+        Initialized `Image` object with attribute values
+        set from header info & updated with source finding results.
+    sources : list
+        List of `database.dbclasses.DetectedSource` objects.
+        Attributes of each object are set from the `PyBDSF`
+        output object.
+    res_tol : float
+        Defines the acceptable range of spatial resolutions in arcsec
+        when considering a source from the assoc_source table for
+        cross-matching.
+    save : bool
+        If ``True``, the extracted sources are written and saved
+        to the database detected_island and detected_source tables. The
+        `PyBDSF` files are always written out.
+    
+    Returns
+    -------
+    detected_unmatched : list of `DetectedSource` objects
+        Sources extracted from the image which could not be successfully
+        associated with previously detected sources. These are added
+        to the assoc_table as new detections and then cross-matched
+        with other sky survey catalogs. If no match is found, then
+        the source becomes a transient candidate.
+    imobj : database.dbclasses.Image instance
+        Initialized `Image` object with updated stage attribute.
+    """
+    # STAGE 3 -- Source association
+    #search_box = imobj.box_pix2world(imobj.trim_box)
+    search_radius = radioxmatch.search_radius(imobj)
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
-        = radioxmatch.associate(conn, search_box, sources, imobj, res_tol)
+        = radioxmatch.associate(conn, sources, imobj, search_radius, res_tol)
     if save:
         # Update assoc_id col for matched detected source
         if detected_matched:
             dbio.update_detected_associd(conn, detected_matched)
         # Add new (unmatched) detected sources to assoc_source table
         if detected_unmatched:
-            dbio.add_assoc(conn, detected_unmatched)
+            # Updates assoc_id attribute
+            detected_unmatched = dbio.add_assoc(conn, detected_unmatched)
         # Update matched assoc_source entries
         if assoc_matched:
             dbio.update_matched_assoc(conn, assoc_matched)
+        # Check for VLITE unique (VU) sources that weren't detected in image
+        for asrc in assoc_unmatched:
+            if asrc.nmatches == 0:
+                asrc.detected = False
+                # Add source to vlite_unique table
+                dbio.add_vlite_unique(conn, asrc, imobj.id)        
+        # Update stage in image table
+        imobj.stage = 3
+        dbio.update_stage(conn, imobj)
 
-    return detected_unmatched
+    return detected_unmatched, imobj
 
 
-def catmatch(imobj, sources, catalogs):
-    # STAGE 4 - Catalog cross-matching
-    matched_srcs, non_matched_srcs, matched_catsrcs = radioXmatch.main(
-        catalogs=catalogs, database=False, objects=(imobj, sources))
+def catmatch(conn, imobj, sources, catalogs, res_tol, save):
+    # STAGE 4 -- Sky catalog cross-matching
+    search_radius = radioxmatch.search_radius(imobj)
+    for catalog in catalogs:
+        catalog = catalog.lower()
+        try:
+            sources, catalog_matched = radioxmatch.catalogmatch(
+                conn, sources, catalog, imobj, search_radius)
+        except TypeError: # no sky catalog sources extracted
+            continue
+        if save:
+            # Add results to catalog_match table
+            dbio.add_catalog_match(conn, catalog_matched)
+    if save:
+        # Update assoc_source.nmatches
+        dbio.update_assoc_nmatches(conn, sources)
+        # Check for new VLITE unique (VU) sources from this image
+        for src in sources:
+            if src.nmatches == 0:
+                src.detected = True
+                # Add source to vlite_unique table
+                dbio.add_vlite_unique(conn, src, src.image_id)
+                # Find previous images where VU source is in FOV
+                src.detected = False
+                prev_images = radioxmatch.check_previous(
+                    conn, src, search_radius, res_tol)
+                for imgid in prev_images:
+                    # Ignore current image
+                    if imgid[0] != imobj.id:
+                        dbio.add_vlite_unique(conn, src, imgid[0])
+        # Update stage
+        imobj.stage = 4
+        dbio.update_stage(conn, imobj)
 
-    return matched_srcs, non_matched_srcs, matched_catsrcs
+    return
 
             
 def process(conn, stages, opts, dirs, catalogs, params, res_tol):
@@ -516,29 +594,27 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, params, save, qa)
+                #os.system('rm '+imgdir+'*.crop.fits')
                 if sources is None:
                     # Image failed to process
                     with open(pybdsfdir+'failed.txt', 'a') as f:
                         f.write(img+'\n')
                     if save:
-                        filldb.pybdsf_fail(conn, imobj)
+                        dbio.pybdsf_fail(conn, imobj)
                     continue
                 else:
-                    os.system('mv '+imgdir+'*pybdsf* '+pybdsfdir+'.')
-                    os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
+                    os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
+                    if glob.glob(imgdir+'*pybdsm.srl'):
+                        os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 # STAGE 3 -- Source association
                 if sa:
-                    new_sources = srcassoc(conn, imobj, sources, res_tol, save)
+                    new_sources, imobj = srcassoc(conn, imobj, sources,
+                                                  res_tol, save)
                     # STAGE 4 -- Sky survey catalog cross-matching
                     if cm: # sf + sa + cm
-                        if rematch:
-                            print('\nSF+SA+CM with rematch')
-                            pass
-                            #catalogmatch()
-                        else:
-                            print('\nSF+SA+CM no rematch')
-                            pass
-                            #catalogmatch() nulls
+                        # Cross-match new sources only
+                        catmatch(conn, imobj, new_sources, catalogs,
+                                 res_tol, save)
                     else: # sf + sa
                         print('\nSF+SA')
                         continue
