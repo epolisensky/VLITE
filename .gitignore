@@ -2,8 +2,3 @@
 *.pyc
 *.txt
 *.sh
-
-# ignore certain directories
-old/
-obsolete/
-testing/

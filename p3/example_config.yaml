@@ -2,8 +2,8 @@
 
 stages:
                               # processing steps; yes | no  or  True | False
-  source finding: yes         # if yes, provide pybdsf_params
-  source association: yes     # if yes, provide database name/path below
+  source finding: yes         # extract sources from image?
+  source association: yes     # match extracted sources to existing catalog?
   catalog matching: yes       # cross-match with sky survey catalogs?
 
 options:
@@ -11,8 +11,9 @@ options:
   save to database: yes       # save results to database?
   quality checks: no          # run image & source count quality checks?
   overwrite: no               # overwrite database if exists?
-  reprocess: yes              # redo selected stages even if done previously?
-  redo match: no              # redo catalog matching for all sources?
+  reprocess: yes              # re-run source finding on image?
+  redo match: no              # redo cross-matching with all sky catalogs?
+  update match: no            # update cross-matching with new sky catalogs?
 
 setup:
   rootdir: /path/to/data/
@@ -21,14 +22,16 @@ setup:
   day: [30]                   # list of days to process; [] = all
   dbname: vlite
   dbuser: postgres
-  catalogs: [FIRST, GLEAM, NVSS, SUMSS, TGSS, WENSS]   # list of sky catalogs
+  catalogs: [FIRST, GLEAM, NVSS, SUMSS, TGSS, VLSSr, WENSS]
 
 pybdsf_params:
   mode: default               # default | minimize_islands
+  scale: 1.0                  # fraction of image size (radius) to use
   # Specify all PyBDSF parameters here
   thresh: hard
-  #trim_box: !!python/tuple [400, 1300, 400, 1300]  # need to force tuple
-  #rms_box: !!python/tuple [30, 10]
+  rms_box: !!python/tuple [100, 30]
+  adaptive_rms_box: True
+  rms_box_bright: !!python/tuple [20, 10]
 
 matching:
   resolution tolerance: 5.0   # (in arcsec) allowed difference in beam sizes

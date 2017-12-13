@@ -1,14 +1,11 @@
 """This module defines classes and their methods for
-Image, DetectedSource, and AssociatedSource objects.
-These objects correspond to the image, raw_source, and
-assoc_source database tables, respectively. 
+Image and DetectedSource objects.
 
 """
 import os
 import re
 import numpy as np
 from astropy.io import fits
-from astropy.wcs import WCS
 import pybdsfcat
 
 
@@ -87,6 +84,9 @@ class Image(object):
     stage : int
         Highest processing stage completed. 1 = Image object initialized,
         2 = source finding, 3 = source association, 4 = catalog matching.
+    radius : float
+        Radius defining the circular field-of-view in degrees in which
+        sources were extracted.
     """
     # A class variable to count the number of images
     num_images = 0
@@ -122,6 +122,7 @@ class Image(object):
         self.rms_box = None
         self.error_id = None
         self.stage = 1
+        self.radius = None
 
         # Increase the image count by one
         Image.num_images += 1
@@ -147,50 +148,11 @@ class Image(object):
         fits.writeto(self.filename, data, header, clobber=owrite)
 
 
-    def define_box(self, scale):
-        """Calculates image corner coordinates."""
-        data, hdr = self.read()
-        wcs = WCS(hdr).celestial
-        try:
-            naxis1 = hdr['NAXIS1']
-            naxis2 = hdr['NAXIS2']
-        except KeyError:
-            naxis1 = data.shape[3] # RA/x/cols
-            naxis2 = data.shape[2] # Dec/y/rows
-
-        n1sc = int(naxis1 * scale)
-        n2sc = int(naxis2 * scale)
-        n1diff = naxis1 - n1sc
-        n2diff = naxis2 - n2sc
-        # pixel edges start at 0.5, center is at 1.0
-        # corners listed starting at BLC and go clockwise
-        corners = np.array([[n1diff + 0.5, n2diff + 0.5],
-                            [n1diff + 0.5, n2sc + 0.5],
-                            [n1sc + 0.5, n2sc + 0.5],
-                            [n1sc + 0.5, n2diff + 0.5]])
-        box = wcs.wcs_pix2world(corners, 1)
-        
-        return corners, box
-
-
-    def box_pix2world(self, trim_box):
-        corners = np.array([[trim_box[0], trim_box[2]],
-                            [trim_box[0], trim_box[3]],
-                            [trim_box[1], trim_box[3]],
-                            [trim_box[1], trim_box[2]]])
-        data, hdr = self.read()
-        wcs = WCS(hdr).celestial
-        box = wcs.wcs_pix2world(corners, 1)
-
-        return box
-
-
     def header_attrs(self, hdr):
         """This method does all the heavy lifting of 
         extracting and assigning the object attributes 
-        (and table column values) from the fits image 
-        header and assigns ``None`` if the keyword
-        is missing in the header.
+        from the fits image header and assigns ``None`` 
+        if the keyword is missing in the header.
 
         """
         try:
@@ -346,8 +308,7 @@ class DetectedSource(object):
     References
     ----------
     Refer to the `PyBDSF` documentation ([1]_) for definitions 
-    of their output columns, which are essentially the same as 
-    the attributes.
+    of their output columns.
 
     .. [1] http://www.astron.nl/citt/pybdsm/write_catalog.html#definition-of-output-columns
     """
@@ -402,6 +363,12 @@ class DetectedSource(object):
         output from `bdsf.process_image` are cast to define
         attributes of a DetectedSource object.
 
+        Parameters
+        ----------
+        origsrc : bdsf.gaul2srl.Source instance
+            Object which stores all the measured properties
+            of a source extracted from an image in `PyBDSF`.
+
         """
         self.src_id = origsrc.source_id
         self.isl_id= origsrc.island_id
@@ -438,52 +405,43 @@ class DetectedSource(object):
         self.code = origsrc.code
 
 
-'''
-class AssociatedSource(DetectedSource):
-    """Class of objects to store properties specific to
-    source association. Inherits all attributes from the
-    DetectedSource class and then adds a few more.
-
-    Attributes
-    ----------
-    beam : float
-        Size of the beam semi-major axis in arcseconds.
-    ndetect : int
-        Number of times the source has been detected in images.
-    nopp : int
-        Number of opportunities for the soure to be detected.
-        For a source to be considered a missed opportunity, or a 
-        source that could have been detected in an image but wasn't, 
-        it must be in the image's field-of-view and have an average
-        peak intensity 5 sigma above the image's average noise.
-    catalog_id : int
-        Identifies from which sky survey a catalog match originates.
-    match_id : int
-        Identifies the matched sky survey source.
-    min_deRuiter : float
-        Value of the minimum deRuiter radius calculated during
-        catalog matching.
-    """    
-    def __init__(self):
-        super(AssociatedSource, self).__init__()
-        self.id = None
-        self.beam = None
-        self.ndetect = None
-        self.nfields = None
-        self.nmatches = None
-'''
-
-
 def dict2attr(obj, dictionary):
-    """Sets dictionary key, value pairs to object attributes."""
+    """Sets dictionary key, value pairs to object attributes.
+    
+    Parameters
+    ----------
+    obj : class instance
+        Any object initialized from a class.
+    dictionary : dict
+        Dictionary key, value pairs become attribute, 
+        value pairs.
+    """
     for key in dictionary.keys():
         setattr(obj, key, dictionary[key])
 
 
 def translate_from_txtfile(img, pybdsfdir):
-    """Creates a list of 'DetectedSource' objects
+    """Creates a list of DetectedSource objects
     from reading in a source list text file output
-    by `PyBDSF`."""
+    by `PyBDSF`.
+    
+    Parameters
+    ----------
+    img : database.dbclasses.Image instance
+        Initialized Image object with attribute
+        values set from header info.
+    pybdsfdir : str
+        Directory path to `PyBDSF` files.
+
+    Returns
+    -------
+    img : database.dbclasses.Image instance
+        Initialized Image object with attribute
+        values updated with source finding results.
+    sources : list of DetectedSource objects
+        DetectedSource objects with attribute values
+        set from `PyBDSF` output source list text file.
+    """
     # Set the file path
     prefix = re.findall('.*\/(.*)\.', img.filename)[0]
     srl = prefix + '.pybdsm.srl'
@@ -503,39 +461,33 @@ def translate_from_txtfile(img, pybdsfdir):
 
 def translate(img, out):
     """Method to translate `PyBDSF` output within the
-    pipeline to `DetectedSource` objects and update 
-    the `Image` object.
+    pipeline to DetectedSource objects and update 
+    the Image object.
 
     Parameters
     ----------
     img : database.dbclasses.Image instance
-        Initialized `Image` object with attribute values
+        Initialized Image object with attribute values
         set from header info.
     out : bdsf.image.Image instance
         The object output by `PyBDSF` after running its
         source finding task `process_image()`. Contains
-        a list of `bdsf.gaul2srl.Source` objects which
-        are translated into `DetectedSource` objects.
+        a list of bdsf.gaul2srl.Source objects which
+        are translated into DetectedSource objects.
 
     Returns
     -------
     img : database.dbclasses.Image instance
-        Initialized `Image` object with attribute values
+        Initialized Image object with attribute values
         set from header info & updated with source finding results.
     newsrcs : list
-        List of `database.dbclasses.DetectedSource` objects.
+        List of database.dbclasses.DetectedSource objects.
         Attributes of each object are set from the `PyBDSF`
         output object.    
     """
-    # Update image stage
-    img.stage = 2
     # Add PyBDSF defined attributes
     img.nsrc = out.nsrc
     img.rms_box = str(out.rms_box)
-    try:
-        img.trim_box = out.trim_box # not in DB, but needed later
-    except AttributeError:
-        pass
     # Try updating any missing attributes from header info
     # using PyBDSF's output object
     if img.imsize is None:

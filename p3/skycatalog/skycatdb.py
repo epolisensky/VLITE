@@ -12,12 +12,6 @@ Currently included catalogs:
 5. TGSS - GMRT 150 MHz, 25" res.
 6. WENSS - WSRT 325 MHz, 54" res.
 
-Runtime is ~2.5 min when sources need to be read in
-and written to psql text files. Otherwise, it should
-take ~40 sec. Without indexing & clustering.
-
-Direct inserts from the object lists took ~11 min.
-
 """
 import os
 import psycopg2
@@ -26,7 +20,15 @@ import catalogio
 
 
 def index(tblname, conn):
-    """Indexes and clusters the table using Q3C."""
+    """Indexes and clusters the table using Q3C.
+
+    Parameters
+    ----------
+    tblname : str
+        Name of the database table.
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    """
     cur = conn.cursor()
 
     # Just in case...
@@ -109,6 +111,20 @@ def add_table(tblname, conn):
         sources = catalogio.read_wenss()
     elif tblname == 'gleam':
         sources = catalogio.read_gleam()
+    elif tblname == 'cosmos':
+        sources = catalogio.read_cosmos()
+    elif tblname == 'vlssr':
+        sources = catalogio.read_vlssr()
+    elif tblname == 'txs':
+        sources = catalogio.read_txs()
+    elif tblname == 'sevenc':
+        sources = catalogio.read_sevenc()
+    elif tblname == 'gpsr5':
+        sources = catalogio.read_gpsr5()
+    elif tblname == 'gpsr1':
+        sources = catalogio.read_gpsr1()
+    elif tblname == 'nordgc':
+        sources = catalogio.read_nordgc()
     else:
         print('\nERROR: No function to read catalog {}.'.format(tblname))
 
@@ -136,7 +152,7 @@ def add_table(tblname, conn):
             psycopg2.sql.Identifier(tblname)), vals)
     """
 
-    # This is waaaaaaay faster (~40 sec if text files already exist)
+    # This is waaaaaaay faster (~10x)
     fname = tblname + '_psql.txt'
     psqlf = os.path.join(catalogio.catalogdir, fname)
     fullname = 'skycat.' + tblname
@@ -149,9 +165,9 @@ def add_table(tblname, conn):
 
 def create(conn):
     """Creates the 'skycat' schema and catalogs 
-    table within that schema. Calls the function
-    `add_table` for each catalog in the list from
-    `catalogio.catalog_list`.
+    table within that schema. Calls the functions
+    `add_table` and `index` for each catalog in the
+    list from `catalogio.catalog_list`.
 
     Parameters
     ----------
