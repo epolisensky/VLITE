@@ -6,7 +6,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 
 
-def deRuitermatch(src, match_srcs, bmaj, match_der=5.68, min_der=99999.9):
+def deRuitermatch(src, match_srcs, bmaj, match_der=6.44, min_der=99999.9):
     """This matching function uses the unitless deRuiter
     radius to determine if there is a successful cross-match
     between two sources. A successful match must have a

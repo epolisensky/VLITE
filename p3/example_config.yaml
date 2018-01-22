@@ -11,15 +11,15 @@ options:
   save to database: yes       # save results to database?
   quality checks: no          # run image & source count quality checks?
   overwrite: no               # overwrite database if exists?
-  reprocess: yes              # re-run source finding on image?
+  reprocess: no               # re-run source finding on image?
   redo match: no              # redo cross-matching with all sky catalogs?
   update match: no            # update cross-matching with new sky catalogs?
 
 setup:
   rootdir: /path/to/data/
-  year: 2017
-  month: 08
-  day: [30]                   # list of days to process; [] = all
+  year: 2018
+  month: 01
+  day: [22]                   # list of days to process; [] = all
   dbname: vlite
   dbuser: postgres
   catalogs: [FIRST, GLEAM, NVSS, SUMSS, TGSS, VLSSr, WENSS]
@@ -29,10 +29,7 @@ pybdsf_params:
   scale: 1.0                  # fraction of image size (radius) to use
   # Specify all PyBDSF parameters here
   thresh: hard
-  rms_box: !!python/tuple [100, 30]
+  #rms_box: !!python/tuple [100, 30]
   adaptive_rms_box: True
-  rms_box_bright: !!python/tuple [20, 10]
-
-matching:
-  resolution tolerance: 5.0   # (in arcsec) allowed difference in beam sizes
-        # for images to be considered as having similar spatial resolutions
+  #rms_box_bright: !!python/tuple [20, 10]
+  adaptive_thresh: 10.

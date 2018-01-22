@@ -493,6 +493,8 @@ def get_associated(conn, sources):
 
     assoc_sources = []
     for row in rows:
+        if not row:
+            continue
         assoc_sources.append(dbclasses.DetectedSource())
         dbclasses.dict2attr(assoc_sources[-1], row)
 

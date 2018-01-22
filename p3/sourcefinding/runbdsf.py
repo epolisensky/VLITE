@@ -50,7 +50,17 @@ class BDSFImage(Image):
         self.box_incr = 10
         self.max_iter = 10
         self.scale = 1.0
+        self.set_rms_box()
         for key, value in kwargs.items():
+            if key == 'rms_box':
+                if value == '' or value == 'None':
+                    value = None
+            if key == 'rms_box_bright':
+                if value == '' or value == 'None':
+                    value = None
+            if key == 'adaptive_thresh':
+                if value == '' or value == 'None':
+                    value = None
             setattr(self, key, value)
         self.crop()
 
@@ -64,7 +74,9 @@ class BDSFImage(Image):
 
         """
         data, hdr = Image.read(self)
-        #data = data.reshape(data.shape[2:])
+        # fix header keyword
+        if hdr['CTYPE3'] == 'SPECLNMF':
+            hdr['CTYPE3'] = 'FREQ'
         n = len(data[0,0,:,:])
         a, b = hdr['CRPIX1'], hdr['CRPIX2']
         y, x = np.ogrid[-a:n-a, -b:n-b]
@@ -74,6 +86,25 @@ class BDSFImage(Image):
         data[0,0,mask] = np.nan
         self.filename = self.filename[:-4]+'crop.fits'
         Image.write(self, data, hdr, owrite=True)
+
+
+    def set_rms_box(self):
+        """Sets the `PyBDSF` rms_box parameter to a box size
+        1/10th of the image size and a step size one third of
+        the box size. This "default" rms_box yields slightly
+        better results with fewer artifacts than if left as a
+        free parameter for `PyBDSF` to calculate. A custom
+        rms_box can be defined in the config file which will
+        supersede the one defined here.
+
+        """
+        data, hdr = Image.read(self)
+        box_size = int(round(hdr['NAXIS2'] / 10.))
+        step_size = int(round(box_size / 3.))
+        self.rms_box = (box_size, step_size)
+        small_box_size = int(round(box_size / 5.))
+        small_step_size = int(round(step_size / 5.))
+        self.rms_box_bright = (small_box_size, small_step_size)
       
 
     def get_attr(self):

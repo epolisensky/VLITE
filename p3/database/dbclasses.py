@@ -145,7 +145,7 @@ class Image(object):
 
     def write(self, data, header, owrite=False):
         """Writes new fits image data and header."""
-        fits.writeto(self.filename, data, header, clobber=owrite)
+        fits.writeto(self.filename, data, header, overwrite=owrite)
 
 
     def header_attrs(self, hdr):

@@ -72,8 +72,6 @@ def cfgparse(cfgfile):
     params : dict
         Specifies any non-default `PyBDSF` parameters to be used in source
         finding. 
-    res_tol : float
-        Spatial resolution tolerance in arcsec.
     """    
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
@@ -94,7 +92,6 @@ def cfgparse(cfgfile):
         dbusr = (data['setup'])['dbuser']
         catalogs = (data['setup'])['catalogs']
         params = data['pybdsf_params']
-        res_tol = (data['matching'])['resolution tolerance']
 
     stages = (sf, sa, cm)
     opts = (save, qa, owrite, reproc, rematch, updatematch)
@@ -169,19 +166,8 @@ def cfgparse(cfgfile):
                         cat))
         except TypeError:
             raise ConfigError('Please provide a list of valid sky catalogs.')
-
-    # Check res_tol input if running source association or catalog matching
-    if sa or cm:
-        try:
-            # WARNING: yes & no will evaluate to 1.0 & 0.0
-            res_tol = float(res_tol)
-        except ValueError:
-            raise ConfigError('Matching: resolution tolerance must be a '
-                              'number.')
-        except TypeError: # None -- will assign default value later
-            pass
       
-    return stages, opts, dirs, dbname, dbusr, catalogs, params, res_tol
+    return stages, opts, dirs, dbname, dbusr, catalogs, params
 
 
 def dbinit(dbname, user, overwrite, safe_override=False):
@@ -239,7 +225,10 @@ def dbinit(dbname, user, overwrite, safe_override=False):
             cur.close()
     except psycopg2.OperationalError:
         # DB does not yet exist
-        makenew = raw_input('\nCreate new database {}? '.format(dbname))
+        if safe_override:
+            makenew = 'yes'
+        else:
+            makenew = raw_input('\nCreate new database {}? '.format(dbname))
         if makenew == 'y' or makenew == 'yes':
             conn = psycopg2.connect(host='localhost', database='postgres',
                                     user=user)
@@ -324,6 +313,7 @@ def iminit(conn, impath, save, qa, reproc, stages):
                 else:
                     # just initialize if not writing to DB
                     imobj = dbio.init_image(impath)
+                    print('\nInitializing {}'.format(impath))
             else:
                 # image not in DB, but not running source finding --> quit
                 print('\nERROR: Image {} not yet processed. Source finding '
@@ -339,6 +329,7 @@ def iminit(conn, impath, save, qa, reproc, stages):
                     else:
                         # just initialize if not writing to DB
                         imobj = dbio.init_image(impath)
+                        print('\nInitializing {}'.format(impath))
                 else:
                     # image already in DB & not re-processing
                     print('\nImage {} already processed. Moving on...'.format(
@@ -348,6 +339,7 @@ def iminit(conn, impath, save, qa, reproc, stages):
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
                     imobj = dbio.init_image(impath)
+                    print('\nInitializing {}'.format(impath))
                     imobj.id = status[0]
                     imobj.stage = status[1]
                     imobj.radius = status[2]
@@ -435,7 +427,7 @@ def srcfind(conn, imobj, params, save, qa):
     return imobj, sources
 
 
-def srcassoc(conn, imobj, sources, res_tol, save):
+def srcassoc(conn, imobj, sources, save):
     """Associates sources extracted from current image with
     previously detected VLITE sources stored in the
     assoc_source database table.
@@ -451,10 +443,6 @@ def srcassoc(conn, imobj, sources, res_tol, save):
         List of database.dbclasses.DetectedSource objects.
         Attributes of each object are set from the `PyBDSF`
         output object.
-    res_tol : float
-        Defines the acceptable range of spatial resolutions in arcsec
-        when considering a source from the assoc_source table for
-        cross-matching.
     save : bool
         If ``True``, the assoc_source table is updated with the
         association results and the assoc_id is updated in the
@@ -473,7 +461,7 @@ def srcassoc(conn, imobj, sources, res_tol, save):
     """
     # STAGE 3 -- Source association
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
-        = radioxmatch.associate(conn, sources, imobj, imobj.radius, res_tol)
+        = radioxmatch.associate(conn, sources, imobj, imobj.radius)
     if save:
         # Update assoc_id col for matched detected source
         if detected_matched:
@@ -504,7 +492,7 @@ def srcassoc(conn, imobj, sources, res_tol, save):
     return assoc_matched, detected_unmatched, imobj
 
 
-def catmatch(conn, imobj, sources, catalogs, res_tol, save):
+def catmatch(conn, imobj, sources, catalogs, save):
     """Cross-matches a list of DetectedSource objects
     to all specified sky catalogs.
 
@@ -519,10 +507,6 @@ def catmatch(conn, imobj, sources, catalogs, res_tol, save):
         List of database.dbclasses.DetectedSource objects.
     catalogs : list of str
         Names of the sky survey catalogs to use.
-    res_tol : float
-        Defines the acceptable range of spatial resolutions in arcsec
-        when considering whether a VLITE unique source was in a
-        previous image's field-of-view.
     save : bool
         If ``True``, match results are recorded in the
         catalog_match table and the assoc_source table is updated.
@@ -562,7 +546,7 @@ def catmatch(conn, imobj, sources, catalogs, res_tol, save):
                     # Find previous images where VU source is in FOV
                     src.detected = False
                     prev_images = radioxmatch.check_previous(
-                        conn, src, imobj.radius, res_tol)
+                        conn, src, imobj.radius)
                     for imgid in prev_images:
                         # Ignore current image
                         if imgid[0] != imobj.id:
@@ -591,7 +575,7 @@ def catmatch(conn, imobj, sources, catalogs, res_tol, save):
     return
 
             
-def process(conn, stages, opts, dirs, catalogs, params, res_tol):
+def process(conn, stages, opts, dirs, catalogs, params):
     """
     This function handles the logic and transitions between
     processing stages. All individual processing functions
@@ -618,8 +602,6 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
     params : dict
         Specifies any non-default `PyBDSF` parameters to be used in source
         finding. 
-    res_tol : float
-        Spatial resolution tolerance in arcsec.
     """
     sf, sa, cm = stages
     save, qa, owrite, reproc, rematch, updatematch = opts
@@ -633,11 +615,11 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
             os.system('mkdir '+pybdsfdir)
 
         # Select only the images that end with 'IPln1.fits'
-        #imglist = [f for f in os.listdir(imgdir) if \
-        #           f.endswith('.eLARS-07.IPln1.fits')]
         imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
         imglist.sort()
-        #imglist = imglist[:15]
+        #imglist = imglist[:1]
+        #imglist = ['1.5GHz.1331+305.IPln1.fits']
+        #imglist = ['1.5GHz.J1331+3030.IPln1.fits']
 
         # Begin loop through images
         for img in imglist:
@@ -667,12 +649,11 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
                 # STAGE 3 -- Source association
                 if sa:
                     matched_assoc, new_sources, imobj = srcassoc(
-                        conn, imobj, sources, res_tol, save)
+                        conn, imobj, sources, save)
                     # STAGE 4 -- Sky survey catalog cross-matching
                     if cm: # sf + sa + cm - branch 12, 15
                         # Cross-match new sources only
-                        catmatch(conn, imobj, new_sources, catalogs,
-                                 res_tol, save)
+                        catmatch(conn, imobj, new_sources, catalogs, save)
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -687,7 +668,7 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
                         continue
                 else:
                     if cm: # sf + cm - branch 10, 13
-                        catmatch(conn, imobj, sources, catalogs, res_tol, False)
+                        catmatch(conn, imobj, sources, catalogs, False)
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -707,11 +688,10 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
                     # Already caught case of no sf but stage < 2 in iminit
                     if imobj.stage == 2: # no sa has been run yet
                         matched_assoc, new_sources, imobj = srcassoc(
-                            conn, imobj, sources, res_tol, save)
+                            conn, imobj, sources, save)
                         if cm: # sa + cm - branch 20
                             # Cross-match new sources only
-                            catmatch(conn, imobj, new_sources, catalogs,
-                                     res_tol, save)
+                            catmatch(conn, imobj, new_sources, catalogs, save)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -740,8 +720,7 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
                                                      src.nmatches is None \
                                                      or src.nmatches == 0]
                                 else: pass
-                            catmatch(conn, imobj, assoc_sources, catalogs,
-                                     res_tol, save)
+                            catmatch(conn, imobj, assoc_sources, catalogs, save)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -767,8 +746,7 @@ def process(conn, stages, opts, dirs, catalogs, params, res_tol):
                                                  if src.nmatches is None or \
                                                  src.nmatches == 0]
                             else: pass
-                        catmatch(conn, imobj, assoc_sources, catalogs,
-                                 res_tol, save)
+                        catmatch(conn, imobj, assoc_sources, catalogs, save)
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -795,14 +773,18 @@ def main():
         cf = sys.argv[1]
     except IndexError:
         raise ConfigError('Please provide a configuration file.')
+    try:
+        ignore_prompt = sys.argv[2]
+    except IndexError:
+        ignore_prompt = False
     # Parse config file
-    stages, opts, dirs, dbname, dbusr, catalogs, params, rtol = cfgparse(cf)
+    stages, opts, dirs, dbname, dbusr, catalogs, params = cfgparse(cf)
 
     # Find existing/create/overwrite database
-    conn = dbinit(dbname, dbusr, opts[2])
+    conn = dbinit(dbname, dbusr, opts[2], safe_override=ignore_prompt)
 
     # Process images
-    process(conn, stages, opts, dirs, catalogs, params, rtol)
+    process(conn, stages, opts, dirs, catalogs, params)
 
     conn.close()
 

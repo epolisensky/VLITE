@@ -25,6 +25,7 @@ import os
 import pandas as pd
 
 
+#catalogdir = '/home/vpipe/vlite-emily/data/SkyCatalogs'
 catalogdir = '/home/erichards/work/data/SkyCatalogs'
 
 # If adding a new catalog, don't forget to add it to this list!

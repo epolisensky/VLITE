@@ -41,7 +41,7 @@ def write_regions(srclist, impath, ext='.reg'):
                 src.ra, src.dec, src.maj, src.min, src.pa + 90.0, src.name))
 
 
-def limit_res(rows, res, res_tol):
+def limit_res(rows, res):
     """Filters out sources extracted from the database
     which originate from images with spatial resolutions
     outside the acceptable range.
@@ -53,9 +53,6 @@ def limit_res(rows, res, res_tol):
         from the database.
     res : float
         Spatial resolution of the current image in arcseconds.
-    res_tol : float
-        Acceptable range above and below the given resolution
-        for sources to be considered for matching.
 
     Returns
     -------
@@ -63,19 +60,34 @@ def limit_res(rows, res, res_tol):
         List of `psycopg2` row dictionary objects after
         applying the spatial resolution filtering.
     """
-    print('\nLimiting to sources with resolution = '
-          '{:.1f}+/-{}"'.format(res, res_tol))
     keep = []
-    for row in rows:
-        if res - res_tol < row['beam'] < res + res_tol:
-            keep.append(row)
+    if res <= 15.0:
+        print('\nLimiting to sources with BMIN <= 15"')
+        for row in rows:
+            if row['beam'] <= 15.0:
+                keep.append(row)
+    elif 15. < res <= 35.:
+        print('\nLimiting to sources with 15" < BMIN <= 35"')
+        for row in rows:
+            if 15. < row['beam'] <= 35.:
+                keep.append(row)
+    elif 35. < res <= 60.:
+        print('\nLimiting to sources with 35" < BMIN <= 60"')
+        for row in rows:
+            if 35. < row['beam'] <= 60.:
+                keep.append(row)
+    else:
+        print('\nLimiting to sources with BMIN > 60"')
+        for row in rows:
+            if row['beam'] > 60.:
+                keep.append(row)
 
     print(' -- {} sources remaining'.format(len(keep)))
 
     return keep
 
 
-def check_previous(conn, src, search_radius, res_tol):
+def check_previous(conn, src, search_radius):
     """Searches the database image table for images
     of similar spatial resolution which cover an area
     on the sky containing a given point.
@@ -91,9 +103,6 @@ def check_previous(conn, src, search_radius, res_tol):
     search_radius : float
         Radius defining the size of the circular search
         area in degrees.
-    res_tol : float
-        Spatial resolution tolerance to define range
-        of acceptable resolutions to consider.
 
     Returns
     -------
@@ -101,12 +110,19 @@ def check_previous(conn, src, search_radius, res_tol):
         List of ids of the images which could have
         contained the given point.
     """
-    resup, reslo = src.beam + res_tol, src.beam - res_tol
+    if src.beam <= 15.0:
+        reslo, reshi = 0., 15.
+    elif 15. < src.beam <= 35.:
+        reslo, reshi = 15., 35.
+    elif 35. < src.beam <= 60.:
+        reslo, reshi = 35., 60.
+    else:
+        reslo, reshi = 60., 99999.
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute('''SELECT id FROM image 
         WHERE q3c_join(%s, %s, obs_ra, obs_dec, %s) AND
-        bmaj BETWEEN %s AND %s''',
-                (src.ra, src.dec, search_radius, reslo, resup))
+        bmin > %s AND bmin <= %s''',
+                (src.ra, src.dec, search_radius, reslo, reshi))
     prev_images = cur.fetchall()
     cur.close()
 
@@ -153,7 +169,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
     return rows
     
 
-def associate(conn, detected_sources, imobj, search_radius, res_tol):
+def associate(conn, detected_sources, imobj, search_radius):
     """Associates new sources with old sources.
 
     Parameters
@@ -167,10 +183,6 @@ def associate(conn, detected_sources, imobj, search_radius, res_tol):
         set from header info & updated with source finding results.
     search_radius : float
         Size of the circular search region in degrees.
-    res_tol : float
-        Defines the acceptable range of spatial resolutions in arcsec
-        when considering a source from the assoc_source table for
-        cross-matching.
 
     Returns
     -------
@@ -203,7 +215,7 @@ def associate(conn, detected_sources, imobj, search_radius, res_tol):
     if not assoc_rows:
         # No previous sources found in that sky region
         for src in detected_sources:
-            src.beam = imobj.bmaj
+            src.beam = imobj.bmin
             src.ndetect = 1
         detected_matched = []
         detected_unmatched = detected_sources
@@ -211,7 +223,7 @@ def associate(conn, detected_sources, imobj, search_radius, res_tol):
         assoc_unmatched = []
     else:
         # Limit to sources taken from images of similar resolution
-        limited_assoc_rows = limit_res(assoc_rows, imobj.bmaj, res_tol)
+        limited_assoc_rows = limit_res(assoc_rows, imobj.bmin)
         # Translate row dictionaries to DetectedSource objects
         assoc_sources = []
         for asrc in limited_assoc_rows:
@@ -226,7 +238,7 @@ def associate(conn, detected_sources, imobj, search_radius, res_tol):
         assoc_unmatched = []
         for src in detected_sources:
             match, asrc, min_der = matchfuncs.deRuitermatch(
-                src, assoc_sources, imobj.bmaj)
+                src, assoc_sources, imobj.bmin)
             if match: # Found a match!
                 src.assoc_id = asrc.id
                 detected_matched.append(src)
@@ -245,7 +257,7 @@ def associate(conn, detected_sources, imobj, search_radius, res_tol):
                 asrc.ndetect += 1
                 assoc_matched.append(asrc)
             else:
-                src.beam = imobj.bmaj
+                src.beam = imobj.bmin
                 src.ndetect = 1
                 detected_unmatched.append(src)
 
@@ -312,7 +324,7 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius):
         sources_unmatched = []
         for src in sources:
             match, csrc, min_der = matchfuncs.deRuitermatch(
-                src, catalog_sources, imobj.bmaj)
+                src, catalog_sources, imobj.bmin)
             if match: # Found a match!
                 try:
                     src.nmatches += 1
