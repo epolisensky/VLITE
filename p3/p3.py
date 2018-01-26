@@ -35,9 +35,12 @@ def print_run_stats(start_time):
     print('--------------------------------------\n')
     print('Run statistics:')
     # Count the number of images processed
-    dbclasses.Image.image_count()
+    nimgs = dbclasses.Image.image_count()
+    print('\nProcessed {} images.'.format(nimgs))
     # Print the runtime
-    print('\nTotal runtime: {}\n'.format(datetime.now() - start_time))
+    runtime = datetime.now() - start_time
+    print('\nTotal runtime: {}\n'.format(runtime))
+    return nimgs, runtime
 
 
 def cfgparse(cfgfile):
@@ -75,28 +78,18 @@ def cfgparse(cfgfile):
     """    
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
-        sf = (data['stages'])['source finding']
-        sa = (data['stages'])['source association']
-        cm = (data['stages'])['catalog matching']
-        save = (data['options'])['save to database']
-        qa = (data['options'])['quality checks']
-        owrite = (data['options'])['overwrite']
-        reproc = (data['options'])['reprocess']
-        rematch = (data['options'])['redo match']
-        updatematch = (data['options'])['update match']
-        rootdir = (data['setup'])['rootdir']
-        yr = (data['setup'])['year']
-        mo = (data['setup'])['month']
-        days = (data['setup'])['day']
-        dbname = (data['setup'])['dbname']
-        dbusr = (data['setup'])['dbuser']
-        catalogs = (data['setup'])['catalogs']
-        params = data['pybdsf_params']
+        stages = data['stages']
+        opts = data['options']
+        setup = data['setup']
+        sfparams = data['pybdsf_params']
+        qaparams = data['image_qa_params']
 
-    stages = (sf, sa, cm)
-    opts = (save, qa, owrite, reproc, rematch, updatematch)
-
-    if not any(stages) and not save:
+    rootdir = setup['rootdir']
+    yr = setup['year']
+    mo = setup['month']
+    days = setup['day']
+      
+    if not any(stages.values()) and not opts['save to database']:
         raise ConfigError('Nothing to do -- change options: save to database: '
                           'to yes in the config file to write images to '
                           'database, or add a processing stage.')
@@ -134,28 +127,28 @@ def cfgparse(cfgfile):
         dirs.append(procdir)
 
     # Make sure stage & option inputs are boolean
-    for stage in stages:
+    for stage in stages.values():
         if isinstance(stage, bool):
             pass
         else:
             raise ConfigError('stage inputs must be True/False or yes/no.')
-    for opt in opts:
+    for opt in opts.values():
         if isinstance(opt, bool):
             pass
         else:
             raise ConfigError('option inputs must be True/False or yes/no.')
 
     # Catch case when no DB is given
-    if dbname is None or dbusr is None:
+    if setup['dbname'] is None or setup['dbuser'] is None:
         raise ConfigError('Please provide a database/user name.')
 
-    if cm:
+    if stages['catalog matching']:
         # Make sure requested catalogs exist
         catalog_opts = catalogio.catalog_list
         try:
-            if len(catalogs) < 1:
-                catalogs = None
-            for cat in catalogs:
+            if len(setup['catalogs']) < 1:
+                setup['catalogs'] = None
+            for cat in setup['catalogs']:
                 if type(cat) != 'string':
                     cat = str(cat)
                 cat = cat.lower()
@@ -166,8 +159,21 @@ def cfgparse(cfgfile):
                         cat))
         except TypeError:
             raise ConfigError('Please provide a list of valid sky catalogs.')
+
+    # Set default QA requirements if not specified
+    if opts['quality checks']:
+        if qaparams['min time on source (s)'] is None:
+            qaparams['min time on source (s)'] = 60.
+        if qaparams['max noise (mJy/beam)'] is None:
+            qaparams['max noise (mJy/beam)'] = 1000.
+        if qaparams['max beam axis ratio'] is None:
+            qaparams['max beam axis ratio'] = 3.
+        if qaparams['min problem source separation (deg)'] is None:
+            qaparams['min problem source separation (deg)'] = 20.
+        if qaparams['max source metric'] is None:
+            qaparams['max source metric'] = 10.    
       
-    return stages, opts, dirs, dbname, dbusr, catalogs, params
+    return stages, opts, setup, sfparams, qaparams, dirs
 
 
 def dbinit(dbname, user, overwrite, safe_override=False):
@@ -250,7 +256,7 @@ def dbinit(dbname, user, overwrite, safe_override=False):
     return conn
 
 
-def iminit(conn, impath, save, qa, reproc, stages):
+def iminit(conn, impath, save, qa, qaparams, reproc, stages):
     """Initializes `database.dbclasses.Image()` object
     and adds row to database image table if the image is not
     already in the table or if the image is being reprocessed.
@@ -287,18 +293,27 @@ def iminit(conn, impath, save, qa, reproc, stages):
     """
     # STAGE 1 -- Initialize image object, add to table, 1st quality check
 
+    # Initialize Image object & set attributes from header
+    imobj = dbio.init_image(impath)
+
     # Is the image in the database?
     status = dbio.status_check(conn, impath)
 
+    # Run image quality checks only if it is a new image
+    if qa and status is None:
+        imobj.image_qa(qaparams)
+    else:
+        pass
+
     # Only adding image to DB - add or update w/o deleting sources
-    if not any(stages):
+    if not any(stages.values()):
         if status is None:
             # image not in DB
-            imobj = dbio.add_image(conn, impath, status) # branch 2
+            imobj = dbio.add_image(conn, imobj, status) # branch 2
         else:
             if reproc:
                 # already processed, but re-doing -- sources NOT deleted
-                imobj = dbio.add_image(conn, impath, status) # branch 4
+                imobj = dbio.add_image(conn, imobj, status) # branch 4
             else:
                 # already processed & not re-doing
                 print('\nImage {} already in database. Moving on...'.format(
@@ -306,13 +321,12 @@ def iminit(conn, impath, save, qa, reproc, stages):
                 imobj = None # branch 3
     else: # Running at least one stage
         if status is None:
-            if stages[0]:
+            if stages['source finding']:
                 if save:
                     # image not in DB; planning to source find & write to DB
-                    imobj = dbio.add_image(conn, impath, status)
+                    imobj = dbio.add_image(conn, imobj, status)
                 else:
                     # just initialize if not writing to DB
-                    imobj = dbio.init_image(impath)
                     print('\nInitializing {}'.format(impath))
             else:
                 # image not in DB, but not running source finding --> quit
@@ -320,15 +334,14 @@ def iminit(conn, impath, save, qa, reproc, stages):
                       'must be run before other stages.'.format(impath))
                 imobj = None # branch 5
         else:
-            if stages[0]:
+            if stages['source finding']:
                 if reproc:
                     if save:
                         # image in DB; re-doing SF, so old sources are removed
-                        imobj = dbio.add_image(conn, impath, status,
+                        imobj = dbio.add_image(conn, imobj, status,
                                                delete=True)
                     else:
                         # just initialize if not writing to DB
-                        imobj = dbio.init_image(impath)
                         print('\nInitializing {}'.format(impath))
                 else:
                     # image already in DB & not re-processing
@@ -338,7 +351,6 @@ def iminit(conn, impath, save, qa, reproc, stages):
             else:
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
-                    imobj = dbio.init_image(impath)
                     print('\nInitializing {}'.format(impath))
                     imobj.id = status[0]
                     imobj.stage = status[1]
@@ -348,20 +360,11 @@ def iminit(conn, impath, save, qa, reproc, stages):
                           'yet. Source finding must be run before other '
                           'stages.'.format(impath))
                     imobj = None # branch 7
-
-    # Run quality checks?
-    if imobj is not None:
-        if qa:
-            pass
-        else:
-            pass
-    else:
-        pass
     
     return imobj
 
 
-def srcfind(conn, imobj, params, save, qa):
+def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     """Runs `PyBDSF` source finding, writes out results,
     and inserts sources into database detected_source and
     detected_island tables, if the save to database option is on.
@@ -399,9 +402,9 @@ def srcfind(conn, imobj, params, save, qa):
     # STAGE 2 -- Source finding + 2nd quality check
     print('\nExtracting sources from {}'.format(imobj.filename))
     # Initialize source finding image object
-    bdsfim = runbdsf.BDSFImage(imobj.filename, **params)
+    bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
-    if params['mode'] == 'minimize_islands':
+    if sfparams['mode'] == 'minimize_islands':
         out = bdsfim.minimize_islands()
     else:
         out = bdsfim.find_sources()
@@ -411,18 +414,22 @@ def srcfind(conn, imobj, params, save, qa):
     imobj.stage = 2
    
     if out is not None:
-        # Write PyBDSF(M) files to daily directory
+        # Write PyBDSF files to daily directory
         runbdsf.write_sources(out)
         imobj, sources = dbclasses.translate(imobj, out)
-        if save:
-            dbio.add_sources(conn, imobj, sources)
-        # run more quality checks
         if qa:
-            pass
-        else:
-            pass
+            imobj.source_qa(sources, qaparams)
     else:
+        # PyBDSF failed to process
         sources = None
+        imobj.error_id = 5
+
+    if save:
+        dbio.add_sources(conn, imobj, sources)
+        # Compute beam corrected fluxes & write to corrected_flux table
+        for src in sources:
+            src.correct_flux(imobj)
+            dbio.add_corrected(conn, src)
 
     return imobj, sources
 
@@ -523,7 +530,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
             if not already_matched:
                 todo_sources.append(src)
         try:
-            sources, catalog_matched = radioxmatch.catalogmatch(
+            todo_sources, catalog_matched = radioxmatch.catalogmatch(
                 conn, todo_sources, catalog, imobj, imobj.radius)
         except TypeError: # no sky catalog sources extracted
             continue
@@ -534,9 +541,9 @@ def catmatch(conn, imobj, sources, catalogs, save):
             dbio.add_catalog_match(conn, catalog_matched)
     if save:
         # Update assoc_source.nmatches
-        dbio.update_assoc_nmatches(conn, sources)
+        dbio.update_assoc_nmatches(conn, todo_sources)
         # Check for new VLITE unique (VU) sources from this image
-        for src in sources:
+        for src in todo_sources:
             if src.nmatches == 0:
                 existing = dbio.check_vlite_unique(conn, src.id)
                 if not existing: # returned empty list
@@ -570,12 +577,12 @@ def catmatch(conn, imobj, sources, catalogs, save):
         dbio.update_stage(conn, imobj)
 
     # Write regions file
-    radioxmatch.write_regions(all_matches, imobj.filename, ext='.matches.reg')
+    #radioxmatch.write_regions(all_matches, imobj.filename, ext='.matches.reg')
 
     return
 
             
-def process(conn, stages, opts, dirs, catalogs, params):
+def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
     """
     This function handles the logic and transitions between
     processing stages. All individual processing functions
@@ -599,12 +606,18 @@ def process(conn, stages, opts, dirs, catalogs, params):
         to be processed during the run.
     catalogs : list of str
         List of sky survey tables to use when running catalog matching.
-    params : dict
+    sfparams : dict
         Specifies any non-default `PyBDSF` parameters to be used in source
         finding. 
     """
-    sf, sa, cm = stages
-    save, qa, owrite, reproc, rematch, updatematch = opts
+    sf = stages['source finding']
+    sa = stages['source association']
+    cm = stages['catalog matching']
+    save = opts['save to database']
+    qa = opts['quality checks']
+    reproc = opts['reprocess']
+    rematch = opts['redo match']
+    updatematch = opts['update match']
     
     # Begin loop through daily directories
     for imgdir in dirs:
@@ -618,29 +631,26 @@ def process(conn, stages, opts, dirs, catalogs, params):
         imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
         imglist.sort()
         #imglist = imglist[:1]
-        #imglist = ['1.5GHz.1331+305.IPln1.fits']
-        #imglist = ['1.5GHz.J1331+3030.IPln1.fits']
 
         # Begin loop through images
         for img in imglist:
             impath = os.path.join(imgdir, img)
 
             # STAGE 1 -- Initialize image object
-            imobj = iminit(conn, impath, save, qa, reproc, stages)
+            imobj = iminit(conn, impath, save, qa, qaparams, reproc, stages)
             # Move on to next image if imobj is None
             if imobj is None:
                 continue
             
             # STAGE 2 -- Source finding
             if sf:
-                imobj, sources = srcfind(conn, imobj, params, save, qa)
+                imobj, sources = srcfind(
+                    conn, imobj, sfparams, save, qa, qaparams)
                 os.system('rm '+imgdir+'*.crop.fits')
                 if sources is None:
                     # Image failed to process
                     with open(pybdsfdir+'failed.txt', 'a') as f:
                         f.write(img+'\n')
-                    if save:
-                        dbio.pybdsf_fail(conn, imobj)
                     continue
                 else:
                     os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
@@ -778,17 +788,24 @@ def main():
     except IndexError:
         ignore_prompt = False
     # Parse config file
-    stages, opts, dirs, dbname, dbusr, catalogs, params = cfgparse(cf)
+    stages, opts, setup, sfparams, qaparams, dirs = cfgparse(cf)
 
     # Find existing/create/overwrite database
-    conn = dbinit(dbname, dbusr, opts[2], safe_override=ignore_prompt)
+    conn = dbinit(setup['dbname'], setup['dbuser'],
+                  opts['overwrite'], safe_override=ignore_prompt)
+    # Make the database error table
+    dbio.make_error(conn, qaparams)
 
     # Process images
-    process(conn, stages, opts, dirs, catalogs, params)
+    process(conn, stages, opts, dirs, setup['catalogs'], sfparams, qaparams)
+
+    nimages, exec_time = print_run_stats(start_time)
+
+    # Record run configuration parameters
+    dbio.record_config(conn, cf, start_time, exec_time, nimages,
+                       stages, opts, setup, sfparams, qaparams)
 
     conn.close()
-
-    print_run_stats(start_time)
 
 
 if __name__ == '__main__':

@@ -4,9 +4,57 @@ data into the `PostgreSQL` database tables.
 """
 import psycopg2
 import psycopg2.extras
+import json
 import dbclasses
 
 
+def record_config(conn, cfgfile, start_time, exec_time, nimages,
+                  stages, opts, setup, sfparams, qaparams):
+    """Records information about the current run of the pipeline,
+    including the contents of the configuration file.
+
+    """
+    jstages = json.dumps(stages)
+    jopts = json.dumps(opts)
+    jsetup = json.dumps(setup)
+    jsfparams = json.dumps(sfparams)
+    jqaparams = json.dumps(qaparams)
+    cur = conn.cursor()
+    cur.execute('''INSERT INTO run_config (
+        file, start_time, execution_time, nimages, stages, options, setup,
+        pybdsf_params, image_qa_params) VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                (cfgfile, start_time, exec_time, nimages,
+                 jstages, jopts, jsetup, jsfparams, jqaparams))
+    conn.commit()
+    cur.close()
+
+
+def make_error(conn, params):
+    """Inserts values into the database error table."""
+    reason_dict = {'integration time on source < {} s'.
+                   format(params['min time on source (s)']) : 1,
+                   'image noise < 0 or > {} mJy/beam'.
+                   format(params['max noise (mJy/beam)']): 2,
+                   'beam axis ratio > {}'.
+                   format(params['max beam axis ratio']) : 3,
+                   'image center within {} deg of problem source'.
+                   format(params['min problem source separation (deg)']): 4,
+                   'PyBDSF failed to process' : 5,
+                   'zero sources extracted' : 6,
+                   'source metric > {}'.
+                   format(params['max source metric']) : 7}
+
+    cur = conn.cursor()
+
+    sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
+    for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
+        cur.execute(sql, (value, key))
+
+    conn.commit()
+    cur.close()
+
+        
 def init_image(impath):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
@@ -36,15 +84,16 @@ def status_check(conn, impath):
     return status
 
 
-def add_image(conn, impath, status, delete=False):
+def add_image(conn, img, status, delete=False):
     """Insert or update rows in database image table.
     
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    impath : str
-        Directory path to the FITS image file.
+    img : database.dbclasses.Image instance
+        Initialized Image object with attributes
+        set from image header.
     status : tuple
         Contains the id and stage for the image's row
         entry in the database image table if it exists.
@@ -63,9 +112,6 @@ def add_image(conn, impath, status, delete=False):
         Initialized Image object which was used to
         insert values into the database image table.    
     """
-    # Initialize Image object
-    img = init_image(impath)    
-    
     cur = conn.cursor()
     
     # Add new image to DB
@@ -75,16 +121,16 @@ def add_image(conn, impath, status, delete=False):
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
             config, nvis, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
-            error_id, stage) 
+            stage, error_id, nearest_problem, separation) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.error_id, img.stage)
+                img.stage, img.error_id, img.nearest_problem, img.separation)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -96,14 +142,16 @@ def add_image(conn, impath, status, delete=False):
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
             nvis = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, rms_box = %s, error_id = %s, stage = %s
+            nsrc = %s, rms_box = %s, stage = %s, error_id = %s,
+            nearest_problem = %s, separation = %s
             WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.error_id, img.stage, img.id)
+                img.stage, img.error_id, img.nearest_problem,
+                img.separation, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -144,6 +192,13 @@ def add_sources(conn, img, sources):
     vals = (img.imsize, img.obs_freq, img.bmaj, img.bmin, img.bpa, img.noise,
             img.radius, img.nsrc, img.rms_box, img.error_id, img.stage, img.id)
     cur.execute(sql, vals)
+
+    if sources is not None:
+        pass
+    else:
+        conn.commit()
+        cur.close()
+        return
     
     # Insert DetectedSources into detected_source and detected_island tables
     print('\nAdding detected sources to database.')
@@ -179,6 +234,28 @@ def add_sources(conn, img, sources):
                 src.e_dc_maj, src.dc_min, src.e_dc_min, src.dc_pa,
                 src.e_dc_pa, src.code, src.assoc_id)
         cur.execute(sql, vals)
+
+    conn.commit()
+    cur.close()
+
+
+def add_corrected(conn, src):
+    """Adds source flux values after being corrected
+    for the primary beam response to the database
+    corrected_flux table.
+
+    """
+    cur = conn.cursor()
+
+    cur.execute('''INSERT INTO corrected_flux (
+        src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
+        e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
+        isl_resid_rms, isl_resid_mean) VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                (src.src_id, src.isl_id, src.image_id, src.total_flux,
+                 src.e_total_flux, src.peak_flux, src.e_peak_flux,
+                 src.total_flux_isl, src.total_flux_islE, src.rms_isl,
+                 src.mean_isl, src.resid_rms, src.resid_mean))
 
     conn.commit()
     cur.close()
@@ -325,7 +402,6 @@ def check_catalog_match(conn, asrc_id, catalog):
     """Checks if a source in the assoc_source table already
     has a match to a source in the specified sky catalog
     in the catalog_match table.
-
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
@@ -335,7 +411,6 @@ def check_catalog_match(conn, asrc_id, catalog):
         match to the assoc_id in the vlite_unique table.
     catalog : str
         Name of the sky catalog.
-
     Returns
     -------
     rowid : integer
@@ -559,29 +634,6 @@ def update_stage(conn, imobj):
 
     cur.execute('UPDATE image SET stage = %s WHERE id = %s',
                 (imobj.stage, imobj.id))
-
-    conn.commit()
-    cur.close()
-
-
-def pybdsf_fail(conn, imobj):
-    """Updates the image table error_id column to indicate
-    a failure to process by PyBDSF: error_id = 3.
-
-    Parameters
-    ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
-        Image object used to set table column values.
-    """
-    imobj.error_id = 3
-    
-    cur = conn.cursor()
-
-    # Update Image table error_id code
-    cur.execute('''UPDATE image SET error_id = %s WHERE id = %s''',
-                (imobj.error_id, imobj.id))
 
     conn.commit()
     cur.close()

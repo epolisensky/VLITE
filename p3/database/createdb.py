@@ -1,16 +1,4 @@
-"""Functions to create database tables, functions, and triggers."""
-
-
-def make_error(cursor):
-    """Inserts values into the database error table."""
-    reason_dict = {'short duration' : 1,
-                   'close to bright radio source' : 2,
-                   'PyBDSF failed to process' : 3,
-                   'poor quality' : 4}
-
-    sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
-    for key in reason_dict.keys():
-        cursor.execute(sql, (reason_dict[key], key))
+"""Function to create database tables, functions, and triggers."""
 
 
 def create(conn, safe=False):
@@ -47,6 +35,7 @@ def create(conn, safe=False):
             DROP TABLE IF EXISTS image;
             DROP TABLE IF EXISTS assoc_source;
             DROP TABLE IF EXISTS error;
+            DROP TABLE IF EXISTS run_config;
             DROP FUNCTION IF EXISTS update_assoc_func;
             DROP FUNCTION IF EXISTS remove_vu_func;
             DROP FUNCTION IF EXISTS update_detected_func;
@@ -57,6 +46,20 @@ def create(conn, safe=False):
         sql = (
             '''
             CREATE EXTENSION IF NOT EXISTS q3c;
+
+            CREATE TABLE run_config (
+                id SERIAL NOT NULL,
+                file TEXT,
+                start_time TIMESTAMP (0),
+                execution_time TIME (1),
+                nimages INTEGER,
+                stages JSON,
+                options JSON,
+                setup JSON,
+                pybdsf_params JSON,
+                image_qa_params JSON,
+                PRIMARY KEY (id)
+            );
 
             CREATE TABLE error (
                 id INTEGER NOT NULL,
@@ -104,6 +107,8 @@ def create(conn, safe=False):
                 rms_box VARCHAR(14),
                 stage INTEGER,
                 error_id INTEGER,
+                nearest_problem TEXT,
+                separation REAL,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 
@@ -218,9 +223,6 @@ def create(conn, safe=False):
             ''')
         cur.execute(sql)
         
-        # Make error table
-        make_error(cur)
-
         conn.commit()
 
         # Triggers

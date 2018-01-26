@@ -6,6 +6,7 @@ Adapted from EP's VSLOW.py.
 Post-Processing Pipeline (P3) Stage 4
 
 """
+import re
 import numpy as np
 import psycopg2
 import psycopg2.extras
@@ -32,7 +33,7 @@ def write_regions(srclist, impath, ext='.reg'):
     """
     fname = impath[:-5] + ext
     with open(fname, 'w') as f:
-        f.write('global color=red font="helvetica 10 normal" '
+        f.write('global color=cyan font="helvetica 10 normal" '
                 'select=1 highlite=1 edit=1 move=1 delete=1 '
                 'include=1 fixed=0 source\n')
         f.write('fk5\n')

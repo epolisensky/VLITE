@@ -9,7 +9,7 @@ stages:
 options:
                               # processing options; yes | no or True | False
   save to database: yes       # save results to database?
-  quality checks: no          # run image & source count quality checks?
+  quality checks: yes         # run image & source count quality checks?
   overwrite: no               # overwrite database if exists?
   reprocess: no               # re-run source finding on image?
   redo match: no              # redo cross-matching with all sky catalogs?
@@ -19,7 +19,7 @@ setup:
   rootdir: /path/to/data/
   year: 2018
   month: 01
-  day: [22]                   # list of days to process; [] = all
+  day: [25]                   # list of days to process; [] = all
   dbname: vlite
   dbuser: postgres
   catalogs: [FIRST, GLEAM, NVSS, SUMSS, TGSS, VLSSr, WENSS]
@@ -33,3 +33,11 @@ pybdsf_params:
   adaptive_rms_box: True
   #rms_box_bright: !!python/tuple [20, 10]
   adaptive_thresh: 10.
+
+image_qa_params:
+  # used when quality checks: yes/True; leave blank for defaults
+  min time on source (s):
+  max noise (mJy/beam):
+  max beam axis ratio:
+  min problem source separation (deg):
+  max source metric:

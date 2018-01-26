@@ -1,5 +1,7 @@
-"""Functions for computing the primary beam correction."""
+"""Functions for computing the primary beam correction
+and expected source counts.
 
+"""
 import numpy as np
 
 
@@ -43,3 +45,33 @@ def find_nearest_pbcorr(angle):
     pbdata = read_fitted_beam()
     idx = (np.abs(np.array(pbdata['angle']) - angle)).argmin()
     return pbdata['power'][idx]
+
+
+def expected_nsrc(rms, max_angle=1.5, sigma=5.):
+    """Calculates expected number of sources that would
+    have been detected within a maximum distance from the
+    image center (max_angle) based on the detection threshold
+    (sigma) in the image from logN-logS fit of WENSS catalog 
+    scaled to 341 MHz from 325 MHz with alpha= -0.7, rms at 
+    center of image [mJy], and fitted beam.
+
+    """
+    wenss_n0 = 10.637 # number per square degree
+    wenss_S0 = 247.569 # mJy
+    wenss_alpha1 = 1.846
+    wenss_alpha2 = 0.332
+    wenss_n = 0.497
+    wenss_n2 = -1.0 / wenss_n
+    # Read fitted beam file
+    pbdata = read_fitted_beam()
+    nexp = 0
+    for i in range(len(pbdata['angle'])):
+        if pbdata['angle'][i] > max_angle:
+            break
+        flux = ((sigma * rms) / pbdata['power'][i]) / wenss_S0
+        nsrc = pbdata['domega'][i] * wenss_n0 * (
+            (flux**(wenss_alpha1*wenss_n) \
+             + flux**(wenss_alpha2*wenss_n))**wenss_n2)
+        nexp += nsrc
+
+    return nexp

@@ -1,4 +1,4 @@
-"""Unit tests (sort of) for all the possible paths
+"""Integration tests for all the possible paths
 through the P3 logic framework that involve stages
 up through source association (branches 11, 14, 18, 19). 
 
@@ -22,7 +22,6 @@ class TestSABranches(unittest.TestCase):
         self.dirs = ['/home/erichards/work/p3/test/2540-06/B/Images/']
         self.catalogs = ['NVSS']
         self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.res_tol = 5.0
         self.conn = dbinit('branchtest', 'erichards', True, True)
 
 
@@ -33,13 +32,14 @@ class TestSABranches(unittest.TestCase):
 
     def test_sfsa_new_image(self):
         """Branch 11 - SF + SA on new image"""
-        # sf, sa, cm
-        stages = (True, True, False)
-        # save, qa, overwrite, reprocess, redo match, update match
-        opts = (True, False, False, False, False, False)
+        stages = {'source finding' : True, 'source association' : True,
+                  'catalog matching' : False}
+        opts = {'save to database' : True, 'quality checks' : True,
+                'overwrite' : False, 'reprocess' : False,
+                'redo match' : False, 'update match' : False}
         # Pipeline should stop after source association
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -52,24 +52,25 @@ class TestSABranches(unittest.TestCase):
             WHERE ndetect = 2''')
         associations = self.cur.fetchone()[0]
         result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 24, 10])
+        self.assertEqual(result, [[(1, 3), (2, 3)], 22, 11])
         self.cur.close()
 
 
     def test_sfsa_reprocess(self):
         """Branch 14 - SF + SA reprocess"""
-        # sf, sa, cm
-        stages = (True, True, False)
-        # save, qa, overwrite, reprocess, redo match, update match
-        opts = (True, False, False, True, False, False)
+        stages = {'source finding' : True, 'source association' : True,
+                  'catalog matching' : False}
+        opts = {'save to database' : True, 'quality checks' : True,
+                'overwrite' : False, 'reprocess' : True,
+                'redo match' : False, 'update match' : False}
         # Process once
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Use different scale so results are different
         self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
         # Process twice
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -82,40 +83,43 @@ class TestSABranches(unittest.TestCase):
             WHERE ndetect = 2''')
         associations = self.cur.fetchone()[0]
         result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 14, 5])
+        self.assertEqual(result, [[(1, 3), (2, 3)], 12, 6])
         self.cur.close()
 
 
     def test_saonly_already_done(self):
         """Branch 18 - SA already done, so do nothing"""
         # Process through SA first
-        # sf, sa, cm
-        stages = (True, True, False)
-        # save, qa, overwrite, reprocess, redo match, update match
-        # Testing with reprocess True to make sure it doesn't matter
-        opts = (True, False, False, True, False, False)
+        stages = {'source finding' : True, 'source association' : True,
+                  'catalog matching' : False}
+        opts = {'save to database' : True, 'quality checks' : True,
+                'overwrite' : False, 'reprocess' : True,
+                'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Now try SA only
-        stages = (False, True, False)
+        stages = {'source finding' : False, 'source association' : True,
+                  'catalog matching' : False}
         # Code should exit
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params, self.res_tol))
+                                  self.catalogs, self.params))
 
 
     def test_saonly(self):
         """Branch 19 - SA only"""
         # Process through SF first
-        # sf, sa, cm
-        stages = (True, False, False)
-        # save, qa, overwrite, reprocess, redo match, update match
-        opts = (True, False, False, False, False, False)
+        stages = {'source finding' : True, 'source association' : False,
+                  'catalog matching' : False}
+        opts = {'save to database' : True, 'quality checks' : True,
+                'overwrite' : False, 'reprocess' : False,
+                'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Now do SA only
-        stages = (False, True, False)
+        stages = {'source finding' : False, 'source association' : True,
+                  'catalog matching' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params, self.res_tol)
+                self.catalogs, self.params)
         # Check DB - should be same as SF + SA (branch 11)
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -128,7 +132,7 @@ class TestSABranches(unittest.TestCase):
             WHERE ndetect = 2''')
         associations = self.cur.fetchone()[0]
         result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 24, 10])
+        self.assertEqual(result, [[(1, 3), (2, 3)], 22, 11])
         self.cur.close()
 
 
