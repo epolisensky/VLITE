@@ -126,6 +126,7 @@ class Image(object):
         self.rms_box = None
         self.error_id = None
         self.stage = 1
+        self.catalogs_checked = None
         self.radius = None
         self.nearest_problem = None
         self.separation = None

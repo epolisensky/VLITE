@@ -29,32 +29,7 @@ def record_config(conn, cfgfile, start_time, exec_time, nimages,
     conn.commit()
     cur.close()
 
-
-def make_error(conn, params):
-    """Inserts values into the database error table."""
-    reason_dict = {'integration time on source < {} s'.
-                   format(params['min time on source (s)']) : 1,
-                   'image noise < 0 or > {} mJy/beam'.
-                   format(params['max noise (mJy/beam)']): 2,
-                   'beam axis ratio > {}'.
-                   format(params['max beam axis ratio']) : 3,
-                   'image center within {} deg of problem source'.
-                   format(params['min problem source separation (deg)']): 4,
-                   'PyBDSF failed to process' : 5,
-                   'zero sources extracted' : 6,
-                   'source metric > {}'.
-                   format(params['max source metric']) : 7}
-
-    cur = conn.cursor()
-
-    sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
-    for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
-        cur.execute(sql, (value, key))
-
-    conn.commit()
-    cur.close()
-
-        
+       
 def init_image(impath):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
@@ -121,16 +96,17 @@ def add_image(conn, img, status, delete=False):
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
             config, nvis, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
-            stage, error_id, nearest_problem, separation) 
+            stage, catalogs_checked, error_id, nearest_problem, separation) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.stage, img.error_id, img.nearest_problem, img.separation)
+                img.stage, img.catalogs_checked, img.error_id,
+                img.nearest_problem, img.separation)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -142,16 +118,16 @@ def add_image(conn, img, status, delete=False):
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
             nvis = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, rms_box = %s, stage = %s, error_id = %s,
-            nearest_problem = %s, separation = %s
+            nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s,
+            error_id = %s, nearest_problem = %s, separation = %s
             WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.stage, img.error_id, img.nearest_problem,
-                img.separation, img.id)
+                img.stage, img.catalogs_checked, img.error_id,
+                img.nearest_problem, img.separation, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -351,6 +327,64 @@ def update_detected_associd(conn, sources):
     cur.close()
 
 
+def update_checked_catalogs(conn, imobj, catalogs):
+    cur = conn.cursor()
+
+    cur.execute('SELECT catalogs_checked FROM image WHERE id = %s',
+                (imobj.id, ))
+    already_checked = cur.fetchone()[0]
+    if already_checked is not None:
+        existing_catalogs = already_checked
+    else:
+        existing_catalogs = []
+
+    new_catalogs = [catalog.lower() for catalog in catalogs \
+                    if catalog.lower() not in existing_catalogs]
+    
+    all_catalogs = json.dumps(existing_catalogs + new_catalogs)
+    
+    cur.execute('UPDATE image SET catalogs_checked = %s WHERE id = %s',
+                (all_catalogs, imobj.id))
+
+    conn.commit()
+    cur.close()
+
+    return new_catalogs
+
+
+def check_catalog_match(conn, asrc_id, catalog):
+    """Checks if a source in the assoc_source table already
+    has a match to a source in the specified sky catalog
+    in the catalog_match table.
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    asrc_id : integer
+        Row id of the source in the assoc_soure table to
+        match to the assoc_id in the vlite_unique table.
+    catalog : str
+        Name of the sky catalog.
+    Returns
+    -------
+    rowid : integer
+        The row id of the entry if it exists. Returns
+        ``None`` otherwise.
+    """
+    cur = conn.cursor()
+
+    cur.execute('''SELECT id FROM catalog_match
+        WHERE assoc_id = %s AND catalog_id = (
+          SELECT id FROM skycat.catalogs WHERE name = %s)''',
+                (asrc_id, catalog))
+    rowid = cur.fetchone()
+
+    conn.commit()
+    cur.close()
+
+    return rowid
+
+
 def update_assoc_nmatches(conn, sources):
     """Updates the number of sky catalog matches to
     a given source in the assoc_source table.
@@ -396,39 +430,6 @@ def add_catalog_match(conn, sources):
 
     conn.commit()
     cur.close()
-
-
-def check_catalog_match(conn, asrc_id, catalog):
-    """Checks if a source in the assoc_source table already
-    has a match to a source in the specified sky catalog
-    in the catalog_match table.
-    Parameters
-    ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    asrc_id : integer
-        Row id of the source in the assoc_soure table to
-        match to the assoc_id in the vlite_unique table.
-    catalog : str
-        Name of the sky catalog.
-    Returns
-    -------
-    rowid : integer
-        The row id of the entry if it exists. Returns
-        ``None`` otherwise.
-    """
-    cur = conn.cursor()
-
-    cur.execute('''SELECT id FROM catalog_match
-        WHERE assoc_id = %s AND catalog_id = (
-          SELECT id FROM skycat.catalogs WHERE name = %s)''',
-                (asrc_id, catalog))
-    rowid = cur.fetchone()
-
-    conn.commit()
-    cur.close()
-
-    return rowid
 
 
 def check_vlite_unique(conn, asrc_id):
@@ -634,6 +635,60 @@ def update_stage(conn, imobj):
 
     cur.execute('UPDATE image SET stage = %s WHERE id = %s',
                 (imobj.stage, imobj.id))
+
+    conn.commit()
+    cur.close()
+
+
+def remove_catalog(conn, catalogs):
+    """Deletes rows with results from specified catalogs
+    in the catalog_match table.
+
+    """
+    cur = conn.cursor()
+
+    for catalog in catalogs:
+        # Get the catalog_id from the skycat.catalogs table
+        cur.execute('SELECT id FROM skycat.catalogs WHERE name = %s',
+                    (catalog, ))
+        catid = cur.fetchone()
+        if catid is None:
+            print('\nERROR: the catalog {} does not exist.'.format(catalog))
+            return
+        else: pass
+
+        # Nothing will happen if the catalog_id is not in the table
+        cur.execute('DELETE FROM catalog_match WHERE catalog_id = %s',
+                    (catid[0], ))
+        # Find all images which need their catalogs_checked list updated
+        cur.execute('''SELECT id, catalogs_checked FROM image
+            WHERE catalogs_checked::jsonb ? %s''',
+                    (catalog, ))
+        rows_to_update = cur.fetchall()
+        
+        updated_rows = []
+        if rows_to_update is not None:
+            for row in rows_to_update:
+                old_catalogs = row[1]
+                new_catalogs = [cat for cat in old_catalogs \
+                                if cat not in [catalog]]
+                updated_rows.append((row[0], json.dumps(new_catalogs)))
+
+        if updated_rows:
+            for row in updated_rows:
+                cur.execute('''UPDATE image SET catalogs_checked = %s
+                    WHERE id = %s''', (row[1], row[0]))
+
+        conn.commit()
+        
+    cur.close()
+
+
+def remove_sources(conn, assoc_ids):
+    cur = conn.cursor()
+
+    cur.execute('DELETE FROM assoc_source WHERE id IN %s',
+                (assoc_ids, ))
 
     conn.commit()
     cur.close()

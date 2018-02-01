@@ -61,6 +61,7 @@ def limit_res(rows, res):
         List of `psycopg2` row dictionary objects after
         applying the spatial resolution filtering.
     """
+    res = int(round(res))
     keep = []
     if res <= 15.0:
         print('\nLimiting to sources with BMIN <= 15"')
@@ -270,8 +271,6 @@ def associate(conn, detected_sources, imobj, search_radius):
     print(' -- number of matches: {}'.format(len(detected_matched)))
     print(' -- number of new sources to add: {}'.format(
         len(detected_unmatched)))
-    print(' -- number of unmatched previously detected sources: {}'.format(
-        len(assoc_unmatched)))
 
     return detected_matched, detected_unmatched, assoc_matched, assoc_unmatched
             

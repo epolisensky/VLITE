@@ -7,6 +7,7 @@ and calling the appropriate processing stages in the correct order.
 import os
 import sys
 import glob
+import argparse
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
@@ -164,19 +165,50 @@ def cfgparse(cfgfile):
     if opts['quality checks']:
         if qaparams['min time on source (s)'] is None:
             qaparams['min time on source (s)'] = 60.
+        else:
+            try:
+                qaparams['min time on source (s)'] = float(
+                    qaparams['min time on source (s)'])
+            except ValueError:
+                raise ConfigError('min time on source must be a number.')
         if qaparams['max noise (mJy/beam)'] is None:
             qaparams['max noise (mJy/beam)'] = 1000.
+        else:
+            try:
+                qaparams['max noise (mJy/beam)'] = float(
+                    qaparams['max noise (mJy/beam)'])
+            except ValueError:
+                raise ConfigError('max noise must be a number.')
         if qaparams['max beam axis ratio'] is None:
-            qaparams['max beam axis ratio'] = 3.
+            qaparams['max beam axis ratio'] = 4.
+        else:
+            try:
+                qaparams['max beam axis ratio'] = float(
+                    qaparams['max beam axis ratio'])
+            except ValueError:
+                raise ConfigError('max beam axis ratio must be a number.')
         if qaparams['min problem source separation (deg)'] is None:
             qaparams['min problem source separation (deg)'] = 20.
+        else:
+            try:
+                qaparams['min problem source separation (deg)'] = float(
+                    qaparams['min problem source separation (deg)'])
+            except ValueError:
+                raise ConfigError('min problem source separation must be a '
+                                  'number.')
         if qaparams['max source metric'] is None:
-            qaparams['max source metric'] = 10.    
-      
+            qaparams['max source metric'] = 10.
+        else:
+            try:
+                qaparams['max source metric'] = float(
+                    qaparams['max source metric'])
+            except ValueError:
+                raise ConfigError('max source metric must be a number.')
+            
     return stages, opts, setup, sfparams, qaparams, dirs
 
 
-def dbinit(dbname, user, overwrite, safe_override=False):
+def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     """Creates a `psycopg2` connection object to communicate
     with the `PostgreSQL` database. If no database with the
     provided name exists, the user is prompted to create a
@@ -214,10 +246,10 @@ def dbinit(dbname, user, overwrite, safe_override=False):
         else:
             print('\nOverwriting existing database tables.')
             if safe_override:
-                createdb.create(conn, safe=True)
+                createdb.create(conn, qaparams, safe=True)
             else:
                 # This will prompt warning in create func
-                createdb.create(conn, safe=False)
+                createdb.create(conn, qaparams, safe=False)
         # Check for sky catalogs by verifying schema exists
         cur = conn.cursor()
         cur.execute('''SELECT EXISTS(SELECT 1 FROM pg_namespace 
@@ -246,7 +278,7 @@ def dbinit(dbname, user, overwrite, safe_override=False):
             conn = psycopg2.connect(host='localhost', database=dbname,
                                     user=user)
             print('\nConnected to new database {}.'.format(dbname))
-            createdb.create(conn, safe=True)
+            createdb.create(conn, qaparams, safe=True)
             print('\nCreating new sky catalog tables...')
             skycatdb.create(conn)
         else:
@@ -300,7 +332,7 @@ def iminit(conn, impath, save, qa, qaparams, reproc, stages):
     status = dbio.status_check(conn, impath)
 
     # Run image quality checks only if it is a new image
-    if qa and status is None:
+    if qa:
         imobj.image_qa(qaparams)
     else:
         pass
@@ -427,6 +459,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     if save:
         dbio.add_sources(conn, imobj, sources)
         # Compute beam corrected fluxes & write to corrected_flux table
+        print('\nCorrecting all flux measurements for primary beam response')
         for src in sources:
             src.correct_flux(imobj)
             dbio.add_corrected(conn, src)
@@ -521,9 +554,10 @@ def catmatch(conn, imobj, sources, catalogs, save):
         also inserted into the vlite_unique table.
     """
     # STAGE 4 -- Sky catalog cross-matching
-    all_matches = []
-    for catalog in catalogs:
-        catalog = catalog.lower()
+    # Filter out catalogs which have already been checked for this image
+    new_catalogs = dbio.update_checked_catalogs(conn, imobj, catalogs)
+    for catalog in new_catalogs:
+        # Filter out sources which already have results for this catalog
         todo_sources = []
         for src in sources:
             already_matched = dbio.check_catalog_match(conn, src.id, catalog)
@@ -534,8 +568,6 @@ def catmatch(conn, imobj, sources, catalogs, save):
                 conn, todo_sources, catalog, imobj, imobj.radius)
         except TypeError: # no sky catalog sources extracted
             continue
-        # Create list of all matched catalog sources for regions file
-        all_matches += catalog_matched
         if save:
             # Add results to catalog_match table
             dbio.add_catalog_match(conn, catalog_matched)
@@ -575,9 +607,6 @@ def catmatch(conn, imobj, sources, catalogs, save):
         # Update stage
         imobj.stage = 4
         dbio.update_stage(conn, imobj)
-
-    # Write regions file
-    #radioxmatch.write_regions(all_matches, imobj.filename, ext='.matches.reg')
 
     return
 
@@ -776,25 +805,46 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
             
 def main():
     """One function to rule them all."""
+    parser = argparse.ArgumentParser(
+        description='Run the VLITE database Post-Processing Pipline (P3)')
+    parser.add_argument('config_file', help='the YAML configuration file')
+    parser.add_argument('--ignore_prompt', action='store_true',
+                        help='ignore prompt to verify database '
+                        'removal/creation')
+    parser.add_argument('--remove_catalog', action='store_true',
+                        help='remove matching results for the specified '
+                        'sky survey catalog(s)')
+    parser.add_argument('--remove_source', action='store_true',
+                        help='removes the specified source(s) from the '
+                        'database assoc_source table')
+    args = parser.parse_args()
+    
     # Start the timer
     start_time = datetime.now()
 
-    try:
-        cf = sys.argv[1]
-    except IndexError:
-        raise ConfigError('Please provide a configuration file.')
-    try:
-        ignore_prompt = sys.argv[2]
-    except IndexError:
-        ignore_prompt = False
-    # Parse config file
-    stages, opts, setup, sfparams, qaparams, dirs = cfgparse(cf)
+    stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
 
     # Find existing/create/overwrite database
-    conn = dbinit(setup['dbname'], setup['dbuser'],
-                  opts['overwrite'], safe_override=ignore_prompt)
-    # Make the database error table
-    dbio.make_error(conn, qaparams)
+    conn = dbinit(setup['dbname'], setup['dbuser'], opts['overwrite'],
+                  qaparams, safe_override=args.ignore_prompt)
+
+    if args.remove_catalog:
+        catalogs = raw_input('\nWhich catalogs would you like to remove? '
+                             '(List catalogs separated by a comma.)\n')
+        cat_list = [cat.lower() for cat in catalogs.split(', ')]
+        print('\nRemoving matching results for {}...'.format(catalogs))
+        dbio.remove_catalog(conn, cat_list)
+        sys.exit(0)
+
+    if args.remove_source:
+        assoc_ids = raw_input('\nPlease enter the id number(s) (separated by '
+                              'commas) of the source(s) you wish to remove '
+                              'from the database assoc_source table:\n')
+        asid_list = [int(asid) for asid in assoc_ids.split(', ')]
+        print('\nRemoving row(s) {} from the assoc_source table...'.format(
+            assoc_ids))
+        dbio.remove_sources(conn, tuple(asid_list))
+        sys.exit(0)
 
     # Process images
     process(conn, stages, opts, dirs, setup['catalogs'], sfparams, qaparams)
@@ -802,8 +852,8 @@ def main():
     nimages, exec_time = print_run_stats(start_time)
 
     # Record run configuration parameters
-    dbio.record_config(conn, cf, start_time, exec_time, nimages,
-                       stages, opts, setup, sfparams, qaparams)
+    dbio.record_config(conn, args.config_file, start_time, exec_time,
+                       nimages, stages, opts, setup, sfparams, qaparams)
 
     conn.close()
 

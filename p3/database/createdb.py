@@ -1,7 +1,29 @@
 """Function to create database tables, functions, and triggers."""
+import sys
 
 
-def create(conn, safe=False):
+def make_error(cur, params):
+    """Inserts values into the database error table."""
+    reason_dict = {'integration time on source < {} s'.
+                   format(params['min time on source (s)']) : 1,
+                   'image noise < 0 or > {} mJy/beam'.
+                   format(params['max noise (mJy/beam)']): 2,
+                   'beam axis ratio > {}'.
+                   format(params['max beam axis ratio']) : 3,
+                   'image center within {} deg of problem source'.
+                   format(params['min problem source separation (deg)']): 4,
+                   'PyBDSF failed to process' : 5,
+                   'zero sources extracted' : 6,
+                   'source metric > {}'.
+                   format(params['max source metric']) : 7}
+
+    sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
+    for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
+        cur.execute(sql, (value, key))
+
+
+
+def create(conn, params, safe=False):
     """Creates new tables and triggers for the connected `PostgreSQL` 
     database by dropping tables if they exist. The current user
     must own the tables or be a superuser in order to drop them.
@@ -99,13 +121,14 @@ def create(conn, safe=False):
                 peak REAL,
                 config TEXT,
                 nvis INTEGER,
-                mjdtime REAL,
+                mjdtime DOUBLE PRECISION,
                 tau_time REAL,
                 duration REAL,
                 radius REAL,
                 nsrc INTEGER,
                 rms_box VARCHAR(14),
                 stage INTEGER,
+                catalogs_checked JSON,
                 error_id INTEGER,
                 nearest_problem TEXT,
                 separation REAL,
@@ -222,6 +245,8 @@ def create(conn, safe=False):
                 WITH (fillfactor = 90);
             ''')
         cur.execute(sql)
+
+        make_error(cur, params)
         
         conn.commit()
 
@@ -290,6 +315,23 @@ def create(conn, safe=False):
               FOR EACH ROW
               EXECUTE PROCEDURE update_detected_func();
             ''')
+
+        sql = (
+            '''
+            CREATE OR REPLACE FUNCTION update_nmatches_func()
+              RETURNS TRIGGER AS $$
+            BEGIN
+              UPDATE assoc_source SET nmatches = nmatches - 1
+              WHERE id = OLD.assoc_id;
+            RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER update_nmatches
+              AFTER DELETE ON catalog_match
+              FOR EACH ROW
+              EXECUTE PROCEDURE update_nmatches_func();
+            ''')
         
         cur.execute(sql)
         conn.commit()
@@ -297,4 +339,5 @@ def create(conn, safe=False):
 
     else:
         print('\nAborting... database left unchanged.')
+        sys.exit(0)
 
