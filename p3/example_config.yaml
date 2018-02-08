@@ -16,12 +16,12 @@ options:
   update match: no            # update cross-matching with new sky catalogs?
 
 setup:
-  rootdir: /path/to/data/
+  root directory: /path/to/data/
   year: 2018
   month: 01
   day: [25]                   # list of days to process; [] = all
-  dbname: vlite
-  dbuser: postgres
+  database name: vlite
+  database user: postgres
   catalogs: [FIRST, GLEAM, NVSS, SUMSS, TGSS, VLSSr, WENSS]
 
 pybdsf_params:

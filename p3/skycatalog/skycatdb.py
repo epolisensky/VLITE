@@ -4,14 +4,6 @@ same `PostgreSQL` database as the VLITE data. This
 module contains the functions to create the schema
 and tables.
 
-Currently included catalogs:
-1. FIRST - VLA 1.4 GHz, 5" res.
-2. GLEAM - MWA 74-231 MHz, 100" res.
-3. NVSS - VLA 1.4 GHz, 45" res.
-4. SUMSS - MOST 843 MHz, 45" res.
-5. TGSS - GMRT 150 MHz, 25" res.
-6. WENSS - WSRT 325 MHz, 54" res.
-
 """
 import os
 import psycopg2
@@ -98,7 +90,8 @@ def add_table(tblname, conn):
         ''').format(psycopg2.sql.Identifier(tblname)))
 
     # Read the sky catalog
-    print('Adding sources from {}'.format(tblname))
+    print('Inserting sources from {} into sky catalogs database'.format(
+        tblname))
     if tblname == 'tgss':
         sources = catalogio.read_tgss()
     elif tblname == 'nvss':
@@ -129,9 +122,13 @@ def add_table(tblname, conn):
         print('\nERROR: No function to read catalog {}.'.format(tblname))
 
     # Add catalog to catalogs table
-    sql = '''INSERT INTO skycat.catalogs (id, name) VALUES (%s, %s)
-        ON CONFLICT (id) DO NOTHING'''
-    cur.execute(sql, (catalogio.catid_dict[tblname], tblname))
+    sql = '''INSERT INTO skycat.catalogs (
+        id, name, telescope, frequency, resolution) VALUES (
+        %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING'''
+    cur.execute(sql, (catalogio.cat_dict[tblname]['id'], tblname,
+                      catalogio.cat_dict[tblname]['telescope'],
+                      catalogio.cat_dict[tblname]['frequency'],
+                      catalogio.cat_dict[tblname]['resolution']))
 
     # This way took too long (~11 min)
     """
@@ -182,13 +179,28 @@ def create(conn):
         CREATE TABLE IF NOT EXISTS skycat.catalogs (
             id INTEGER NOT NULL,
             name TEXT,
+            telescope TEXT,
+            frequency REAL,
+            resolution REAL,
             PRIMARY KEY (id)
         );
         ''')
     cur.execute(sql)
-    cur.close
 
     tables = catalogio.catalog_list
+    atleastone = False
     for table in tables:
-        add_table(table, conn)
-        index(table, conn)
+        cur.execute('''SELECT EXISTS(SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'skycat' AND table_name = %s)''',
+                    (table, ))
+        if not cur.fetchone()[0]:
+            atleastone = True
+            add_table(table, conn)
+            index(table, conn)
+        else:
+            continue
+
+    if not atleastone:
+        print('\nNo new sky catalogs to add.')
+
+    cur.close 

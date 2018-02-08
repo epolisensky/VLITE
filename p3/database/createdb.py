@@ -49,6 +49,7 @@ def create(conn, params, safe=False):
         cur = conn.cursor()
         sql = (
             '''
+            DROP TABLE IF EXISTS new_vu;
             DROP TABLE IF EXISTS vlite_unique;
             DROP TABLE IF EXISTS catalog_match;
             DROP TABLE IF EXISTS corrected_flux;
@@ -203,6 +204,7 @@ def create(conn, params, safe=False):
                 isl_mean DOUBLE PRECISION,
                 isl_resid_rms DOUBLE PRECISION,
                 isl_resid_mean DOUBLE PRECISION,
+                distance_from_center DOUBLE PRECISION,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)
                   REFERENCES detected_source (src_id, image_id)
@@ -221,8 +223,7 @@ def create(conn, params, safe=False):
                 PRIMARY KEY (id),
                 FOREIGN KEY (assoc_id)
                   REFERENCES assoc_source (id)
-                  ON DELETE CASCADE,
-                UNIQUE (catalog_id, src_id, assoc_id)
+                  ON DELETE CASCADE
             );
 
             CREATE TABLE vlite_unique (
@@ -316,13 +317,28 @@ def create(conn, params, safe=False):
               EXECUTE PROCEDURE update_detected_func();
             ''')
 
+        cur.execute(sql)
+
         sql = (
             '''
             CREATE OR REPLACE FUNCTION update_nmatches_func()
               RETURNS TRIGGER AS $$
+            DECLARE
+              asid INTEGER;
+              nm INTEGER;
             BEGIN
               UPDATE assoc_source SET nmatches = nmatches - 1
               WHERE id = OLD.assoc_id;
+              SELECT INTO asid, nm id, nmatches FROM assoc_source
+              WHERE id = OLD.assoc_id;
+              IF nm = 0 THEN
+                CREATE TABLE new_vu (
+                  assoc_id INTEGER,
+                  nmatches INTEGER
+                );
+                INSERT INTO new_vu (assoc_id, nmatches)
+                VALUES (asid, nm);
+              END IF;
             RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
@@ -333,7 +349,7 @@ def create(conn, params, safe=False):
               EXECUTE PROCEDURE update_nmatches_func();
             ''')
         
-        cur.execute(sql)
+        cur.execute(sql)        
         conn.commit()
         cur.close()
 

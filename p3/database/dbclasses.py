@@ -126,7 +126,6 @@ class Image(object):
         self.rms_box = None
         self.error_id = None
         self.stage = 1
-        self.catalogs_checked = None
         self.radius = None
         self.nearest_problem = None
         self.separation = None
@@ -530,6 +529,8 @@ class DetectedSource(object):
         self.resid_mean = None
         self.code = None
         self.assoc_id = None
+        # corrected_flux attribute
+        self.dist_from_center = None
         # assoc_source attributes
         self.id = None
         self.beam = None
@@ -589,9 +590,9 @@ class DetectedSource(object):
     def correct_flux(self, imobj):
         img_center = SkyCoord(imobj.obs_ra, imobj.obs_dec, unit='deg')
         src_loc = SkyCoord(self.ra, self.dec, unit='deg')
-        angle = img_center.separation(src_loc).degree
+        self.dist_from_center = img_center.separation(src_loc).degree
         # Correct for beam response - only 1D (sym. beam) for now
-        pb_power = beam_tools.find_nearest_pbcorr(angle)
+        pb_power = beam_tools.find_nearest_pbcorr(self.dist_from_center)
         # List of attributes to correct
         attrs = ['total_flux', 'e_total_flux', 'peak_flux', 'e_peak_flux',
                  'total_flux_isl', 'total_flux_islE', 'rms_isl', 'mean_isl',

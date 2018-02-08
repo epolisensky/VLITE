@@ -32,10 +32,10 @@ catalogdir = '/home/erichards/work/data/SkyCatalogs'
 catalog_list = ['cosmos', 'first', 'gleam', 'gpsr1', 'gpsr5', 'nordgc',
                 'nvss', 'sevenc', 'sumss', 'tgss', 'txs', 'vlssr', 'wenss']
 
-catid_dict = {}
+cat_dict = {}
 id = 1
 for catalog in catalog_list:
-    catid_dict[catalog] = id
+    cat_dict[catalog] = {'id' : id}
     id += 1
 
 
@@ -118,6 +118,10 @@ def read_tgss(return_sources=False):
     Spatial resolution: 25'' 
 
     """
+    cat_dict['tgss']['telescope'] = 'GMRT'
+    cat_dict['tgss']['frequency'] = 150.
+    cat_dict['tgss']['resolution'] = 25.
+    
     psqlf = os.path.join(catalogdir, 'tgss_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -126,6 +130,7 @@ def read_tgss(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'TGSSADR1_7sigma_catalog.tsv')
     f = open(fname, 'r')
     b = f.readlines()
@@ -180,6 +185,10 @@ def read_first(return_sources=False):
     Spatial resolution: 5'' 
 
     """
+    cat_dict['first']['telescope'] = 'VLA'
+    cat_dict['first']['frequency'] = 1400.
+    cat_dict['first']['resolution'] = 5.
+    
     psqlf = os.path.join(catalogdir, 'first_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -188,6 +197,7 @@ def read_first(return_sources=False):
             pass
     else:
         pass
+    
     sources = []
     fname = os.path.join(catalogdir, 'FIRST_catalog_14dec17.txt')
     fread = open(fname, 'r')
@@ -252,6 +262,10 @@ def read_sumss(return_sources=False):
     Spatial resolution: 45'' 
 
     """
+    cat_dict['sumss']['telescope'] = 'MOST'
+    cat_dict['sumss']['frequency'] = 843.
+    cat_dict['sumss']['resolution'] = 45.
+    
     psqlf = os.path.join(catalogdir, 'sumss_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -260,6 +274,7 @@ def read_sumss(return_sources=False):
             pass
     else:
         pass
+    
     sources = []
     fname = os.path.join(catalogdir, 'SUMSS.txt')
     fread = open(fname, 'r')
@@ -311,6 +326,10 @@ def read_wenss(return_sources=False):
     Spatial resolution: 54'' 
     
     """
+    cat_dict['wenss']['telescope'] = 'WSRT'
+    cat_dict['wenss']['frequency'] = 325.
+    cat_dict['wenss']['resolution'] = 54.
+    
     psqlf = os.path.join(catalogdir, 'wenss_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -319,6 +338,7 @@ def read_wenss(return_sources=False):
             pass
     else:
         pass
+    
     sources = []
     fname = os.path.join(catalogdir, 'WENS.COMPLETE.txt')
     fread = open(fname, 'r')
@@ -369,6 +389,10 @@ def read_nvss(return_sources=False):
     Spatial resolution: 45'' 
 
     """
+    cat_dict['nvss']['telescope'] = 'VLA'
+    cat_dict['nvss']['frequency'] = 1400.
+    cat_dict['nvss']['resolution'] = 45.
+    
     psqlf = os.path.join(catalogdir, 'nvss_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -377,6 +401,7 @@ def read_nvss(return_sources=False):
             pass
     else:
         pass
+    
     sources = []
     fname = os.path.join(catalogdir, 'NVSSCatalog.text')
     fread = open(fname, 'r')
@@ -466,6 +491,10 @@ def read_gleam(return_sources=False):
     Spatial resolution: ~100'' 
 
     """
+    cat_dict['gleam']['telescope'] = 'MWA'
+    cat_dict['gleam']['frequency'] = 150.
+    cat_dict['gleam']['resolution'] = 100.
+    
     psqlf = os.path.join(catalogdir, 'gleam_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -474,6 +503,7 @@ def read_gleam(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'gleamegc.dat')
     f = open(fname, 'r')
     b = f.readlines()
@@ -532,6 +562,10 @@ def read_cosmos(return_sources=False):
     Spatial resolution: ~6''
 
     """
+    cat_dict['cosmos']['telescope'] = 'VLA'
+    cat_dict['cosmos']['frequency'] = 320.
+    cat_dict['cosmos']['resolution'] = 6.
+    
     psqlf = os.path.join(catalogdir, 'cosmos_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -540,6 +574,7 @@ def read_cosmos(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir,
                          'vla-cosmos_327_sources_published_version.tbl')
     fin = open(fname, 'r')
@@ -607,6 +642,10 @@ def read_vlssr(return_sources=False):
     Spatial resolution: ~75''
 
     """
+    cat_dict['vlssr']['telescope'] = 'VLA'
+    cat_dict['vlssr']['frequency'] = 74.
+    cat_dict['vlssr']['resolution'] = 75.
+    
     psqlf = os.path.join(catalogdir, 'vlssr_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -615,6 +654,7 @@ def read_vlssr(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'FullVLSSCatalog.clean')
     fread = open(fname, 'r')
     sources = []
@@ -668,6 +708,10 @@ def read_txs(return_sources=False):
     Spatial resolution: ? 
 
     """
+    cat_dict['txs']['telescope'] = 'Texas Interferometer'
+    cat_dict['txs']['frequency'] = 365.
+    cat_dict['txs']['resolution'] = None
+    
     psqlf = os.path.join(catalogdir, 'txs_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -676,6 +720,7 @@ def read_txs(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'TXS_J2000.txt')
     fread = open(fname, 'r')
     # First line is header
@@ -722,6 +767,10 @@ def read_sevenc(return_sources=False):
     Spatial resolution: ~70''
 
     """
+    cat_dict['sevenc']['telescope'] = 'CLFST'
+    cat_dict['sevenc']['frequency'] = 151.
+    cat_dict['sevenc']['resolution'] = 70.
+    
     psqlf = os.path.join(catalogdir, 'sevenc_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -730,6 +779,7 @@ def read_sevenc(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, '7C_new.txt')
     fread = open(fname, 'r')
     sources = []
@@ -779,6 +829,10 @@ def read_gpsr5(return_sources=False):
     Spatial resolution: ~4''
 
     """
+    cat_dict['gpsr5']['telescope'] = 'VLA'
+    cat_dict['gpsr5']['frequency'] = 5000.
+    cat_dict['gpsr5']['resolution'] = 4.
+    
     psqlf = os.path.join(catalogdir, 'gpsr5_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -787,6 +841,7 @@ def read_gpsr5(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'GPRS_5GHz.txt')
     fread = open(fname, 'r')
     sources = []
@@ -841,6 +896,10 @@ def read_gpsr1(return_sources=False):
     Spatial resolution: ~5''
 
     """
+    cat_dict['gpsr1']['telescope'] = 'VLA'
+    cat_dict['gpsr1']['frequency'] = 1400.
+    cat_dict['gpsr1']['resolution'] = 5.
+    
     psqlf = os.path.join(catalogdir, 'gpsr1_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -849,6 +908,7 @@ def read_gpsr1(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'GPRS_1.4GHz.txt')
     fread = open(fname, 'r')
     sources = []
@@ -903,6 +963,10 @@ def read_nordgc(return_sources=False):
     Spatial resolution: ~10''
 
     """
+    cat_dict['nordgc']['telescope'] = 'VLA'
+    cat_dict['nordgc']['frequency'] = 330.
+    cat_dict['nordgc']['resolution'] = 10.
+    
     psqlf = os.path.join(catalogdir, 'nordgc_psql.txt')
     if os.path.isfile(psqlf):
         if not return_sources:
@@ -911,6 +975,7 @@ def read_nordgc(return_sources=False):
             pass
     else:
         pass
+    
     fname = os.path.join(catalogdir, 'NordGC_330MHz.txt')
     fread = open(fname, 'r')
     sources = []

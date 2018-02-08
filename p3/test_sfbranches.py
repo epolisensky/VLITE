@@ -21,8 +21,13 @@ class TestSFBranches(unittest.TestCase):
         every time."""
         self.dirs = ['/home/erichards/work/p3/test/2540-06/B/Images/']
         self.catalogs = ['NVSS']
-        self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.conn = dbinit('branchtest', 'erichards', True, True)
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
+        self.qaparams = {'min time on source (s)' : 60.,
+                         'max noise (mJy/beam)' : 1000.,
+                         'max beam axis ratio' : 4.,
+                         'min problem source separation (deg)' : 20.,
+                         'max source metric' : 10.}
+        self.conn = dbinit('branchtest', 'erichards', True, self.qaparams, True)
 
 
     def tearDown(self):
@@ -40,7 +45,7 @@ class TestSFBranches(unittest.TestCase):
         # Uses fresh DB, no need to add images first
         # Pipeline should stop after adding image to DB
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - image table should have 2 rows
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -60,10 +65,10 @@ class TestSFBranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Add images to DB
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try to reprocess; nothing should happen
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
     def test_no_stages_reprocess(self):
@@ -76,10 +81,10 @@ class TestSFBranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Add images to DB
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now reprocess
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - image table should have 2 rows
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -97,7 +102,7 @@ class TestSFBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
     def test_sfonly_new_image(self):
@@ -109,7 +114,7 @@ class TestSFBranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Pipeline should stop after source finding
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -141,12 +146,12 @@ class TestSFBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try to sa/cm before sf
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : True}
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
     def test_sfonly_reprocess(self):
@@ -158,12 +163,12 @@ class TestSFBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Use different scale so I know the originals were removed
-        self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
         # Now redo source finding
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -196,10 +201,10 @@ class TestSFBranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Add images to DB
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try to reprocess; nothing should happen
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
 if __name__ == '__main__':

@@ -85,7 +85,7 @@ def cfgparse(cfgfile):
         sfparams = data['pybdsf_params']
         qaparams = data['image_qa_params']
 
-    rootdir = setup['rootdir']
+    rootdir = setup['root directory']
     yr = setup['year']
     mo = setup['month']
     days = setup['day']
@@ -140,8 +140,8 @@ def cfgparse(cfgfile):
             raise ConfigError('option inputs must be True/False or yes/no.')
 
     # Catch case when no DB is given
-    if setup['dbname'] is None or setup['dbuser'] is None:
-        raise ConfigError('Please provide a database/user name.')
+    if setup['database name'] is None or setup['database user'] is None:
+        raise ConfigError('Please provide a database name/user.')
 
     if stages['catalog matching']:
         # Make sure requested catalogs exist
@@ -396,6 +396,35 @@ def iminit(conn, impath, save, qa, qaparams, reproc, stages):
     return imobj
 
 
+def vlite_unique(conn, src, image_id, radius):
+    existing = dbio.check_vlite_unique(conn, src.id)
+    if not existing: # returned empty list
+        src.detected = True
+        # Add source to vlite_unique table
+        dbio.add_vlite_unique(conn, src, image_id)
+        # Find previous images where VU source is in FOV
+        src.detected = False
+        prev_images = radioxmatch.check_previous(conn, src, radius)
+        for previd in prev_images:
+            # Ignore current image
+            if previd[0] != image_id:
+                dbio.add_vlite_unique(conn, src, previd[0])
+    else: # VU source already in table
+        existing_imgids = [row[1] for row in existing]
+        if image_id not in existing_imgids:
+            # Add if new image
+            src.detected = True
+            dbio.add_vlite_unique(conn, src, image_id)
+        else: # entry exists
+            entry = [row for row in existing if row[1] == image_id]
+            if not entry[0][2]:
+                # Update entry to detected = True
+                src.detected = True
+                dbio.add_vlite_unique(conn, src, image_id, update=True)
+
+    return src
+
+
 def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     """Runs `PyBDSF` source finding, writes out results,
     and inserts sources into database detected_source and
@@ -555,7 +584,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
     """
     # STAGE 4 -- Sky catalog cross-matching
     # Filter out catalogs which have already been checked for this image
-    new_catalogs = dbio.update_checked_catalogs(conn, imobj, catalogs)
+    new_catalogs = dbio.update_checked_catalogs(conn, imobj.id, catalogs)
     for catalog in new_catalogs:
         # Filter out sources which already have results for this catalog
         todo_sources = []
@@ -577,32 +606,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
         # Check for new VLITE unique (VU) sources from this image
         for src in todo_sources:
             if src.nmatches == 0:
-                existing = dbio.check_vlite_unique(conn, src.id)
-                if not existing: # returned empty list
-                    src.detected = True
-                    # Add source to vlite_unique table
-                    dbio.add_vlite_unique(conn, src, imobj.id)
-                    # Find previous images where VU source is in FOV
-                    src.detected = False
-                    prev_images = radioxmatch.check_previous(
-                        conn, src, imobj.radius)
-                    for imgid in prev_images:
-                        # Ignore current image
-                        if imgid[0] != imobj.id:
-                            dbio.add_vlite_unique(conn, src, imgid[0])
-                else:
-                    existing_imgids = [row[1] for row in existing]
-                    if imobj.id not in existing_imgids:
-                        # Add if new image
-                        src.detected = True
-                        dbio.add_vlite_unique(conn, src, imobj.id)
-                    else: # entry exists
-                        entry = [row for row in existing if row[1] == imobj.id]
-                        if not entry[0][2]:
-                            # Update entry to detected = True
-                            src.detected = True
-                            dbio.add_vlite_unique(
-                                conn, src, imobj.id, update=True)
+                src  = vlite_unique(conn, src, imobj.id, imobj.radius)
                             
         # Update stage
         imobj.stage = 4
@@ -811,12 +815,15 @@ def main():
     parser.add_argument('--ignore_prompt', action='store_true',
                         help='ignore prompt to verify database '
                         'removal/creation')
-    parser.add_argument('--remove_catalog', action='store_true',
+    parser.add_argument('--remove_catalog_matches', action='store_true',
                         help='remove matching results for the specified '
                         'sky survey catalog(s)')
     parser.add_argument('--remove_source', action='store_true',
                         help='removes the specified source(s) from the '
                         'database assoc_source table')
+    parser.add_argument('--add_catalog', action='store_true',
+                        help='adds any new sky survey catalogs to a table in '
+                        'the database "skycat" schema')
     args = parser.parse_args()
     
     # Start the timer
@@ -825,25 +832,47 @@ def main():
     stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
 
     # Find existing/create/overwrite database
-    conn = dbinit(setup['dbname'], setup['dbuser'], opts['overwrite'],
-                  qaparams, safe_override=args.ignore_prompt)
+    conn = dbinit(setup['database name'], setup['database user'],
+                  opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
 
-    if args.remove_catalog:
-        catalogs = raw_input('\nWhich catalogs would you like to remove? '
-                             '(List catalogs separated by a comma.)\n')
+    if args.remove_catalog_matches:
+        catalogs = raw_input('\nFor which catalogs would you like to remove '
+                             'matching results? (List catalogs separated by '
+                             'a comma.)\n')
         cat_list = [cat.lower() for cat in catalogs.split(', ')]
         print('\nRemoving matching results for {}...'.format(catalogs))
         dbio.remove_catalog(conn, cat_list)
+        # Find all assoc_sources whose nmatches dropped to 0
+        vu_assoc_sources = dbio.get_new_vu(conn)
+        if vu_assoc_sources is not None:
+            for vu_asrc in vu_assoc_sources:
+                # Get image_ids, radii for the new VU source
+                vu_image_list = dbio.get_vu_image(conn, vu_asrc.id)
+                for vu_image in vu_image_list:
+                    src = vlite_unique(conn, vu_asrc, vu_image[0], vu_image[1])
+        conn.close()
         sys.exit(0)
 
     if args.remove_source:
-        assoc_ids = raw_input('\nPlease enter the id number(s) (separated by '
-                              'commas) of the source(s) you wish to remove '
-                              'from the database assoc_source table:\n')
-        asid_list = [int(asid) for asid in assoc_ids.split(', ')]
+        inp = raw_input('\nPlease enter the id number(s) (separated by '
+                        'commas) of the source(s) you wish to remove '
+                        'from the database assoc_source table or provide '
+                        'a path to a text file with the id numbers:\n')
+        try:
+            asid_list = [int(asid) for asid in inp.strip('[]').split(', ')]
+        except ValueError:
+            with open(inp, 'r') as f:
+                text = f.read()
+            asid_list = [int(asid) for asid in text.strip().split('\n')]
         print('\nRemoving row(s) {} from the assoc_source table...'.format(
-            assoc_ids))
+            asid_list))
         dbio.remove_sources(conn, tuple(asid_list))
+        conn.close()
+        sys.exit(0)
+
+    if args.add_catalog:
+        skycatdb.create(conn)
+        conn.close()
         sys.exit(0)
 
     # Process images

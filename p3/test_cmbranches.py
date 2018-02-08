@@ -22,8 +22,13 @@ class TestCMBranches(unittest.TestCase):
         every time."""
         self.dirs = ['/home/erichards/work/p3/test/2540-06/B/Images/']
         self.catalogs = ['NVSS']
-        self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.conn = dbinit('branchtest', 'erichards', True, True)
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
+        self.qaparams = {'min time on source (s)' : 60.,
+                         'max noise (mJy/beam)' : 1000.,
+                         'max beam axis ratio' : 4.,
+                         'min problem source separation (deg)' : 20.,
+                         'max source metric' : 10.}
+        self.conn = dbinit('branchtest', 'erichards', True, self.qaparams, True)
 
 
     def tearDown(self):
@@ -39,7 +44,7 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # No results past SF should be saved to the DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -60,7 +65,7 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -87,12 +92,12 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now do SF + CM
         stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : True}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # No results past SF should be saved to the DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -114,12 +119,12 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now run all stages
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : True}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -146,13 +151,13 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try to run CM only
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
         # Should fail due to stage < 2
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
     def test_cmonly(self):
@@ -164,12 +169,12 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}        
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now run CM only
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should be same as branch 12/15 (SF + SA + CM)
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -196,7 +201,7 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now redo CM
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
@@ -204,7 +209,7 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : True, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should be same as branch 12/15 (SF + SA + CM)
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -231,7 +236,7 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now run CM again adding the FIRST catalog
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
@@ -240,7 +245,7 @@ class TestCMBranches(unittest.TestCase):
                 'redo match' : False, 'update match' : True}
         self.catalogs = ['NVSS', 'FIRST']
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should have results for both NVSS & FIRST
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -271,12 +276,12 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now run SA + CM
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : True}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should be same as branch 12/15 (SF + SA + CM)
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -303,12 +308,12 @@ class TestCMBranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try to run SA + CM
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : True}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should be same results as branch 17
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')

@@ -96,17 +96,16 @@ def add_image(conn, img, status, delete=False):
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
             config, nvis, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
-            stage, catalogs_checked, error_id, nearest_problem, separation) 
+            stage, error_id, nearest_problem, separation) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.stage, img.catalogs_checked, img.error_id,
-                img.nearest_problem, img.separation)
+                img.stage, img.error_id, img.nearest_problem, img.separation)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -118,16 +117,15 @@ def add_image(conn, img, status, delete=False):
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
             nvis = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s,
-            error_id = %s, nearest_problem = %s, separation = %s
-            WHERE id = %s'''
+            nsrc = %s, rms_box = %s, stage = %s, error_id = %s, 
+            nearest_problem = %s, separation = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.stage, img.catalogs_checked, img.error_id,
-                img.nearest_problem, img.separation, img.id)
+                img.stage, img.error_id, img.nearest_problem,
+                img.separation, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -226,12 +224,13 @@ def add_corrected(conn, src):
     cur.execute('''INSERT INTO corrected_flux (
         src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
         e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
-        isl_resid_rms, isl_resid_mean) VALUES (
-        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+        isl_resid_rms, isl_resid_mean, distance_from_center) VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                 (src.src_id, src.isl_id, src.image_id, src.total_flux,
                  src.e_total_flux, src.peak_flux, src.e_peak_flux,
                  src.total_flux_isl, src.total_flux_islE, src.rms_isl,
-                 src.mean_isl, src.resid_rms, src.resid_mean))
+                 src.mean_isl, src.resid_rms, src.resid_mean,
+                 src.dist_from_center))
 
     conn.commit()
     cur.close()
@@ -327,11 +326,11 @@ def update_detected_associd(conn, sources):
     cur.close()
 
 
-def update_checked_catalogs(conn, imobj, catalogs):
+def update_checked_catalogs(conn, image_id, catalogs):
     cur = conn.cursor()
 
     cur.execute('SELECT catalogs_checked FROM image WHERE id = %s',
-                (imobj.id, ))
+                (image_id, ))
     already_checked = cur.fetchone()[0]
     if already_checked is not None:
         existing_catalogs = already_checked
@@ -344,7 +343,7 @@ def update_checked_catalogs(conn, imobj, catalogs):
     all_catalogs = json.dumps(existing_catalogs + new_catalogs)
     
     cur.execute('UPDATE image SET catalogs_checked = %s WHERE id = %s',
-                (all_catalogs, imobj.id))
+                (all_catalogs, image_id))
 
     conn.commit()
     cur.close()
@@ -424,8 +423,7 @@ def add_catalog_match(conn, sources):
     for src in sources:
         cur.execute('''INSERT INTO catalog_match (
             catalog_id, src_id, assoc_id, min_deruiter) VALUES (
-            %s, %s, %s, %s) ON CONFLICT (
-            catalog_id, src_id, assoc_id) DO NOTHING''',
+            %s, %s, %s, %s)''',
                     (src.catalog_id, src.id, src.assoc_id, src.min_deruiter))
 
     conn.commit()
@@ -560,8 +558,18 @@ def get_associated(conn, sources):
 
     rows = []
     for src in sources:
+        # If list of DetectedSource objects
+        try:
+            src_id = src.assoc_id
+        except AttributeError:
+            # If list of tuple row ids
+            try:
+                src_id = src[0]
+            except TypeError:
+                # If list of ids (not from fetchall())
+                src_id = src
         cur.execute('SELECT * FROM assoc_source WHERE id = %s',
-                    (src.assoc_id, ))
+                    (src_id, ))
         rows.append(cur.fetchone())
 
     conn.commit()
@@ -605,6 +613,9 @@ def delete_matches(conn, sources, image_id):
           'for {} sources.'.format(len(sources)))
 
     cur = conn.cursor()
+
+    cur.execute('UPDATE image SET catalogs_checked = %s WHERE id = %s',
+                (None, image_id))
 
     for src in sources:
         src.nmatches = None
@@ -682,6 +693,52 @@ def remove_catalog(conn, catalogs):
         conn.commit()
         
     cur.close()
+
+
+def get_new_vu(conn):
+    cur = conn.cursor()
+
+    # Get assoc_ids of all sources whose nmatches went down to 0
+    try:
+        cur.execute('SELECT assoc_id FROM new_vu')
+        asrc_ids = cur.fetchall()
+        cur.execute('DROP TABLE new_vu')
+    except psycopg2.ProgrammingError:
+        asrc_ids = None
+
+    conn.commit()
+    cur.close()
+
+    # No new_vu table; no new VU sources
+    if asrc_ids is None:
+        return None
+
+    # Create list of objects for all assoc_sources which are new VU sources
+    assoc_objs = get_associated(conn, asrc_ids)
+
+    return assoc_objs
+
+
+def get_vu_image(conn, assoc_id):
+    cur = conn.cursor()
+
+    cur.execute('SELECT image_id FROM detected_source WHERE assoc_id = %s',
+                (assoc_id, ))
+    rows = cur.fetchall()
+    image_ids = [row[0] for row in rows]
+    
+    radii = []
+    for image_id in image_ids:
+        cur.execute('SELECT radius FROM image WHERE id = %s',
+                    (image_id, ))
+        radii.append(cur.fetchone()[0])
+
+    conn.commit()
+    cur.close()
+
+    vu_image_list = zip(image_ids, radii)
+
+    return vu_image_list
 
 
 def remove_sources(conn, assoc_ids):

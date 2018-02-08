@@ -21,8 +21,13 @@ class TestSABranches(unittest.TestCase):
         every time."""
         self.dirs = ['/home/erichards/work/p3/test/2540-06/B/Images/']
         self.catalogs = ['NVSS']
-        self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.conn = dbinit('branchtest', 'erichards', True, True)
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
+        self.qaparams = {'min time on source (s)' : 60.,
+                         'max noise (mJy/beam)' : 1000.,
+                         'max beam axis ratio' : 4.,
+                         'min problem source separation (deg)' : 20.,
+                         'max source metric' : 10.}
+        self.conn = dbinit('branchtest', 'erichards', True, self.qaparams, True)
 
 
     def tearDown(self):
@@ -39,7 +44,7 @@ class TestSABranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Pipeline should stop after source association
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -65,12 +70,12 @@ class TestSABranches(unittest.TestCase):
                 'redo match' : False, 'update match' : False}
         # Process once
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Use different scale so results are different
-        self.params = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
         # Process twice
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
@@ -96,13 +101,13 @@ class TestSABranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now try SA only
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : False}
         # Code should exit
         self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.catalogs, self.params))
+                                  self.catalogs, self.sfparams, self.qaparams))
 
 
     def test_saonly(self):
@@ -114,12 +119,12 @@ class TestSABranches(unittest.TestCase):
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Now do SA only
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : False}
         process(self.conn, stages, opts, self.dirs,
-                self.catalogs, self.params)
+                self.catalogs, self.sfparams, self.qaparams)
         # Check DB - should be same as SF + SA (branch 11)
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
