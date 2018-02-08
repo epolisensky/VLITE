@@ -16,8 +16,8 @@ def cluster():
 
     with open(cf, 'r') as stream:
         data = load(stream, Loader=Loader)
-        dbname = (data['setup'])['dbname']
-        dbusr = (data['setup'])['dbuser']
+        dbname = (data['setup'])['database name']
+        dbusr = (data['setup'])['database user']
     
     try:
         conn = psycopg2.connect(host='localhost', database=dbname, user=dbusr)
@@ -32,6 +32,8 @@ def cluster():
         cur.execute('CLUSTER assoc_source_q3c_ang2ipix_idx ON assoc_source;')
         cur.execute('ANALYZE assoc_source;')
         cur.close()
+        print('\ndetected_source and assoc_source tables successfully '
+              'clustered and analyzed.')
     except:
         raise ConfigError('Tables could not be clustered.')
 

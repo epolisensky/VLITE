@@ -47,8 +47,8 @@ class BDSFImage(Image):
         self.filename = image
         # These will be overwritten if in config file
         self.quiet = True
-        self.box_incr = 10
-        self.max_iter = 10
+        self.box_incr = 20
+        self.max_iter = 5
         self.scale = 1.0
         self.set_rms_box()
         for key, value in kwargs.items():
@@ -128,11 +128,18 @@ class BDSFImage(Image):
             warnings.filterwarnings('ignore', r'invalid value')
             try:
                 out = bdsf.process_image(opts)
-                print('\nFound {} sources in {:.2f} seconds\n'.format(
-                    out.nsrc, (datetime.now() - start).total_seconds()))
-                return out
             except:
-                return None
+                out = None
+
+        try:
+            print('\nFound {} sources in {:.2f} seconds\n'.format(
+                out.nsrc, (datetime.now() - start).total_seconds()))
+        except AttributeError:
+            print('\nFound {} islands in {:.2f} seconds\n'.format(
+                out.nisl, (datetime.now() - start).total_seconds()))
+
+        return out
+
             
 
     def minimize_islands(self):
@@ -146,19 +153,20 @@ class BDSFImage(Image):
 
         """
         # Initial run
+        print('\nStarting minimize_islands with box {}...'.format(
+            self.rms_box))
         self.stop_at = 'isl' # stop fitting at islands
         out = self.find_sources()
         if out is not None:
             box0 = out.rms_box # record initial box
             min_isl = out.nisl # initialize island number minimum
-            print ("\nInitial box {} found {} islands.\n".format(box0,
-                                                                  min_isl))
+            #print ('Initial box {} found {} islands.\n'.format(box0, min_isl))
         else:
             # Only fails when user's box is too small
             box0 = self.rms_box            
             min_isl = 99999
-            print ("\nPyBDSF has failed with box {}.".format(box0))
-            print("Increasing rms_box...\n")
+            print ('\nPyBDSF has failed with box {}.'.format(box0))
+            print('Increasing rms_box...\n')
 
         opt_box = box0 # initialize optimal box
         box_size = box0[0]
@@ -169,7 +177,7 @@ class BDSFImage(Image):
             box_size += self.box_incr
             box_step = int(box_size / 3.)
             self.rms_box = (box_size, box_step)
-            print ("\nTrying box {}\n".format(self.rms_box))
+            print ('Trying box {}...'.format(self.rms_box))
             out = self.find_sources()
             if out is not None:
                 if out.nisl < min_isl: # new winner, keep going
@@ -182,8 +190,8 @@ class BDSFImage(Image):
             else:
                 # usually happens when box size is too small and "an
                 # unphysical rms value was encountered", so keep going
-                print ("\nPyBDSF has failed with box {}.".format(self.rms_box))
-                print("Increasing rms_box...\n")
+                print ('\nPyBDSF has failed with box {}.'.format(self.rms_box))
+                print('Increasing rms_box...\n')
             i += 1
 
         # Begin decreasing box size loop
@@ -194,7 +202,7 @@ class BDSFImage(Image):
             box_step = int(box_size / 3.)
             self.rms_box = (box_size, box_step)
             if box_size > 0: # stop if box size goes to 0 or below
-                print ("\nTrying box {}\n".format(self.rms_box))
+                print ('Trying box {}...'.format(self.rms_box))
                 out = self.find_sources()
             else:
                 break
@@ -209,14 +217,15 @@ class BDSFImage(Image):
             else:
                 # usually happens when box size is too small and "an
                 # unphysical rms value was encountered", so stop here
-                print ("\nPyBDSF has failed with box {}.".format(self.rms_box))
-                print ("Stopping here.\n")
+                print ('\nPyBDSF has failed with box {}.'.format(self.rms_box))
+                print ('Stopping here.\n')
                 break
             i += 1
 
-        print ("\nFound minimum of {} islands using box {}\n".format(min_isl,
+        print('Found minimum of {} islands using box {}.'.format(min_isl,
                                                                     opt_box))
         # Final complete run with best parameters
+        print('\nFinal run...')
         self.rms_box = opt_box
         self.stop_at = None
         opt_out = self.find_sources()

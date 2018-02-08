@@ -146,9 +146,9 @@ def cfgparse(cfgfile):
     if stages['catalog matching']:
         # Make sure requested catalogs exist
         catalog_opts = catalogio.catalog_list
+        if len(setup['catalogs']) < 1:
+            setup['catalogs'] = catalog_opts
         try:
-            if len(setup['catalogs']) < 1:
-                setup['catalogs'] = None
             for cat in setup['catalogs']:
                 if type(cat) != 'string':
                     cat = str(cat)
@@ -663,7 +663,7 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
         # Select only the images that end with 'IPln1.fits'
         imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
         imglist.sort()
-        #imglist = imglist[:1]
+        imglist = imglist[:1]
 
         # Begin loop through images
         for img in imglist:
@@ -874,7 +874,7 @@ def main():
         skycatdb.create(conn)
         conn.close()
         sys.exit(0)
-
+    
     # Process images
     process(conn, stages, opts, dirs, setup['catalogs'], sfparams, qaparams)
 
