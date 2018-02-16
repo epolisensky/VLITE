@@ -1,10 +1,10 @@
-"""This module contains all the functionality to run a fits image
+"""This module contains all the functionality to run a FITS image
 through the LOFAR source finding software `PyBDSF` 
 (https://github.com/lofar-astron/PyBDSF). The class
 BDSFImage() creates an object whose attributes can be any number
 of `PyBDSF` parameters. Source finding is performed by calling the
 object method find_sources(), which calls the `PyBDSF` function
-process_image() and returns the output object. 
+process_image() and returns the output object.
 
 """
 import warnings
@@ -12,6 +12,7 @@ from datetime import datetime
 import numpy as np
 import bdsf
 from database.dbclasses import Image
+from timeout import timeout
 
 
 def write_sources(out):
@@ -27,18 +28,20 @@ def write_sources(out):
     """
     # Write the source list catalog, ascii and ds9 regions file
     out.write_catalog(format='ds9', catalog_type='srl', clobber=True)
-    out.write_catalog(format='ascii', catalog_type='srl', clobber=True)
+    #out.write_catalog(format='ascii', catalog_type='srl', clobber=True)
 
     # Write the residual image
-    out.export_image(img_type='gaus_resid', clobber=True)
+    #out.export_image(img_type='gaus_resid', clobber=True)
     # Write the model image
-    # out.export_image(img_type='gaus_model', clobber=True)
+    #out.export_image(img_type='gaus_model', clobber=True)
 
 
 class BDSFImage(Image):
     """Object to be manipulated and read into `PyBDSF`.
     Inherits all methods defined for Image class, but
-    overrides initialization.
+    overrides initialization. The number of attributes
+    and their values will change based on what the user
+    specifies in the run configuration file.
 
     """
     def __init__(self, image, **kwargs):
@@ -50,7 +53,9 @@ class BDSFImage(Image):
         self.box_incr = 20
         self.max_iter = 5
         self.scale = 1.0
+        # Set our own default rms_box parameter
         self.set_rms_box()
+        # Set attributes from config file
         for key, value in kwargs.items():
             if key == 'rms_box':
                 if value == '' or value == 'None':
@@ -62,6 +67,7 @@ class BDSFImage(Image):
                 if value == '' or value == 'None':
                     value = None
             setattr(self, key, value)
+        # Pre-process the image for PyBDSF
         self.crop()
 
 
@@ -74,9 +80,16 @@ class BDSFImage(Image):
 
         """
         data, hdr = Image.read(self)
-        # fix header keyword
+        Image.header_attrs(self, hdr)
+        # Fix header keywords for PyBDSF
         if hdr['CTYPE3'] == 'SPECLNMF':
             hdr['CTYPE3'] = 'FREQ'
+        try:
+            hdr['BMAJ']
+        except KeyError:
+            hdr['BMAJ'] = self.bmaj / 3600. # deg
+            hdr['BMIN'] = self.bmin / 3600.
+            hdr['BPA'] = self.bpa
         n = len(data[0,0,:,:])
         a, b = hdr['CRPIX1'], hdr['CRPIX2']
         y, x = np.ogrid[-a:n-a, -b:n-b]
@@ -115,13 +128,15 @@ class BDSFImage(Image):
         """
         return self.__dict__
 
-
+    # Function will timeout after 5 min
+    @timeout()
     def find_sources(self):
         """Run `PyBDSF` `process_image()` task using object 
         attributes as parameter inputs. Returns ``None`` if 
         `PyBDSF` fails.
 
         """
+        print('\nExtracting sources...')
         start = datetime.now()
         opts = self.get_attr()
         with warnings.catch_warnings():
@@ -132,11 +147,14 @@ class BDSFImage(Image):
                 out = None
 
         try:
-            print('\nFound {} sources in {:.2f} seconds\n'.format(
+            print(' -- found {} sources in {:.2f} seconds\n'.format(
                 out.nsrc, (datetime.now() - start).total_seconds()))
         except AttributeError:
-            print('\nFound {} islands in {:.2f} seconds\n'.format(
-                out.nisl, (datetime.now() - start).total_seconds()))
+            try:
+                print(' -- found {} islands in {:.2f} seconds\n'.format(
+                    out.nisl, (datetime.now() - start).total_seconds()))
+            except AttributeError:
+                print(' -- PyBDSF failed to process image.\n')
 
         return out
 

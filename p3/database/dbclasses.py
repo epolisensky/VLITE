@@ -14,22 +14,19 @@ from sourcefinding import beam_tools
 
 
 class Image(object):
-    """Creates an Image object that can be easily 
-    passed to SQL table insertion functions. Object 
-    attributes correspond to the database image table 
-    column values.
+    """A class to hold information about the FITS image file.
 
     Parameters
     ----------
     image : str
-        Directory path to the fits image file.
+        Directory path to the FITS image file location.
 
     Attributes
     ----------
     id : int
         Numerical index. Incremented by `PostgreSQL` upon insertion.
     filename : str
-        Full path name for the image fits file.
+        Full directory path for the image file.
     imsize : str
         Image size in pixels -- (NAXIS1, NAXIS2).
     obs_ra : float
@@ -37,17 +34,16 @@ class Image(object):
     obs_dec : float
         Declination of image pointing center in degrees.
     pixel_scale : float
-        Spatial conversion from pixel to angular size.
+        Spatial conversion from pixel to angular size on the sky.
         Units are arcseconds / pixel.
     obj : str
         Name of observed object.
     obs_date : str
         Date when observations were taken.
     map_date : str
-        Date when data was imaged.
+        Date when data was processed.
     obs_freq : float
-        Frequency of the observations in MHz (actual
-        frequency of the image).
+        Rest frequency of the observations in MHz.
     pri_freq : float
         Frequency of the simultaneously acquired primary
         band data in GHz (NOT the frequency of the image
@@ -59,7 +55,7 @@ class Image(object):
     bpa : float
         Beam position angle in degrees.
     noise : float
-        Estimate of the image noise in mJy/beam.
+        Noise estimate from the image center in mJy/beam.
     peak : float
         Peak brightness in the image in mJy/beam.
     config : str
@@ -91,6 +87,12 @@ class Image(object):
     radius : float
         Radius defining the circular field-of-view in degrees in which
         sources were extracted.
+    nearest_problem : str
+        Name of the closest (in angular separation) source which is known
+        to cause difficulties in imaging.
+    separation : float
+        Angular separation in degrees from the nearest problem source
+        to the image pointing center.
     """
     # A class variable to count the number of images
     num_images = 0
@@ -136,204 +138,34 @@ class Image(object):
 
     @classmethod
     def image_count(cls):
-        """Returns the number of images initialized."""
+        """Returns the number of Image objects initialized."""
         return cls.num_images
 
 
     def read(self):
-        """Reads fits image data and header."""
+        """Reads FITS image data and header."""
         try:
             data, header = fits.getdata(self.filename, header=True)
             return data, header
         except:
-            print('\nERROR: Problem reading image.\n')
+            print('\nERROR: Problem reading image.')
 
 
     def write(self, data, header, owrite=False):
-        """Writes new fits image data and header."""
-        fits.writeto(self.filename, data, header, overwrite=owrite)
-
-
-    def image_qa(self, params):
-        """Performs quality checks on the image pre-source finding
-        to flag images with the following issues:
-        1.) integration time on source (tau_time) < 60 s
-        2.) noise < 0 mJy/beam or > 1000 mJy/beam
-        3.) beam semi-major/semi-minor axis > 3 (too elliptical)
-        4.) pointing center within 20 degrees of a known bright
-        radio source (Cas A, Cygnus A, Taurus A, Hercules A,
-        Virgo A (M87), the Sun, Jupiter, Galactic Center)
-
-        """
-        # QA requirements
-        min_tos = params['min time on source (s)']
-        max_rms = params['max noise (mJy/beam)']
-        max_ellip = params['max beam axis ratio']
-        prob_sep = params['min problem source separation (deg)']
-        
-        # VLITE can't track planets, so flag all of them
-        sun = ephem.Sun()
-        mer = ephem.Mercury()
-        ven = ephem.Venus()
-        mars = ephem.Mars()
-        jup = ephem.Jupiter()
-        sat = ephem.Saturn()
-        ur = ephem.Uranus()
-        nep = ephem.Neptune()
-        plu = ephem.Pluto()
-        # convert from MJD to JD
-        jd = self.mjdtime + 2400000.5
-        jdt = Time(jd, format='jd', scale='utc')
-        sun.compute(jdt.iso)
-        mer.compute(jdt.iso)
-        ven.compute(jdt.iso)
-        mars.compute(jdt.iso)
-        jup.compute(jdt.iso)
-        sat.compute(jdt.iso)
-        ur.compute(jdt.iso)
-        nep.compute(jdt.iso)
-        plu.compute(jdt.iso)
-        bright_sources = {'Sun' : SkyCoord(str(sun.a_ra), str(sun.a_dec),
-                                           unit=('hourangle', 'deg')),
-                          'Mercury' : SkyCoord(str(mer.a_ra), str(mer.a_dec),
-                                               unit=('hourangle', 'deg')),
-                          'Venus' : SkyCoord(str(ven.a_ra), str(ven.a_dec),
-                                             unit=('hourangle', 'deg')),
-                          'Mars' : SkyCoord(str(mars.a_ra), str(mars.a_dec),
-                                            unit=('hourangle', 'deg')),
-                          'Jupiter' : SkyCoord(str(jup.a_ra), str(jup.a_dec),
-                                               unit=('hourangle', 'deg')),
-                          'Saturn' : SkyCoord(str(sat.a_ra), str(sat.a_dec),
-                                              unit=('hourangle', 'deg')),
-                          'Uranus' : SkyCoord(str(ur.a_ra), str(ur.a_dec),
-                                              unit=('hourangle', 'deg')),
-                          'Neptune' : SkyCoord(str(nep.a_ra), str(nep.a_dec),
-                                               unit=('hourangle', 'deg')),
-                          'Pluto' : SkyCoord(str(plu.a_ra), str(plu.a_dec),
-                                             unit=('hourangle', 'deg')),
-                          'Cas A' : SkyCoord(350.866250, 58.811667, unit='deg'),
-                          'Cyg A' : SkyCoord(299.867917, 40.733889, unit='deg'),
-                          'Tau A' : SkyCoord(83.633333, 22.014444, unit='deg'),
-                          'Her A' : SkyCoord(252.783750, 4.992500, unit='deg'),
-                          'M87' : SkyCoord(187.705833, 12.391111, unit='deg'),
-                          'GC' : SkyCoord(266.416833, -29.007806, unit='deg')}
-
-        image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
-
-        print('\nPerforming preliminary image quality checks...')
-
-        if self.tau_time is not None:
-            if self.tau_time < min_tos:
-                print('IMAGE FAILED QA: integration time on source < {} s'.
-                      format(min_tos))
-                self.error_id = 1
-                return
-            else: pass
-        else:
-            if self.duration is not None and self.duration < min_tos:
-                print('IMAGE FAILED QA: integration time on source < {} s'.
-                      format(min_tos))
-                self.error_id = 1
-                return
-            else: pass
-
-        if self.noise is not None:
-            if self.noise < 0. or self.noise > max_rms:
-                print('IMAGE FAILED QA: image noise is {}. Max allowed is {}'.
-                      format(self.noise, max_rms)) 
-                self.error_id = 2
-                return
-            else: pass
-        else:
-            pass
-
+        """Writes FITS image data and header."""
         try:
-            axis_ratio = self.bmaj / self.bmin
-        except TypeError:
-            axis_ratio = 1.
-        if axis_ratio > max_ellip:
-            print('IMAGE FAILED QA: beam axis ratio is {}. Max allowed is {}'.
-                  format(axis_ratio, max_ellip))
-            self.error_id = 3
-            return
-        else: pass
-
-        min_sep = 999999.99
-        for src, loc in bright_sources.items():
-            ang_sep = image_center.separation(loc).degree
-            if ang_sep < min_sep:
-                min_sep = ang_sep
-                self.separation = ang_sep
-                self.nearest_problem = src
-            else: pass
-            if ang_sep < prob_sep:
-                print('IMAGE FAILED QA: {} is within {} degrees'.format(
-                    src, prob_sep))
-                self.error_id = 4
-                return
-            else: pass
-        # Check to see if image header says it's looking at the NCP
-        if self.obj == 'NCP':
-            print('IMAGE FAILED QA: pointing is at NCP')
-            self.error_id = 4
-            return
-        else: pass
-        # Some planet observations have obs_ra, obs_dec = 0, 0
-        if self.obs_ra == 0. and self.obs_dec == 0.:
-            print('IMAGE FAILED QA: pointing center is at RA, Dec = 0, 0')
-            self.error_id = 4
-            return
-        else: pass
-
-        print('...image passed.')
+            fits.writeto(self.filename, data, header, overwrite=owrite)
+        except TypeError: # astropy version < 1.3
+            fits.writeto(self.filename, data, header, clobber=owrite)
 
 
-    def source_qa(self, sources, params):
-        """Approximates the expected number of sources in an
-        image based on source counts from WENSS scaled by
-        noise and fitted beam. See EP's PythonTools.
-
-        """
-        max_src_metric = params['max source metric']
-        
-        print('\nPerforming source count quality checks...')
-        # First, check if there are any sources
-        if len(sources) < 1:
-            print('IMAGE FAILED QA: 0 sources were detected')
-            self.error_id = 6
-            return
-        else: pass
-
-        # Get number of actual sources within central 1.5 degrees
-        image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
-        nsrc_cut = 0
-        for src in sources:
-            src_loc = SkyCoord(src.ra, src.dec, unit='deg')
-            deg_from_center = image_center.separation(src_loc).degree
-            if deg_from_center <= 1.5:
-                nsrc_cut += 1
-
-        # Estimate number of expected sources within central 1.5 degrees
-        nsrc_exp = beam_tools.expected_nsrc(self.noise)
-        # Compute metric for determining if source count is way off
-        nsrc_metric = (float(nsrc_cut) - nsrc_exp) / nsrc_exp
-        
-        if nsrc_metric > max_src_metric:
-            print('IMAGE FAILED QA: too many sources detected, ')
-            print('nsrc_metric = {}; limit = {}'.format(
-                nsrc_metric, max_src_metric))
-            self.error_id = 7
-            return
-        else: pass
-
-        print('...image passed.')
-
-        
     def header_attrs(self, hdr):
-        """This method does all the heavy lifting of 
-        extracting and assigning the object attributes 
-        from the fits image header and assigns ``None`` 
-        if the keyword is missing in the header.
+        """Extracts all keywords of interest from the FITS image
+        header and stores their values as attributes of the
+        initialized Image object. If a header keyword is missing
+        from the image metadata, then that attribute value is
+        set to ``None``. The error_id attribute is also set to 1
+        if the missing header keyword is deemed important enough.        
 
         """
         try:
@@ -342,14 +174,17 @@ class Image(object):
             self.imsize = str((naxis1, naxis2)) # pixels
         except KeyError:
             self.imsize = None
+            self.error_id = 1
         try:
             self.obs_ra = hdr['OBSRA'] # deg
         except KeyError:
             self.obs_ra = None
+            self.error_id = 1
         try:
             self.obs_dec = hdr['OBSDEC'] # deg
         except KeyError:
             self.obs_dec = None
+            self.error_id = 1
         try:
             self.pixel_scale = abs(hdr['CDELT1']) * 3600. # arcsec/pixel
         except KeyError:
@@ -357,6 +192,7 @@ class Image(object):
                 self.pixel_scale = abs(hdr['CDELT2']) * 3600. # arcsec/pixel
             except KeyError:
                 self.pixel_scale = None
+                self.error_id = 1
         try:
             self.obj = hdr['OBJECT']
         except KeyError:
@@ -365,6 +201,7 @@ class Image(object):
             self.obs_date = hdr['DATE-OBS']
         except KeyError:
             self.obs_date = None
+            self.error_id = 1
         try:
             self.map_date = hdr['DATE-MAP']
         except KeyError:
@@ -373,12 +210,13 @@ class Image(object):
             self.obs_freq = hdr['RESTFREQ'] / 10**6. # MHz
         except KeyError:
             try:
-                if hdr['CTYPE3'] == 'FREQ':
+                if hdr['CTYPE3'] == 'FREQ' or hdr['CTYPE3'] == 'SPECLNMF':
                     self.obs_freq = hdr['CRVAL3'] / 10**6. # MHz
                 else:
                     self.obs_freq = hdr['CRVAL4'] / 10**6. # MHz
             except KeyError:
                 self.obs_freq = None
+                self.error_id = 1
         try:
             self.bmaj = hdr['BMAJ'] * 3600. # arcsec
             self.bmin = hdr['BMIN'] * 3600. # arcsec
@@ -406,10 +244,12 @@ class Image(object):
                     self.bmaj = None
                     self.bmin = None
                     self.bpa = None
+                    self.error_id = 1
         try:
             self.noise = hdr['ACTNOISE'] * 1000. # mJy/beam
         except KeyError:
             self.noise = None
+            self.error_id = 1
         try:
             self.peak = hdr['PEAK'] * 1000. # mJy/beam
         except KeyError:
@@ -425,18 +265,191 @@ class Image(object):
             self.nvis = hdr['NVIS']
         except KeyError:
             self.nvis = None
+            self.error_id = 1
         try:
-            self.mjdtime = hdr['MJDTIME']
+            self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME']
         except KeyError:
             self.mjdtime = None
+            self.error_id = 1
         try:
             self.tau_time = hdr['TAU_TIME'] # sec
         except KeyError:
             self.tau_time = None
+            self.error_id = 1
         try:
             self.duration = hdr['DURATION'] # sec
         except KeyError:
             self.duration = None
+
+
+    def image_qa(self, params):
+        """Performs quality checks on the image pre-source finding
+        to flag images with the following issues:
+        1.) missing necessary header keywords (self.error_id = 1)
+        2.) integration time on source (tau_time) < min_tos
+        3.) noise < 0 or > max_rms mJy/beam
+        4.) beam semi-major/semi-minor axis > max_ellip (too elliptical)
+        5.) pointing center within prob_sep degrees of a known bright
+        radio source (Cas A, Cygnus A, Taurus A, Hercules A,
+        Virgo A (M87), the Sun, planets, Galactic Center)
+
+        """
+        print('\nPerforming preliminary image quality checks...')
+        
+        # Check if image was missing any necessary header keywords
+        if self.error_id == 1:
+            print('IMAGE FAILED QA: missing necessary header keyword(s)')
+            return
+        
+        # QA requirements
+        min_tos = params['min time on source (s)']
+        max_rms = params['max noise (mJy/beam)']
+        max_ellip = params['max beam axis ratio']
+        prob_sep = params['min problem source separation (deg)']
+        
+        # VLITE can't track planets, so flag all of them
+        sun = ephem.Sun()
+        mer = ephem.Mercury()
+        ven = ephem.Venus()
+        mars = ephem.Mars()
+        jup = ephem.Jupiter()
+        sat = ephem.Saturn()
+        ur = ephem.Uranus()
+        nep = ephem.Neptune()
+        plu = ephem.Pluto()
+        # convert from MJD to UTC ISO format
+        jdt = Time(self.mjdtime, format='mjd', scale='utc')
+        sun.compute(jdt.iso)
+        mer.compute(jdt.iso)
+        ven.compute(jdt.iso)
+        mars.compute(jdt.iso)
+        jup.compute(jdt.iso)
+        sat.compute(jdt.iso)
+        ur.compute(jdt.iso)
+        nep.compute(jdt.iso)
+        plu.compute(jdt.iso)
+        bad_sources = {'Sun' : SkyCoord(str(sun.a_ra), str(sun.a_dec),
+                                        unit=('hourangle', 'deg')),
+                       'Mercury' : SkyCoord(str(mer.a_ra), str(mer.a_dec),
+                                            unit=('hourangle', 'deg')),
+                       'Venus' : SkyCoord(str(ven.a_ra), str(ven.a_dec),
+                                          unit=('hourangle', 'deg')),
+                       'Mars' : SkyCoord(str(mars.a_ra), str(mars.a_dec),
+                                         unit=('hourangle', 'deg')),
+                       'Jupiter' : SkyCoord(str(jup.a_ra), str(jup.a_dec),
+                                            unit=('hourangle', 'deg')),
+                       'Saturn' : SkyCoord(str(sat.a_ra), str(sat.a_dec),
+                                           unit=('hourangle', 'deg')),
+                       'Uranus' : SkyCoord(str(ur.a_ra), str(ur.a_dec),
+                                           unit=('hourangle', 'deg')),
+                       'Neptune' : SkyCoord(str(nep.a_ra), str(nep.a_dec),
+                                            unit=('hourangle', 'deg')),
+                       'Pluto' : SkyCoord(str(plu.a_ra), str(plu.a_dec),
+                                          unit=('hourangle', 'deg')),
+                       'Cas A' : SkyCoord(350.866250, 58.811667, unit='deg'),
+                       'Cyg A' : SkyCoord(299.867917, 40.733889, unit='deg'),
+                       'Tau A' : SkyCoord(83.633333, 22.014444, unit='deg'),
+                       'Her A' : SkyCoord(252.783750, 4.992500, unit='deg'),
+                       'M87' : SkyCoord(187.705833, 12.391111, unit='deg'),
+                       'GC' : SkyCoord(266.416833, -29.007806, unit='deg')}
+
+        image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
+
+        # Check integration time
+        if self.tau_time < min_tos:
+            print('IMAGE FAILED QA: integration time on source < {} s'.
+                  format(min_tos))
+            self.error_id = 2
+            return
+        else: pass
+        
+        # Check image noise
+        if self.noise < 0. or self.noise > max_rms:
+            print('IMAGE FAILED QA: image noise is {}. Max allowed is {}'.
+                  format(self.noise, max_rms)) 
+            self.error_id = 3
+            return
+        else: pass
+
+        # Check beam ellipticity
+        axis_ratio = self.bmaj / self.bmin
+        if axis_ratio > max_ellip:
+            print('IMAGE FAILED QA: beam axis ratio is {}. Max allowed is {}'.
+                  format(axis_ratio, max_ellip))
+            self.error_id = 4
+            return
+        else: pass
+
+        # Check angular separation from problem sources
+        min_sep = 999999.99
+        for src, loc in bad_sources.items():
+            ang_sep = image_center.separation(loc).degree
+            if ang_sep < min_sep:
+                min_sep = ang_sep
+                self.separation = ang_sep
+                self.nearest_problem = src
+            else: pass
+            if ang_sep < prob_sep:
+                print('IMAGE FAILED QA: {} is within {} degrees'.format(
+                    src, prob_sep))
+                self.error_id = 5
+                return
+            else: pass
+        # Check to see if image header says it's looking at the NCP
+        if self.obj == 'NCP':
+            print('IMAGE FAILED QA: pointing is at NCP')
+            self.error_id = 5
+            return
+        else: pass
+        # Some planet observations have obs_ra, obs_dec = 0, 0
+        if self.obs_ra == 0. and self.obs_dec == 0.:
+            print('IMAGE FAILED QA: pointing center is at RA, Dec = 0, 0')
+            self.error_id = 5
+            return
+        else: pass
+
+        print('...image passed.')
+
+
+    def source_qa(self, sources, params):
+        """Approximates the expected number of sources in an
+        image based on source counts from WENSS scaled by
+        noise and fitted beam. See EP's PythonTools.
+
+        """
+        max_src_metric = params['max source metric']
+        
+        print('\nPerforming source count quality checks...')
+        # First, check if there are any sources
+        if len(sources) < 1:
+            print('IMAGE FAILED QA: 0 sources were detected')
+            self.error_id = 7
+            return
+        else: pass
+
+        # Get number of actual sources within central 1.5 degrees
+        image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
+        nsrc_cut = 0
+        for src in sources:
+            src_loc = SkyCoord(src.ra, src.dec, unit='deg')
+            deg_from_center = image_center.separation(src_loc).degree
+            if deg_from_center <= 1.5:
+                nsrc_cut += 1
+
+        # Estimate number of expected sources within central 1.5 degrees
+        nsrc_exp = beam_tools.expected_nsrc(self.noise)
+        # Compute metric for determining if source count is way off
+        nsrc_metric = (float(nsrc_cut) - nsrc_exp) / nsrc_exp
+        
+        if nsrc_metric > max_src_metric:
+            print('IMAGE FAILED QA: too many sources detected, ')
+            print('nsrc_metric = {}; limit = {}'.format(
+                nsrc_metric, max_src_metric))
+            self.error_id = 8
+            return
+        else: pass
+
+        print('...image passed.')
 
 
     def log_attrs(self, pybdsfdir):
@@ -482,9 +495,10 @@ class Image(object):
 
 
 class DetectedSource(object):
-    """Class of objects to store properties of sources extracted
-    from an image by `PyBDSF`. Attributes are translated from
-    attributes of the class of objects output by `PyBDSF`.
+    """Class of objects to store elliptical Gaussian fit 
+    properties of sources found and measured by `PyBDSF`. 
+    Attribute values are translated from the class of objects 
+    output by `PyBDSF`.
 
     References
     ----------
@@ -542,7 +556,7 @@ class DetectedSource(object):
 
     def cast(self, origsrc):
         """Attributes of a `bdsf.gaul2srl.Source` object
-        output from `bdsf.process_image` are cast to define
+        output from `bdsf.process_image` are re-cast to define
         attributes of a DetectedSource object.
 
         Parameters
@@ -588,6 +602,14 @@ class DetectedSource(object):
 
 
     def correct_flux(self, imobj):
+        """Applies a 1-D radial correction to all flux measurements
+        from `PyBDSF`. The correction factor has been empirically derived
+        from flux comparisons of sources as a function of angular
+        distance from the image center. The scale factor increases
+        farther from the pointing center as the beam power decreases.
+
+        """
+        # Compute source's angular distance from image center
         img_center = SkyCoord(imobj.obs_ra, imobj.obs_dec, unit='deg')
         src_loc = SkyCoord(self.ra, self.dec, unit='deg')
         self.dist_from_center = img_center.separation(src_loc).degree
@@ -603,7 +625,7 @@ class DetectedSource(object):
 
 
 def dict2attr(obj, dictionary):
-    """Sets dictionary key, value pairs to object attributes.
+    """Converts dictionary key, value pairs to object attributes.
     
     Parameters
     ----------
@@ -644,7 +666,7 @@ def translate_from_txtfile(img, pybdsfdir):
     srl = prefix + '.pybdsm.srl'
     catalog = os.path.join(pybdsfdir, srl)
     # Read the catalog
-    print('\nExtracting sources from {}'.format(srl))
+    print('\nExtracting sources from {}.'.format(srl))
     sources = pybdsfcat.read_catalog(catalog)
 
     # Count the number of sources
@@ -685,23 +707,8 @@ def translate(img, out):
     # Add PyBDSF defined attributes
     img.nsrc = out.nsrc
     img.rms_box = str(out.rms_box)
-    # Try updating any missing attributes from header info
-    # using PyBDSF's output object
-    if img.imsize is None:
-        img.imsize = str(out._original_shape) # pixels
-    if img.obs_freq is None:
-        img.obs_freq = out.frequency / 10**6. # MHz
-    if img.bmaj is None:
-        img.bmaj = out.beam[0] * 3600. # arcsec
-    if img.bmin is None:
-        img.bmin = out.beam[1] * 3600. # arcsec
-    if img.bpa is None:
-        img.bpa = out.beam[2] # deg
-    if img.noise is None:
-        img.noise = np.std(out.resid_gaus_arr) * 1000. # mJy/beam
 
-    # Translate PyBDSF output source objects to our own
-    # DetectedSource objects
+    # Translate PyBDSF output source objects to DetectedSource objects
     newsrcs = []
     for oldsrc in out.sources:
         newsrcs.append(DetectedSource())

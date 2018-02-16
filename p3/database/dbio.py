@@ -1,5 +1,5 @@
-"""This module contains methods to prepare and insert
-data into the `PostgreSQL` database tables.
+"""Functions for specific I/O to the `PostgreSQL` database
+tables needed for the Post-Processing Pipeline.
 
 """
 import psycopg2
@@ -10,8 +10,35 @@ import dbclasses
 
 def record_config(conn, cfgfile, start_time, exec_time, nimages,
                   stages, opts, setup, sfparams, qaparams):
-    """Records information about the current run of the pipeline,
-    including the contents of the configuration file.
+    """Inputs information about the current run of the pipeline
+    into the database **run_config** table. All contents of the
+    configuration file are stored as dictionaries/json.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    cfgfile : str
+        Name of the `YAML` run configuration file.
+    start_time : datetime.datetime instance
+        Date & time at the start of the pipeline run.
+    exec_time : datetime.timedelta instance
+        Execution time of the pipeline run.
+    nimages : int
+        Number of images processed. (Technically,
+        number of Image objects initialized.)
+    stages : dict
+        Dictionary of the 'stages' section of the configuration file.
+    opts : dict
+        Dictionary of the 'options' section of the configuration file.
+    setup : dict
+        Dictionary of the 'setup' section of the configuration file.
+    sfparams : dict
+        Dictionary of the 'pybdsf_params' section of the
+        configuration file.
+    qaparams : dict
+        Dictionary of the 'image_qa_params' section of the
+        configuration file.
 
     """
     jstages = json.dumps(stages)
@@ -60,7 +87,8 @@ def status_check(conn, impath):
 
 
 def add_image(conn, img, status, delete=False):
-    """Insert or update rows in database image table.
+    """Inserts or updates rows in the database
+    **image** table.
     
     Parameters
     ----------
@@ -70,28 +98,29 @@ def add_image(conn, img, status, delete=False):
         Initialized Image object with attributes
         set from image header.
     status : tuple
-        Contains the id and stage for the image's row
-        entry in the database image table if it exists.
-        Otherwise, status is ``None``.
+        If ``None``, the image is new and is added to the
+        database **image** table. If not ``None``, the iamge
+        id stored in the tuple is used to update the correct
+        row in the **image** table.
     delete : bool, optional
-        If ``True``, rows in the detected_island database table
+        If ``True``, rows in the **detected_island** database table
         with the appropriate image_id will be deleted,
-        cascading to the detected_source table and triggering 
-        updates on the assoc_source and catalog_match
-        tables. Rows with the same image_id are also deleted 
-        from the vlite_unique table. Default value is ``False``.
+        cascading to the **detected_source** and **corrected_flux**
+        tables and triggering updates on the **assoc_source**, 
+        **catalog_match**, and **vlite_unique** tables. Default value
+        is ``False``.
 
     Returns
     -------
     img : database.dbclasses.Image instance
-        Initialized Image object which was used to
-        insert values into the database image table.    
+        Initialized Image object with updated id attribute,
+        if newly added to the database.
     """
     cur = conn.cursor()
     
     # Add new image to DB
     if status is None:
-        print('\nAdding {} to database'.format(img.filename))
+        print('\nAdding new entry to image table.')
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
@@ -110,7 +139,7 @@ def add_image(conn, img, status, delete=False):
         img.id = cur.fetchone()[0]
     # Update existing image entry
     else:
-        print('\nUpdating existing entries for {}'.format(img.filename))
+        print('\nUpdating existing entries in image table.')
         img.id = status[0]
         sql = '''UPDATE image SET filename = %s, imsize = %s, obs_ra = %s,
             obs_dec = %s, pixel_scale = %s, object = %s, obs_date = %s, 
@@ -140,31 +169,29 @@ def add_image(conn, img, status, delete=False):
 
 
 def add_sources(conn, img, sources):
-    """Inserts DetectedSource objects into database
-    detected_island and detected_source tables. The Image object
-    and image table are also updated with some results
-    from the source finding.
+    """Inserts source finding and measurement results from
+    PyBDSF stored as DetectedSource object attributes into
+    the database **detected_island** and **detected_source**
+    tables. The **image** table is also updated with some
+    results from the source finding.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.    
     img : database.dbclasses.Image instance
-        Initialized Image object which was used to
-        insert values into the database image table.
-    sources : list of DetectedSource objects
-        DetectedSource objects to be inserted into
-        the detected_island and detected_source 
-        database tables.
+        Image object with attributes updated with source
+        finding results.
+    sources : list
+        DetectedSource objects whose attributes are the
+        elliptical Gaussian fitting results.
     """
     cur = conn.cursor()
 
-    # Update image table -- overwrites all possible updated columns
-    sql = '''UPDATE image SET imsize = %s, obs_freq = %s, bmaj = %s, 
-        bmin = %s, bpa = %s, noise = %s, radius = %s, nsrc = %s, 
-        rms_box = %s, error_id = %s, stage = %s WHERE id = %s'''
-    vals = (img.imsize, img.obs_freq, img.bmaj, img.bmin, img.bpa, img.noise,
-            img.radius, img.nsrc, img.rms_box, img.error_id, img.stage, img.id)
+    # Update image table
+    sql = '''UPDATE image SET radius = %s, nsrc = %s, rms_box = %s, 
+        error_id = %s, stage = %s WHERE id = %s'''
+    vals = (img.radius, img.nsrc, img.rms_box, img.error_id, img.stage, img.id)
     cur.execute(sql, vals)
 
     if sources is not None:
@@ -174,7 +201,7 @@ def add_sources(conn, img, sources):
         cur.close()
         return
     
-    # Insert DetectedSources into detected_source and detected_island tables
+    # Add sources to  detected_source and detected_island tables
     print('\nAdding detected sources to database.')
     for src in sources:
         src.image_id = img.id
@@ -214,9 +241,8 @@ def add_sources(conn, img, sources):
 
 
 def add_corrected(conn, src):
-    """Adds source flux values after being corrected
-    for the primary beam response to the database
-    corrected_flux table.
+    """Inserts primary beam corrected flux values into
+    the database **corrected_flux** table.
 
     """
     cur = conn.cursor()
@@ -238,20 +264,20 @@ def add_corrected(conn, src):
 
 def add_assoc(conn, sources):
     """Adds a newly detected VLITE source to the
-    assoc_source table and updates the assoc_id
-    for that source in the detected_source table.
+    **assoc_source** table and updates the assoc_id
+    for that source in the **detected_source** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : list of DetectedSource objects
-        DetectedSource objects to be inserted into
-        the assoc_source database table.
+    sources : list
+        Newly detected VLITE sources stored as 
+        DetectedSource objects.
 
     Returns
     -------
-    sources : list of DetectedSource objects
+    sources : list
         DetectedSource objects with updated assoc_id
         attribute.
     """
@@ -277,16 +303,17 @@ def add_assoc(conn, sources):
 
 
 def update_matched_assoc(conn, sources):
-    """Updates position and size properties of an assoc_source
-    entry to the new weigthed average from all detections.
+    """Updates the position of existing sources in the
+    **assoc_source** table to the weighted average of all
+    detections.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : list of DetectedSource objects
+    sources : list
         DetectedSource objects extracted from the
-        assoc_source table which have been matched
+        **assoc_source** table which have been matched
         to sources detected in the current image.
     """
     cur = conn.cursor()
@@ -302,18 +329,18 @@ def update_matched_assoc(conn, sources):
 
 def update_detected_associd(conn, sources):
     """Updates the assoc_id for sources in the
-    detected_source table which have been successfully
+    **detected_source** table which have been successfully
     associated with existing VLITE sources in the 
-    assoc_source table.
+    **assoc_source** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : list of DetectedSource objects
+    sources : list
         DetectedSource objects detected in the current
         image that have been associated with previous
-        VLITE sources in the assoc_source table.
+        VLITE sources in the **assoc_source** table.
     """
     cur = conn.cursor()
 
@@ -327,8 +354,33 @@ def update_detected_associd(conn, sources):
 
 
 def update_checked_catalogs(conn, image_id, catalogs):
+    """Updates the list of sky catalogs that have been
+    checked for matches to VLITE sources detected in the
+    image. A list of new catalogs to check is additionally
+    defined by first querying the 'catalogs_checked' column
+    in the **image** table and comparing to the list of catalogs
+    specified from the configuration file.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    image_id : int
+        Id number of the image in consideration.
+    catalogs : list
+        List of sky catalogs to use in matching as specified
+        in the run configuration file.
+
+    Returns
+    -------
+    new_catalogs : list
+        Filtered list of only the sky catalogs for which
+        cross-matching has not yet been carried out for
+        the VLITE sources in the image.
+    """
     cur = conn.cursor()
 
+    # Get the catalogs which have already been checked for this image
     cur.execute('SELECT catalogs_checked FROM image WHERE id = %s',
                 (image_id, ))
     already_checked = cur.fetchone()[0]
@@ -337,9 +389,11 @@ def update_checked_catalogs(conn, image_id, catalogs):
     else:
         existing_catalogs = []
 
+    # Filter out the already checked catalogs
     new_catalogs = [catalog.lower() for catalog in catalogs \
                     if catalog.lower() not in existing_catalogs]
-    
+
+    # Update catalogs_checked with new catalogs
     all_catalogs = json.dumps(existing_catalogs + new_catalogs)
     
     cur.execute('UPDATE image SET catalogs_checked = %s WHERE id = %s',
@@ -352,21 +406,23 @@ def update_checked_catalogs(conn, image_id, catalogs):
 
 
 def check_catalog_match(conn, asrc_id, catalog):
-    """Checks if a source in the assoc_source table already
-    has a match to a source in the specified sky catalog
-    in the catalog_match table.
+    """Checks if a source from the **assoc_source** table 
+    already has a match to a sky catalog source in the
+    **catalog_match** table.
+
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    asrc_id : integer
-        Row id of the source in the assoc_soure table to
-        match to the assoc_id in the vlite_unique table.
+    asrc_id : int
+        Row id of the source in the **assoc_soure** table to
+        match to the assoc_id in the **catalog_match** table.
     catalog : str
         Name of the sky catalog.
+
     Returns
     -------
-    rowid : integer
+    rowid : int
         The row id of the entry if it exists. Returns
         ``None`` otherwise.
     """
@@ -386,13 +442,13 @@ def check_catalog_match(conn, asrc_id, catalog):
 
 def update_assoc_nmatches(conn, sources):
     """Updates the number of sky catalog matches to
-    a given source in the assoc_source table.
+    a given source in the **assoc_source** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : list of DetectedSource objects
+    sources : list
         DetectedSource objects with updated nmatches
         attribute after running sky catalog matching.
     """
@@ -407,16 +463,17 @@ def update_assoc_nmatches(conn, sources):
 
 
 def add_catalog_match(conn, sources):
-    """Adds an entry to the catalog_match table for
+    """Adds an entry to the **catalog_match** table for
     every sky catalog source matched to a VLITE source
-    in the assoc_source table.
+    in the **assoc_source** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : list of CatalogSource objects
-        CatalogSource matched to a VLITE DetectedSource.
+    sources : list
+        List of CatalogSource objects matched to VLITE
+        DetectedSource objects.
     """
     cur = conn.cursor()
 
@@ -431,11 +488,11 @@ def add_catalog_match(conn, sources):
 
 
 def check_vlite_unique(conn, asrc_id):
-    """Checks if a given source from the assoc_source
-    table is already in the vlite_unique table. This
+    """Checks if a given source from the **assoc_source**
+    table is already in the **vlite_unique** table. This
     is so that sources don't get added twice to the
-    vlite_unique table (once when the nmatches = 0 source
-    is pulled from assoc_source table and again if no
+    **vlite_unique** table (once when the nmatches = 0 source
+    is pulled from **assoc_source** table and again if no
     sky catalog match is found) when updating the catalog
     matching results by adding new sky catalogs without
     re-doing the previous catalog matching results.
@@ -444,9 +501,9 @@ def check_vlite_unique(conn, asrc_id):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    asrc_id : integer
-        Row id of the source in the assoc_soure table to
-        match to the assoc_id in the vlite_unique table.
+    asrc_id : int
+        Row id of the source in the **assoc_soure** table to
+        match to the assoc_id in the **vlite_unique** table.
 
     Returns
     -------
@@ -468,18 +525,18 @@ def check_vlite_unique(conn, asrc_id):
 
 
 def add_vlite_unique(conn, src, image_id, update=False):
-    """Adds an entry in the vlite_unique table.
+    """Adds or updates an entry in the **vlite_unique** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    src : DetectedSource object
+    src : database.dbclasses.DetectedSource instance 
         DetectedSource object with attribute nmatches = 0.
-    image_id : integer
-        Value of the DetectedSource object image_id attribute.
+    image_id : int
+        Id number of the image from which the source came.
     update : boolean, optional
-        If ``True``, the detected column is updated for
+        If ``True``, the 'detected' column is updated for
         the existing row with the specified image_id and
         assoc_id. Otherwise, a new row is added.
         Default is ``False``.
@@ -501,19 +558,19 @@ def add_vlite_unique(conn, src, image_id, update=False):
     
 def get_image_sources(conn, image_id):
     """Returns a list of sources belonging to a
-    particular image from the detected_source table.
+    particular image from the **detected_source** table.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    image_id : integer
-        Value of the DetectedSource object image_id attribute.
+    image_id : int
+        Id number of the image.
 
     Returns
     -------
-    detected_sources : List of DetectedSource objects
-        Sources pulled from the detected_source table
+    detected_sources : list
+        Sources pulled from the **detected_source** table
         translated from row dictionary objects to
         DetectedSource objects.
     """
@@ -536,20 +593,20 @@ def get_image_sources(conn, image_id):
 
 def get_associated(conn, sources):
     """Returns a list of sources belonging to a
-    particular image from the assoc_source table.
+    particular image from the **assoc_source** table.
     
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : List of DetectedSource objects
+    sources : list
         DetectedSource objects pulled from the
-        detected_source table based on image_id.
+        **detected_source** table based on image_id.
 
     Returns
     -------
-    assoc_sources : List of DetectedSource objects
-        Sources pulled from the assoc_source table
+    assoc_sources : list
+        Sources pulled from the **assoc_source** table
         based on matching assoc_id and translated
         from row dictionary objects to 
         DetectedSource objects.
@@ -558,16 +615,7 @@ def get_associated(conn, sources):
 
     rows = []
     for src in sources:
-        # If list of DetectedSource objects
-        try:
-            src_id = src.assoc_id
-        except AttributeError:
-            # If list of tuple row ids
-            try:
-                src_id = src[0]
-            except TypeError:
-                # If list of ids (not from fetchall())
-                src_id = src
+        src_id = src.assoc_id
         cur.execute('SELECT * FROM assoc_source WHERE id = %s',
                     (src_id, ))
         rows.append(cur.fetchone())
@@ -595,17 +643,16 @@ def delete_matches(conn, sources, image_id):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    sources : List of DetectedSource objects
+    sources : list
         DetectedSource objects belonging to a
         particular image pulled from the
-        assoc_source table based on matching assoc_id.
-    image_id : integer
-        Image id to match to the image_id in the
-        vlite_unique table.
+        **assoc_source** table based on matching assoc_id.
+    image_id : int
+        Id number of the image.
 
     Returns
     -------
-    sources : List of DetectedSource objects
+    sources : list
         DetectedSource objects with their nmatches
         attribute re-initialized to ``None``.
     """
@@ -633,7 +680,7 @@ def delete_matches(conn, sources, image_id):
 
 
 def update_stage(conn, imobj):
-    """Updates the stage column in the image table.
+    """Updates the stage column in the **image** table.
 
     Parameters
     ----------
@@ -653,7 +700,7 @@ def update_stage(conn, imobj):
 
 def remove_catalog(conn, catalogs):
     """Deletes rows with results from specified catalogs
-    in the catalog_match table.
+    from the **catalog_match** table.
 
     """
     cur = conn.cursor()
@@ -696,6 +743,25 @@ def remove_catalog(conn, catalogs):
 
 
 def get_new_vu(conn):
+    """Returns list of sources from the **assoc_source** table
+    for which the number of sky catalog matching results dropped
+    to 0 after removing results of catalog. The **new_vu** table
+    is created to record the row id number of sources in the
+    **assoc_source** table whose 'nmatches' column is 0 after
+    subtracting 1 as triggered by deletion of rows in the
+    **catalog_match** table.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+
+    Returns
+    -------
+    assoc_objs : list
+        List of DetectedSource objects pulled from the
+        **assoc_source** table whose nmatches now equals 0.
+    """
     cur = conn.cursor()
 
     # Get assoc_ids of all sources whose nmatches went down to 0
@@ -720,6 +786,26 @@ def get_new_vu(conn):
 
 
 def get_vu_image(conn, assoc_id):
+    """Retrieves the id numbers and field-of-view radii for
+    any image which contains the specified the VLITE source.
+    This information is needed to update the **vlite_unique**
+    table.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    assoc_id : int
+        The id number of the VLITE source from the
+        **assoc_source** table.
+
+    Returns
+    -------
+    vu_image_list : list
+        List of tuples containing the id number and radius of
+        any image in which the specified VLITE source was
+        detected.
+    """
     cur = conn.cursor()
 
     cur.execute('SELECT image_id FROM detected_source WHERE assoc_id = %s',
@@ -742,6 +828,17 @@ def get_vu_image(conn, assoc_id):
 
 
 def remove_sources(conn, assoc_ids):
+    """Deletes the specified sources from the database
+    **assoc_source** table.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    assoc_ids : list
+        List of id numbers corresponding to the VLITE sources
+        to be removed from the **assoc_source** table.    
+    """
     cur = conn.cursor()
 
     cur.execute('DELETE FROM assoc_source WHERE id IN %s',

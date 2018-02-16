@@ -19,6 +19,7 @@ def read_fitted_beam():
         in degrees ('angle').
     """
     beamfile = '/home/erichards/work/data/FITBEAM_FINAL_DOMEGA.txt'
+    #beamfile = '/home/vpipe/vlite-emily/data/FITBEAM_FINAL_DOMEGA.txt'
     with open(beamfile, 'r') as f:
         lines = f.readlines()
 
@@ -41,9 +42,15 @@ def find_nearest_pbcorr(angle):
     ----------
     angle : float
         Distance from the image center in degrees.
+
+    Returns
+    -------
+    pbdata['power'][idx] : float
+        Primary beam correction factor.
     """
     pbdata = read_fitted_beam()
     idx = (np.abs(np.array(pbdata['angle']) - angle)).argmin()
+    
     return pbdata['power'][idx]
 
 
@@ -55,6 +62,25 @@ def expected_nsrc(rms, max_angle=1.5, sigma=5.):
     scaled to 341 MHz from 325 MHz with alpha= -0.7, rms at 
     center of image [mJy], and fitted beam.
 
+    Parameters
+    ----------
+    rms : float
+        Estimate of the noise in the center of the image
+        in mJy/beam.
+    max_angle : float, optional
+        Maximum angular distance in degrees from image center
+        within which to count/estimate the number of sources.
+        Default value is 1.5 degrees.
+    sigma : float, optional
+        The detection threshold used when source finding.
+        Default value is 5.
+
+    Returns
+    -------
+    nexp : int
+        The expected number of sources within 'max_angle'
+        given the detection threshold, 'sigma', and the
+        image noise.
     """
     wenss_n0 = 10.637 # number per square degree
     wenss_S0 = 247.569 # mJy

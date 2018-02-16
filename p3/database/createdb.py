@@ -1,21 +1,22 @@
-"""Function to create database tables, functions, and triggers."""
+"""Creates database tables, functions, and triggers."""
 import sys
 
 
 def make_error(cur, params):
     """Inserts values into the database error table."""
-    reason_dict = {'integration time on source < {} s'.
-                   format(params['min time on source (s)']) : 1,
+    reason_dict = {'image missing necessary header keyword(s)' : 1,
+                   'integration time on source < {} s'.
+                   format(params['min time on source (s)']) : 2,
                    'image noise < 0 or > {} mJy/beam'.
-                   format(params['max noise (mJy/beam)']): 2,
+                   format(params['max noise (mJy/beam)']): 3,
                    'beam axis ratio > {}'.
-                   format(params['max beam axis ratio']) : 3,
+                   format(params['max beam axis ratio']) : 4,
                    'image center within {} deg of problem source'.
-                   format(params['min problem source separation (deg)']): 4,
-                   'PyBDSF failed to process' : 5,
-                   'zero sources extracted' : 6,
+                   format(params['min problem source separation (deg)']): 5,
+                   'PyBDSF failed to process' : 6,
+                   'zero sources extracted' : 7,
                    'source metric > {}'.
-                   format(params['max source metric']) : 7}
+                   format(params['max source metric']) : 8}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
@@ -33,6 +34,9 @@ def create(conn, params, safe=False):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
+    params : dict
+        Dictionary of quality check requirements from the run
+        configuration file.
     safe : bool, optional
         If ``False``, the user will be warned that existing data
         is about to be deleted and prompted to continue. Default

@@ -24,14 +24,15 @@ others.
 import os
 import pandas as pd
 
-
+# Define path to the sky catalog data
 #catalogdir = '/home/vpipe/vlite-emily/data/SkyCatalogs'
 catalogdir = '/home/erichards/work/data/SkyCatalogs'
 
-# If adding a new catalog, don't forget to add it to this list!
+# If adding a new catalog, don't forget to add it to the end of this list!
 catalog_list = ['cosmos', 'first', 'gleam', 'gpsr1', 'gpsr5', 'nordgc',
                 'nvss', 'sevenc', 'sumss', 'tgss', 'txs', 'vlssr', 'wenss']
 
+# Dictionary to hold info to be put into the skycat.catalogs table
 cat_dict = {}
 id = 1
 for catalog in catalog_list:
@@ -60,8 +61,8 @@ def set_error(catalog, attrs):
     catalog : list
         List of CatalogSource objects with missing
         attribute values.
-    attrs : list of str
-        Attributes which contain missing values to be
+    attrs : list
+        Attribute names which contain missing values to be
         set to the median of the distribution.
    
     Returns

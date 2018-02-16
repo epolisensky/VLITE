@@ -20,7 +20,7 @@ class TestCMBranches(unittest.TestCase):
         """Define variables to be used by all tests and
         connect the database, overwriting existing tables
         every time."""
-        self.dirs = ['/home/erichards/work/p3/test/2540-06/B/Images/']
+        self.dirs = ['/home/erichards/work/p3/test/2540-06/02/Images/']
         self.catalogs = ['NVSS']
         self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
         self.qaparams = {'min time on source (s)' : 60.,

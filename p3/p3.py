@@ -1,7 +1,7 @@
 """This is the main script for the VLITE Post-Processing 
 Pipeline (P3). It is responsible for reading in the
 configuration file, connecting to the the `PostgreSQL` database,
-and calling the appropriate processing stages in the correct order.
+and calling the processing stages.
 
 """
 import os
@@ -23,15 +23,25 @@ except ImportError:
     from yaml import Loader
 
 
+__version__ = 1.5
+
+
 def print_run_stats(start_time):
     """Prints general information about the just completed run 
     of the Post-Processing Pipeline, including the number of
-    images initialized and the total runtime.
+    images initialized and the total execution time.
     
     Parameters
     ----------
     start_time : datetime.datetime instance
         Time when the run was started.
+
+    Returns
+    -------
+    nimgs : integer
+        Number of image files initialized as Image objects.
+    runtime : datetime.timedelta instance
+        Total execution time of the just completed pipeline run.
     """
     print('--------------------------------------\n')
     print('Run statistics:')
@@ -45,8 +55,9 @@ def print_run_stats(start_time):
 
 
 def cfgparse(cfgfile):
-    """This function reads the `yaml` configuration file provided
-    as a command line argument when `p3.py` is called.
+    """This function reads the `YAML` configuration file provided
+    as a command line argument when `p3.py` is called and parses
+    each section of the file into dictionaries.
 
     Parameters
     ----------
@@ -55,27 +66,28 @@ def cfgparse(cfgfile):
 
     Returns
     -------
-    stages : tuple of 3 booleans
-        Indicates which stages to run listed in the following order: 
-        *source finding, source association, catalog matching*.
-        Items can be ``True`` or ``False``.
-    opts : tuple of 6 booleans
-        Turns on and off options listed in the following order: 
-        *save to database, quality checks, overwrite, reprocess, 
-        redo match, update match*. Items can be ``True`` or ``False``.
-    dirs : list of str
+    stages : dict
+        Keys are the processing stages (source finding, source assocation,
+        and catalog matrching) and values are boolean ``True`` or ``False``.
+    opts : dict
+        Keys are the processing options (save to database, quality checks,
+        overwrite, reprocess, redo match, and update match) and values are
+        boolean ``True`` or ``False``.
+    setup : dict
+        Keys are the setup parameters (root directory, year, month, day,
+        database name, database user, and catalogs) and values are the
+        user-supplied inputs.
+    sfparams : dict
+        Keys are the source finding (mode and scale) and `PyBDSF` parameters
+        and values are the user inputs.
+    qaparams : dict
+        Keys are the image quality parameters (min time on source (s),
+        max noise (mJy/beam), max beam axis ratio, min problem source
+        separation (deg), and max source metric) and values are the user
+        inputs. Defaults are defined if none are specified.        
+    dirs : list
         List of strings specifying paths to daily image directories
         to be processed during the run.
-    dbname : str
-        Name of the `PostgreSQL` database.
-    dbusr : str
-        Username for the `PostgreSQL` database connection.
-    catalogs : list of str
-        List of sky survey tables to use when running catalog matching.
-        They are cross-matched in the order they are listed.
-    params : dict
-        Specifies any non-default `PyBDSF` parameters to be used in source
-        finding. 
     """    
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
@@ -89,11 +101,12 @@ def cfgparse(cfgfile):
     yr = setup['year']
     mo = setup['month']
     days = setup['day']
-      
+
+    # Raise error if the configuration says to do nothing
     if not any(stages.values()) and not opts['save to database']:
         raise ConfigError('Nothing to do -- change options: save to database: '
-                          'to yes in the config file to write images to '
-                          'database, or add a processing stage.')
+                          'to "yes" in the configuration file to write images '
+                          'to the database or add a processing stage.')
 
     # Perform checks on path to images 
     try:
@@ -120,11 +133,15 @@ def cfgparse(cfgfile):
     # Define path to processing directories
     dirs = []
     for day in days:
-        if type(day) != 'string':
-            day = str(day)
+        try:
+            day = format(int(day), '02')
+        except ValueError:
+            continue
         procdir = os.path.join(monthdir, day, 'Images/')
-        if not os.path.isdir(procdir): # check full image path
-            raise ConfigError('Directory does not exist: {}'.format(procdir))
+        # Check full image path
+        if not os.path.isdir(procdir):
+            print('\nSkipping non-existent directory {}'.format(procdir))
+            continue
         dirs.append(procdir)
 
     # Make sure stage & option inputs are boolean
@@ -139,18 +156,20 @@ def cfgparse(cfgfile):
         else:
             raise ConfigError('option inputs must be True/False or yes/no.')
 
-    # Catch case when no DB is given
+    # Catch case when no database is given
     if setup['database name'] is None or setup['database user'] is None:
         raise ConfigError('Please provide a database name/user.')
 
+    # Check list of sky catalogs
     if stages['catalog matching']:
-        # Make sure requested catalogs exist
-        catalog_opts = catalogio.catalog_list
+        catalog_opts = catalogio.catalog_list # all available catalogs
+        # If catalogs = [], use all of them
         if len(setup['catalogs']) < 1:
             setup['catalogs'] = catalog_opts
+        # Make sure requested catalogs exist
         try:
             for cat in setup['catalogs']:
-                if type(cat) != 'string':
+                if type(cat) != str:
                     cat = str(cat)
                 cat = cat.lower()
                 if cat not in catalog_opts:
@@ -212,11 +231,13 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     """Creates a `psycopg2` connection object to communicate
     with the `PostgreSQL` database. If no database with the
     provided name exists, the user is prompted to create a
-    new one. This is done by first connecting to the *postgres* 
-    database and then calling the SQL CREATE DATABASE command. 
-    If the database is new or if overwriting the old one, all 
-    necessary schemas, tables, and functions are additionally
-    created through a call to `database.createdb.create()`.
+    new one. The "skycat" schema which holds all the sky survey
+    catalogs in tables is created at this stage if it does not
+    already exist. The user will be prompted to verify deletion
+    of all current tables if the database exists and the *overwrite*
+    option in the configuration file is ``True``. All necessary
+    tables, functions, and triggers are created through a call to 
+    `database.createdb.create()`.
     
     Parameters
     ----------
@@ -226,8 +247,12 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
         Username for the `PostgreSQL` database connection.
     overwrite : bool
         If ``True``, tables and data will be deleted and re-created,
-        assuming there is a pre-existing database of name `dbname`.
-        If ``False`, the existing database with `dbname` is used.
+        assuming there is a pre-existing database of name "dbname".
+        If ``False``, the existing database with "dbname" is used.
+    qaparams : dict
+        The dictionary of image quality cuts specified by the user
+        in the configuration file. The values are written to the
+        database **error** table.
     safe_override : bool, optional
         If ``True``, this overrides the safe boolean. Implemented
         for testing purposes. Default value is ``False``.
@@ -248,7 +273,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
             if safe_override:
                 createdb.create(conn, qaparams, safe=True)
             else:
-                # This will prompt warning in create func
+                # This will prompt warning in create function
                 createdb.create(conn, qaparams, safe=False)
         # Check for sky catalogs by verifying schema exists
         cur = conn.cursor()
@@ -288,117 +313,38 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     return conn
 
 
-def iminit(conn, impath, save, qa, qaparams, reproc, stages):
-    """Initializes `database.dbclasses.Image()` object
-    and adds row to database image table if the image is not
-    already in the table or if the image is being reprocessed.
-    This function represents the first stage in the 
-    Post-Processing Pipeline.
+def vlite_unique(conn, src, image_id, radius):
+    """This function adds a VLITE unique (VU) source, or a source
+    with no sky catalog matches, to the **vlite_unique** table. 
+    After adding a new VU source, the **image** table is queried
+    to find all previously processed images in which the VU source
+    could have been detected based on field-of-view (FOV) and spatial
+    resolution. The **vlite_unique** table, therefore, keeps a record
+    of every image in which a VU source was in the FOV and whether it
+    was detected.
 
     Parameters
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    impath : str
-        Directory path to the FITS image file.
-    save : bool
-        If ``True``, the image info is written and saved
-        to the database image table. If ``False``, an Image
-        class object is initialized without writing to the database.
-    qa : bool
-        Turns on and off quality assurance. If ``True``, quality
-        checks are run on the image data.
-    reproc : bool
-        Turns on and off reprocessing. If ``True``, the image is
-        re-initialized as an Image class object and updated in the
-        database image table (if save = ``True``) even if the image
-        already has an entry in the database. If ``False`` and the
-        image is in the database, no further processing is done and
-        the code moves on to the next image in the list.
+    src : database.dbclasses.DetectedSource instance
+        The VU source from the **assoc_source** table.
+    image_id : int
+        Id number of the image in which the VU source
+        was detected.
+    radius : float
+        Radius (in degrees) of the image's FOV. Used in
+        querying the **image** table.
 
     Returns
     -------
-    imobj : database.dbclasses.Image instance
-        Initialized Image object with attribute values
-        set from header info, or ``None`` if the image
-        has already been processed and will not be reprocessed.
+    src : database.dbclasses.DetectedSource instance
+        The same VU src with updated `detected` attribute.
     """
-    # STAGE 1 -- Initialize image object, add to table, 1st quality check
-
-    # Initialize Image object & set attributes from header
-    imobj = dbio.init_image(impath)
-
-    # Is the image in the database?
-    status = dbio.status_check(conn, impath)
-
-    # Run image quality checks only if it is a new image
-    if qa:
-        imobj.image_qa(qaparams)
-    else:
-        pass
-
-    # Only adding image to DB - add or update w/o deleting sources
-    if not any(stages.values()):
-        if status is None:
-            # image not in DB
-            imobj = dbio.add_image(conn, imobj, status) # branch 2
-        else:
-            if reproc:
-                # already processed, but re-doing -- sources NOT deleted
-                imobj = dbio.add_image(conn, imobj, status) # branch 4
-            else:
-                # already processed & not re-doing
-                print('\nImage {} already in database. Moving on...'.format(
-                    impath))
-                imobj = None # branch 3
-    else: # Running at least one stage
-        if status is None:
-            if stages['source finding']:
-                if save:
-                    # image not in DB; planning to source find & write to DB
-                    imobj = dbio.add_image(conn, imobj, status)
-                else:
-                    # just initialize if not writing to DB
-                    print('\nInitializing {}'.format(impath))
-            else:
-                # image not in DB, but not running source finding --> quit
-                print('\nERROR: Image {} not yet processed. Source finding '
-                      'must be run before other stages.'.format(impath))
-                imobj = None # branch 5
-        else:
-            if stages['source finding']:
-                if reproc:
-                    if save:
-                        # image in DB; re-doing SF, so old sources are removed
-                        imobj = dbio.add_image(conn, imobj, status,
-                                               delete=True)
-                    else:
-                        # just initialize if not writing to DB
-                        print('\nInitializing {}'.format(impath))
-                else:
-                    # image already in DB & not re-processing
-                    print('\nImage {} already processed. Moving on...'.format(
-                        impath))
-                    imobj = None # branch 9
-            else:
-                # not running SF -- stage must be > 1
-                if status[1] > 1:
-                    print('\nInitializing {}'.format(impath))
-                    imobj.id = status[0]
-                    imobj.stage = status[1]
-                    imobj.radius = status[2]
-                else:
-                    print('\nERROR: Image {} does not have sources extracted '
-                          'yet. Source finding must be run before other '
-                          'stages.'.format(impath))
-                    imobj = None # branch 7
-    
-    return imobj
-
-
-def vlite_unique(conn, src, image_id, radius):
+    # Start by checking if the VU source is already in the VU table
     existing = dbio.check_vlite_unique(conn, src.id)
     if not existing: # returned empty list
+        # Newly detected VU source
         src.detected = True
         # Add source to vlite_unique table
         dbio.add_vlite_unique(conn, src, image_id)
@@ -409,15 +355,17 @@ def vlite_unique(conn, src, image_id, radius):
             # Ignore current image
             if previd[0] != image_id:
                 dbio.add_vlite_unique(conn, src, previd[0])
-    else: # VU source already in table
+    else:
+        # VU source already in table, check if new image
         existing_imgids = [row[1] for row in existing]
         if image_id not in existing_imgids:
             # Add if new image
             src.detected = True
             dbio.add_vlite_unique(conn, src, image_id)
-        else: # entry exists
+        else:
+            # VU source newly detected in previous image
             entry = [row for row in existing if row[1] == image_id]
-            if not entry[0][2]:
+            if not entry[0][2]: # if not detected
                 # Update entry to detected = True
                 src.detected = True
                 dbio.add_vlite_unique(conn, src, image_id, update=True)
@@ -425,12 +373,126 @@ def vlite_unique(conn, src, image_id, radius):
     return src
 
 
+def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
+    """This function handles ingestion of the image metadata
+    into the database **image** table and represents the first
+    stage in the Post-Processing Pipeline.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    imobj : database.dbclasses.Image instance
+        Initialized Image object with attribute values
+        set from the header info.
+    save : bool
+        If ``True``, the image info is written and saved
+        to the database **image** table.
+    qa : bool
+        If ``True``, quality checks are run on the image data.
+    qaparams : dict
+        Dictionary of image quality requirements and their
+        user-specified values from the configuration file.
+    reproc : bool
+        If ``True``, any existing entry for this image in the
+        database **image** table is updated. If ``False`` and
+        there is an existing entry, no further processing is
+        done and the code moves on to the next image in the list.
+    stages : dict
+        Dictionary specifying which processing stages are to be run.
+
+    Returns
+    -------
+    imobj : database.dbclasses.Image instance
+        Image object with `id` attribute updated after insertion into
+        the database **image** table, or ``None`` if the image
+        has already been processed and will not be reprocessed.
+    """
+    # STAGE 1 -- Add image to table, 1st quality check
+    print
+    print('**********************')
+    print('STAGE 1: READING IMAGE')
+    print('**********************')
+
+    # Run image quality checks
+    if qa:
+        imobj.image_qa(qaparams)
+    else:
+        pass
+
+    # Is the image in the database?
+    status = dbio.status_check(conn, imobj.filename)
+
+    # Only adding image to DB - add or update w/o deleting sources
+    if not any(stages.values()):
+        if status is None:
+            # image not in DB, so add it
+            imobj = dbio.add_image(conn, imobj, status) # branch 2
+        else:
+            if reproc:
+                # already processed, but re-doing -- sources NOT deleted
+                imobj = dbio.add_image(conn, imobj, status) # branch 4
+            else:
+                # already processed & not re-doing
+                print('\nImage already in database. Moving on...')
+                imobj = None # branch 3
+    else: # Running at least one stage
+        if status is None:
+            if stages['source finding']:
+                if save:
+                    # image not in DB; planning to source find & write to DB
+                    imobj = dbio.add_image(conn, imobj, status)
+                else:
+                    # just initialize if not writing to DB
+                    print('\nInitializing image.')
+            else:
+                # image not in DB, but not running source finding --> quit
+                print('\nERROR: Image {} not yet processed. Source finding '
+                      'must be run before other stages.'.format(imobj.filename))
+                imobj = None # branch 5
+        else:
+            if stages['source finding']:
+                if reproc:
+                    if save:
+                        # image in DB; re-doing SF, so old sources are removed
+                        imobj = dbio.add_image(conn, imobj, status,
+                                               delete=True)
+                    else:
+                        # just initialize if not writing to DB
+                        print('\nInitializing image.')
+                else:
+                    # image already in DB & not re-processing
+                    print('\nImage already processed. Moving on...')
+                    imobj = None # branch 9
+            else:
+                # not running SF -- stage must be > 1
+                if status[1] > 1:
+                    print('\nInitializing image.')
+                    imobj.id = status[0]
+                    imobj.stage = status[1]
+                    imobj.radius = status[2]
+                else:
+                    print('\nERROR: Image {} does not have sources extracted '
+                          'yet. Source finding must be run before other '
+                          'stages.'.format(imobj.filename))
+                    imobj = None # branch 7
+
+    # Uncomment below when ready to stop flagged images (after testing)
+    #if imobj.error_id is not None:
+    # For now, just stop if header keywords are missing
+    if imobj is not None and imobj.error_id == 1:
+        imobj = None
+    
+    return imobj
+
+
 def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     """Runs `PyBDSF` source finding, writes out results,
-    and inserts sources into database detected_source and
-    detected_island tables, if the save to database option is on.
-    This function represents the second stage of the
-    Post-Processing Pipeline.
+    and inserts source fit parameters into database 
+    **detected_source**, **detected_island**, and 
+    **corrected_flux** tables, if the *save to database*
+    option is set to ``True``. This function represents
+    the second stage of the Post-Processing Pipeline.
 
     Parameters
     ----------
@@ -439,29 +501,37 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     imobj : database.dbclasses.Image instance
         Initialized Image object with attribute values
         set from header info.
-    params : dict
+    sfparams : dict
         Specifies any non-default `PyBDSF` parameters to be 
         used in source finding.
     save : bool
-        If ``True``, the extracted sources are written and saved
-        to the database detected_island and detected_source tables. The
-        `PyBDSF` files are always written out.
+        If ``True``, the source fit parameters are written and saved
+        to the database **detected_island*, **detected_source**, and
+        **corrected_flux** tables. The `PyBDSF` files are always 
+        written out.
     qa : bool
-        Turns on and off quality assurance. If ``True``, quality
-        checks are run on the source finding results.
+        If ``True``, quality checks are run on the source finding
+        results.
+    qaparams : dict
+        User-specified requirements from the configuration file for
+        the source finding quality checks.
 
     Returns
     -------
     imobj : database.dbclasses.Image instance
-        Initialized Image object with attribute values
-        set from header info & updated with source finding results.
+        Initialized Image object with updated attributes
+        from the source finding results.
     sources : list
         List of database.dbclasses.DetectedSource objects.
         Attributes of each object are set from the `PyBDSF`
         output object.
     """
     # STAGE 2 -- Source finding + 2nd quality check
-    print('\nExtracting sources from {}'.format(imobj.filename))
+    print
+    print('**********************')
+    print('STAGE 2: SOURCE FINDNG')
+    print('**********************')
+    
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
@@ -477,29 +547,34 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     if out is not None:
         # Write PyBDSF files to daily directory
         runbdsf.write_sources(out)
+        # Translate `PyBDSF` output to DetectedSource objects
         imobj, sources = dbclasses.translate(imobj, out)
+        # Run quality checks, part 2
         if qa:
             imobj.source_qa(sources, qaparams)
     else:
         # PyBDSF failed to process
         sources = None
-        imobj.error_id = 5
+        imobj.error_id = 6
 
     if save:
+        # Add source fit parameters to database tables
         dbio.add_sources(conn, imobj, sources)
-        # Compute beam corrected fluxes & write to corrected_flux table
-        print('\nCorrecting all flux measurements for primary beam response')
-        for src in sources:
-            src.correct_flux(imobj)
-            dbio.add_corrected(conn, src)
+        if sources is not None:
+            # Compute beam corrected fluxes & write to corrected_flux table
+            print('Correcting all flux measurements for primary beam '
+                  'response.')
+            for src in sources:
+                src.correct_flux(imobj)
+                dbio.add_corrected(conn, src)
 
     return imobj, sources
 
 
 def srcassoc(conn, imobj, sources, save):
-    """Associates sources extracted from current image with
-    previously detected VLITE sources stored in the
-    assoc_source database table.
+    """Associates through positional cross-matching sources
+    extracted from the current image with previously detected
+    VLITE sources stored in the **assoc_source** database table.
 
     Parameters
     ----------
@@ -510,43 +585,45 @@ def srcassoc(conn, imobj, sources, save):
         set from header info & updated with source finding results.
     sources : list
         List of database.dbclasses.DetectedSource objects.
-        Attributes of each object are set from the `PyBDSF`
-        output object.
+        Attributes of each object are from the `PyBDSF` fit results.
     save : bool
-        If ``True``, the assoc_source table is updated with the
-        association results and the assoc_id is updated in the
-        detected_source table. An entry is also added to the
-        vlite_unique table if a source with 0 catalog matches
-        is pulled from the asssoc_source table.
+        If ``True``, the **assoc_source** table is updated with the
+        association results and the 'assoc_id' is updated in the
+        **detected_source** table. If ``False``, no results are
+        saved to the database.
     
     Returns
     -------
-    detected_unmatched : list of DetectedSource objects
-        Sources extracted from the image which could not be successfully
-        associated with previously detected sources. These are added
-        to the assoc_table as new detections.
+    detected_unmatched : list
+        List of new VLITE detected sources. 
     imobj : database.dbclasses.Image instance
-        Initialized Image object with updated stage attribute.
+        Initialized Image object with updated `stage` attribute.
     """
     # STAGE 3 -- Source association
+    print
+    print('***************************')
+    print('STAGE 3: SOURCE ASSOCIATION')
+    print('***************************')
+
+    # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, imobj.radius)
     if save:
-        # Update assoc_id col for matched detected source
+        # Update assoc_id col for matched detected sources
         if detected_matched:
             dbio.update_detected_associd(conn, detected_matched)
         # Add new (unmatched) detected sources to assoc_source table
         if detected_unmatched:
             # Updates assoc_id attribute
             detected_unmatched = dbio.add_assoc(conn, detected_unmatched)
-        # Update matched assoc_source entries
+        # Update matched assoc_source positions
         if assoc_matched:
             dbio.update_matched_assoc(conn, assoc_matched)
         # Check for VLITE unique (VU) sources that weren't detected in image
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
                 asrc.detected = False
-                # Add source to vlite_unique table
+                # Update vlite_unique table with image/source non-detection 
                 dbio.add_vlite_unique(conn, asrc, imobj.id)
         # Check for VU sources that were detected in image
         for asrc in assoc_matched:
@@ -558,12 +635,12 @@ def srcassoc(conn, imobj, sources, save):
         imobj.stage = 3
         dbio.update_stage(conn, imobj)
 
-    return assoc_matched, detected_unmatched, imobj
+    return detected_unmatched, imobj
 
 
 def catmatch(conn, imobj, sources, catalogs, save):
-    """Cross-matches a list of DetectedSource objects
-    to all specified sky catalogs.
+    """Performs positional cross-matching of VLITE 
+    detected sources to other radio sky survey catalogs.
 
     Parameters
     ----------
@@ -571,42 +648,43 @@ def catmatch(conn, imobj, sources, catalogs, save):
         The `PostgreSQL` database connection object.
     imobj : database.dbclasses.Image instance
         Initialized Image object with attribute values
-        set from header info & updated with source finding results.
+        set from header info.
     sources : list
-        List of database.dbclasses.DetectedSource objects.
-    catalogs : list of str
+        VLITE detected sources to be matched to sky catalog sources.
+    catalogs : list
         Names of the sky survey catalogs to use.
     save : bool
         If ``True``, match results are recorded in the
-        catalog_match table and the assoc_source table is updated.
-        VLITE unique sources with no sky catalog match are
-        also inserted into the vlite_unique table.
+        **catalog_match** table and the **assoc_source** table is
+        updated. VLITE unique sources with no sky catalog match are
+        inserted into the **vlite_unique** table.
     """
     # STAGE 4 -- Sky catalog cross-matching
+    print
+    print('*********************************')
+    print('STAGE 4: MATCHING TO SKY CATALOGS')
+    print('*********************************')
+    
     # Filter out catalogs which have already been checked for this image
     new_catalogs = dbio.update_checked_catalogs(conn, imobj.id, catalogs)
     for catalog in new_catalogs:
-        # Filter out sources which already have results for this catalog
-        todo_sources = []
-        for src in sources:
-            already_matched = dbio.check_catalog_match(conn, src.id, catalog)
-            if not already_matched:
-                todo_sources.append(src)
         try:
-            todo_sources, catalog_matched = radioxmatch.catalogmatch(
-                conn, todo_sources, catalog, imobj, imobj.radius)
-        except TypeError: # no sky catalog sources extracted
+            # Do the positional cross-match
+            sources, catalog_matched = radioxmatch.catalogmatch(
+                conn, sources, catalog, imobj, imobj.radius)
+        except TypeError:
+            # No sky catalog sources extracted, move on to next catalog
             continue
         if save:
             # Add results to catalog_match table
             dbio.add_catalog_match(conn, catalog_matched)
     if save:
         # Update assoc_source.nmatches
-        dbio.update_assoc_nmatches(conn, todo_sources)
+        dbio.update_assoc_nmatches(conn, sources)
         # Check for new VLITE unique (VU) sources from this image
-        for src in todo_sources:
+        for src in sources:
             if src.nmatches == 0:
-                src  = vlite_unique(conn, src, imobj.id, imobj.radius)
+                src = vlite_unique(conn, src, imobj.id, imobj.radius)
                             
         # Update stage
         imobj.stage = 4
@@ -614,10 +692,9 @@ def catmatch(conn, imobj, sources, catalogs, save):
 
     return
 
-            
+
 def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
-    """
-    This function handles the logic and transitions between
+    """This function handles the logic and transitions between
     processing stages. All individual processing functions
     are called from here. Input parameters come from output
     of `cfgparse`.
@@ -626,23 +703,27 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    stages : tuple of 3 booleans
-        Indicates which stages to run listed in the following order: 
-        *source finding, source association, catalog matching*.
-        Items can be ``True`` or ``False``.
-    opts : tuple of 6 booleans
-        Turns on and off options listed in the following order: 
-        *save to database, quality checks, overwrite, reprocess,
-        redo match, update match*. Items can be ``True`` or ``False``.
-    dirs : list of str
+    stages : dict
+        Keys are the processing stages (source finding, source assocation,
+        and catalog matrching) and values are boolean ``True`` or ``False``.
+    opts : dict
+        Keys are the processing options (save to database, quality checks,
+        overwrite, reprocess, redo match, and update match) and values are
+        boolean ``True`` or ``False``.
+    dirs : list
         List of strings specifying paths to daily image directories
         to be processed during the run.
-    catalogs : list of str
-        List of sky survey tables to use when running catalog matching.
+    catalogs : list
+        Names of radio sky survey catalogs to use when running
+        catalog matching.
     sfparams : dict
         Specifies any non-default `PyBDSF` parameters to be used in source
-        finding. 
+        finding.
+    qaparams : dict
+        User-specified quality requirements or default values defined
+        and set in `cfgparse`.
     """
+    # Define booleans from stages & opts dictionaries
     sf = stages['source finding']
     sa = stages['source association']
     cm = stages['catalog matching']
@@ -662,15 +743,22 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
 
         # Select only the images that end with 'IPln1.fits'
         imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
-        imglist.sort()
-        imglist = imglist[:1]
-
-        # Begin loop through images
+        # Loop through images to initialize
+        imobjlist = []
         for img in imglist:
             impath = os.path.join(imgdir, img)
+            # Initialize Image object & set attributes from header
+            imobjlist.append(dbio.init_image(impath))
 
-            # STAGE 1 -- Initialize image object
-            imobj = iminit(conn, impath, save, qa, qaparams, reproc, stages)
+        # Sort imobjlist by mjdtime
+        imobjlist.sort(key=lambda x: x.mjdtime)
+
+        # Begin loop through time-sorted images
+        for imobj in imobjlist:
+            print('_' * (len(imobj.filename) + 10))
+            print('\nStarting {}.'.format(imobj.filename))
+            # STAGE 1 -- Add image to database
+            imobj = iminit(conn, imobj, save, qa, qaparams, reproc, stages)
             # Move on to next image if imobj is None
             if imobj is None:
                 continue
@@ -679,20 +767,24 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
             if sf:
                 imobj, sources = srcfind(
                     conn, imobj, sfparams, save, qa, qaparams)
+                # Remove temp fits file
                 os.system('rm '+imgdir+'*.crop.fits')
+                # Do this so PyBDSF warning messages get printed to log
+                # when re-directing out put to text file
+                os.system('grep "WARNING" '+imgdir+'*.log')
                 if sources is None:
                     # Image failed to process
                     with open(pybdsfdir+'failed.txt', 'a') as f:
                         f.write(img+'\n')
                     continue
                 else:
+                    # Move PyBDSF output files to PyBDSF directory
                     os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
-                    if glob.glob(imgdir+'*pybdsm.srl'):
+                    if glob.glob(imgdir+'*pybdsm*'):
                         os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 # STAGE 3 -- Source association
                 if sa:
-                    matched_assoc, new_sources, imobj = srcassoc(
-                        conn, imobj, sources, save)
+                    new_sources, imobj = srcassoc(conn, imobj, sources, save)
                     # STAGE 4 -- Sky survey catalog cross-matching
                     if cm: # sf + sa + cm - branch 12, 15
                         # Cross-match new sources only
@@ -700,14 +792,21 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n======================================\n')
+                        print('\n====================================='
+                              '==========================================\n')
                         print('Completed source finding, association, '
-                              'and sky catalog cross-matching.')
-                        print('\n======================================\n')
+                              'and sky catalog cross-matching on image')
+                        print('{}.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
                     else: # sf + sa - branch 11, 14
-                        print('\n======================================\n')
-                        print('Completed source finding and association.')
-                        print('\n======================================\n')
+                        print('\n====================================='
+                              '==========================================\n')
+                        print('Completed source finding and association on '
+                              'image')
+                        print('{}.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
                         continue
                 else:
                     if cm: # sf + cm - branch 10, 13
@@ -715,14 +814,21 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n======================================\n')
+                        print('\n====================================='
+                              '==========================================\n')
                         print('Completed source finding and sky catalog '
-                              'cross-matching to the extracted sources.')
-                        print('\n======================================\n')
+                              'cross-matching to the extracted')
+                        print('sources from image')
+                        print('{}.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
                     else: # sf only - branch 6, 8
-                        print('\n======================================\n')
-                        print('Completed source finding.')
-                        print('\n======================================\n')
+                        print('\n====================================='
+                              '==========================================\n')
+                        print('Completed source finding on image')
+                        print('{}.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
                         continue
             else: # no sf
                 if sa:
@@ -730,46 +836,60 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
                     sources = dbio.get_image_sources(conn, imobj.id)
                     # Already caught case of no sf but stage < 2 in iminit
                     if imobj.stage == 2: # no sa has been run yet
-                        matched_assoc, new_sources, imobj = srcassoc(
-                            conn, imobj, sources, save)
+                        new_sources, imobj = srcassoc(conn, imobj,
+                                                      sources, save)
                         if cm: # sa + cm - branch 20
                             # Cross-match new sources only
                             catmatch(conn, imobj, new_sources, catalogs, save)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            print('\n======================================\n')
+                            print('\n====================================='
+                              '==========================================\n')
                             print('Completed source association and sky '
-                                  'catalog cross-matching to the newly '
-                                  'detected sources.')
-                            print('\n======================================\n')
+                                  'catalog cross-matching to the newly')
+                            print('detected sources from image')
+                            print('{}.'.format(impath))
+                            print('\n====================================='
+                              '==========================================\n')
                         else: # sa only - branch 19
-                            print('\n======================================\n')
-                            print('Completed associating detected sources with '
-                                  'the existing catalog.')
-                            print('\n======================================\n')
+                            print('\n====================================='
+                              '==========================================\n')
+                            print('Completed source association for image')
+                            print('{}.'.format(impath))
+                            print('\n====================================='
+                              '==========================================\n')
                     else: # stage > 2
-                        print("\n{}'s sources have already been associated "
-                              "with the existing catalog.".format(impath))
+                        print("\nNOTE: {}'s".format(impath))
+                        print('sources have already been associated with the '
+                              'existing VLITE catalog.')
                         if cm: # cm only - branch 21
                             assoc_sources = dbio.get_associated(conn, sources)
                             if rematch:
+                                # Delete & redo matching
                                 assoc_sources = dbio.delete_matches(
                                     conn, assoc_sources, imobj.id)
                             else:
                                 if not updatematch:
+                                    # Cross-match new/un-matched sources only
                                     assoc_sources = [src for src in \
                                                      assoc_sources if \
                                                      src.nmatches is None \
                                                      or src.nmatches == 0]
-                                else: pass
+                                else:
+                                    # Use all sources if updating
+                                    pass
                             catmatch(conn, imobj, assoc_sources, catalogs, save)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            print('\n======================================\n')
-                            print('Completed sky catalog cross-matching.')
-                            print('\n======================================\n')
+                            print('\n====================================='
+                              '==========================================\n')
+                            print('Completed sky catalog cross-matching for '
+                                  'image')
+                            print('{}.'.format(impath))
+                            print('\n====================================='
+                              '==========================================\n')
                         else: continue # branch 18
                 else:
                     if cm: # cm only - branch 17
@@ -777,38 +897,51 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
                     else: # branches 2, 4 continued
                         continue
                     if imobj.stage > 2:
-                        # Get sources from detected_source table
+                        # Get detected, then assoc sources
                         sources = dbio.get_image_sources(conn, imobj.id)
                         assoc_sources = dbio.get_associated(conn, sources)
                         if rematch:
+                            # Delete & redo matching
                             assoc_sources = dbio.delete_matches(
                                 conn, assoc_sources, imobj.id)
                         else:
                             if not updatematch:
+                                # Cross-match new/un-matched sources only
                                 assoc_sources = [src for src in assoc_sources \
                                                  if src.nmatches is None or \
                                                  src.nmatches == 0]
-                            else: pass
+                            else:
+                                # Use all sources if updating
+                                pass
                         catmatch(conn, imobj, assoc_sources, catalogs, save)
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n======================================\n')
-                        print('Completed sky catalog cross-matching.')
-                        print('\n======================================\n')
+                        print('\n====================================='
+                              '==========================================\n')
+                        print('Completed sky catalog cross-matching for image')
+                        print('{}.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
                     else: # branch 16
-                        print('\nERROR: Source association for image {} must '
-                              'be run before catalog cross-matching. '
-                              'Alternatively, run source finding first and '
-                              'cross-match extracted sources with sky survey '
-                              'catalogs.'.format(impath))
+                        print('\n====================================='
+                              '==========================================\n')
+                        print('\nERROR: Source association must be run '
+                              'before catalog cross-matching for image')
+                        print('{}.\n'.format(impath))
+                        print('Alternatively, run source finding with catalog '
+                              'matching to cross-match detected')
+                        print('VLITE sources with other radio sky surveys.')
+                        print('\n====================================='
+                              '==========================================\n')
                         continue
 
     return
 
-            
+
 def main():
     """One function to rule them all."""
+    # Set required & optional command line arguments
     parser = argparse.ArgumentParser(
         description='Run the VLITE database Post-Processing Pipline (P3)')
     parser.add_argument('config_file', help='the YAML configuration file')
@@ -829,12 +962,14 @@ def main():
     # Start the timer
     start_time = datetime.now()
 
+    # Parse run configuration file
     stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
 
     # Find existing/create/overwrite database
     conn = dbinit(setup['database name'], setup['database user'],
                   opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
 
+    # Option to remove matching results for sky catalogs
     if args.remove_catalog_matches:
         catalogs = raw_input('\nFor which catalogs would you like to remove '
                              'matching results? (List catalogs separated by '
@@ -853,6 +988,7 @@ def main():
         conn.close()
         sys.exit(0)
 
+    # Option to remove sources from the **assoc_source** database table
     if args.remove_source:
         inp = raw_input('\nPlease enter the id number(s) (separated by '
                         'commas) of the source(s) you wish to remove '
@@ -870,6 +1006,7 @@ def main():
         conn.close()
         sys.exit(0)
 
+    # Option to add a new sky survey catalog to the database "skycat" schema
     if args.add_catalog:
         skycatdb.create(conn)
         conn.close()

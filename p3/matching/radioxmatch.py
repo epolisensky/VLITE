@@ -3,8 +3,6 @@ radio point sources.
 
 Adapted from EP's VSLOW.py.
 
-Post-Processing Pipeline (P3) Stage 4
-
 """
 import re
 import numpy as np
@@ -28,8 +26,8 @@ def write_regions(srclist, impath, ext='.reg'):
         Name of the image including full directory path.
     ext : str, optional
         Extension for the file name
-        (i.e. '1.5GHz.0137+331.IPln1.matches.reg'). Default
-        is '.reg'.
+        (i.e. '1.5GHz.0137+331.IPln1.matches.reg').
+        Default is '.reg'.
     """
     fname = impath[:-5] + ext
     with open(fname, 'w') as f:
@@ -63,23 +61,27 @@ def limit_res(rows, res):
     """
     res = int(round(res))
     keep = []
+    # A/B+
     if res <= 15.0:
-        print('\nLimiting to sources with BMIN <= 15"')
+        print('Limiting to sources with BMIN <= 15"')
         for row in rows:
             if row['beam'] <= 15.0:
                 keep.append(row)
+    # B
     elif 15. < res <= 35.:
-        print('\nLimiting to sources with 15" < BMIN <= 35"')
+        print('Limiting to sources with 15" < BMIN <= 35"')
         for row in rows:
             if 15. < row['beam'] <= 35.:
                 keep.append(row)
+    # C
     elif 35. < res <= 60.:
-        print('\nLimiting to sources with 35" < BMIN <= 60"')
+        print('Limiting to sources with 35" < BMIN <= 60"')
         for row in rows:
             if 35. < row['beam'] <= 60.:
                 keep.append(row)
+    # D
     else:
-        print('\nLimiting to sources with BMIN > 60"')
+        print('Limiting to sources with BMIN > 60"')
         for row in rows:
             if row['beam'] > 60.:
                 keep.append(row)
@@ -90,7 +92,7 @@ def limit_res(rows, res):
 
 
 def check_previous(conn, src, search_radius):
-    """Searches the database image table for images
+    """Searches the database **image** table for images
     of similar spatial resolution which cover an area
     on the sky containing a given point.
 
@@ -120,6 +122,7 @@ def check_previous(conn, src, search_radius):
         reslo, reshi = 35., 60.
     else:
         reslo, reshi = 60., 99999.
+
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute('''SELECT id FROM image 
         WHERE q3c_join(%s, %s, obs_ra, obs_dec, %s) AND
@@ -139,9 +142,6 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    schema : str, optional
-        The database schema which contains the table.
-        Default is 'public'.
     table : str
         Name of the database table to query.
     center_ra : float
@@ -151,6 +151,9 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
         Declination coordinate of the circle center in degrees.
     radius : float
         Size of the circular search region in degrees.
+    schema : str, optional
+        The database schema which contains the table.
+        Default is 'public'.
 
     Returns
     -------
@@ -178,7 +181,7 @@ def associate(conn, detected_sources, imobj, search_radius):
     ----------
     conn : psycopg2.extensions.connect instance
         The `PostgreSQL` database connection object.
-    detected_sources : list of DetectedSource objects
+    detected_sources : list
         List of the sources extracted from the current image.
     imobj : database.dbclasses.Image instance
         Initialized Image object with attribute values
@@ -188,32 +191,33 @@ def associate(conn, detected_sources, imobj, search_radius):
 
     Returns
     -------
-    detected_matched : list of DetectedSource objects
+    detected_matched : list
         Sources extracted from the image that were successfully
         associated with previously detected sources stored in the
-        assoc_source table.
-    detected_unmatched : list of DetectedSource objects
-        Sources extracted from the image which could not be successfully
+        **assoc_source** table.
+    detected_unmatched : list
+        Sources extracted from the image which could NOT be successfully
         associated with previously detected sources. These are added
-        to the assoc_table as new detections and then cross-matched
+        to the **assoc_table** as new detections and then cross-matched
         with other sky survey catalogs.
-    assoc_matched : list of DetectedSource objects
-        Previously detected sources from the assoc_source table which
+    assoc_matched : list
+        Previously detected sources from the **assoc_source** table which
         were successfully associated with sources from the new image. 
-        Size and position properties of these sources are updated in the
-        assoc_source table to reflect the weighted average of all 
-        detections. The number of detections (ndetect) is increased 
-        by one.
-    assoc_unmatched : list of DetectedSource objects
-        Previously detected sources from the assoc_source table which
+        Positions of these sources are updated in the **assoc_source**
+        table to reflect the weighted average of all detections. The 
+        number of detections (ndetect) is increased by one.
+    assoc_unmatched : list
+        Previously detected sources from the **assoc_source** table which
         were not successfully associated with sources from the new image.
         Any of these non-detections with no sky catalog matches
-        (nmatches = 0) are recorded in the vlite_unique table.
+        (nmatches = 0) are recorded in the **vlite_unique** table.
     """
+    # Extract all previously detected sources in the same FOV
     assoc_rows = cone_search(conn, 'assoc_source', imobj.obs_ra,
                              imobj.obs_dec, search_radius)
     print('\nExtracted {} sources from assoc_source table within {} degrees.'.
           format(len(assoc_rows), search_radius))
+    
     if not assoc_rows:
         # No previous sources found in that sky region
         for src in detected_sources:
@@ -231,13 +235,14 @@ def associate(conn, detected_sources, imobj, search_radius):
         for asrc in limited_assoc_rows:
             assoc_sources.append(dbclasses.DetectedSource())
             dbclasses.dict2attr(assoc_sources[-1], asrc)
-        print('\nAttempting to match {} sources from this image to {} sources '
+        print('Attempting to match {} sources from this image to {} sources '
               'previously detected in VLITE images...'.format(
                   len(detected_sources), len(assoc_sources)))
         detected_matched = []
         detected_unmatched = []
         assoc_matched = []
         assoc_unmatched = []
+        # Use de Ruiter radius to cross-match each new source with old ones
         for src in detected_sources:
             match, asrc, min_der = matchfuncs.deRuitermatch(
                 src, assoc_sources, imobj.bmin)
@@ -276,8 +281,8 @@ def associate(conn, detected_sources, imobj, search_radius):
             
 
 def catalogmatch(conn, sources, catalog, imobj, search_radius):
-    """Matches VLITE sources to other source from
-    other sky surveys.
+    """Matches VLITE sources to sources from other radio
+    sky survey catalogs.
 
     Parameters
     ----------
@@ -302,7 +307,7 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius):
     catalog_matched : list
         CatalogSource objects which have been successfully
         matched to the VLITE sources.
-    """
+    """            
     # Extract catalog sources
     catalog_rows = cone_search(conn, catalog, imobj.obs_ra, imobj.obs_dec,
                                search_radius, 'skycat')
@@ -317,12 +322,18 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius):
         for csrc in catalog_rows:
             catalog_sources.append(catalogio.CatalogSource())
             dbclasses.dict2attr(catalog_sources[-1], csrc)
-        print('\nAttempting to match {} sources from this image to {} '
+        print('Attempting to match {} sources from this image to {} '
               'sources from the {} sky catalog...'.format(
                   len(sources), len(catalog_sources), catalog))
+        # Loop through sources to cross-match
         catalog_matched = []
         sources_unmatched = []
         for src in sources:
+            # Skip the sources which already have results for this catalog
+            # (from a different image)
+            already_matched = dbio.check_catalog_match(conn, src.id, catalog)
+            if already_matched:
+                continue
             match, csrc, min_der = matchfuncs.deRuitermatch(
                 src, catalog_sources, imobj.bmin)
             if match: # Found a match!

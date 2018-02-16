@@ -130,7 +130,7 @@ def add_table(tblname, conn):
                       catalogio.cat_dict[tblname]['frequency'],
                       catalogio.cat_dict[tblname]['resolution']))
 
-    # This way took too long (~11 min)
+    # OLD WAY: this way took too long
     """
     # Add sources to table
     for src in sources:

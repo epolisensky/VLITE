@@ -1,16 +1,13 @@
-"""This script contains functions for positional
-cross-matching.
-
-"""
+"""This script contains functions for positional cross-matching."""
 import numpy as np
 from astropy.coordinates import SkyCoord
 
 
-def deRuitermatch(src, match_srcs, bmaj, match_der=6.44, min_der=99999.9):
-    """This matching function uses the unitless deRuiter
+def deRuitermatch(src, match_srcs, beam, match_der=6.44, min_der=99999.9):
+    """This matching function uses the unitless de Ruiter
     radius to determine if there is a successful cross-match
     between two sources. A successful match must have a
-    deRuiter radius < match_der, which defaults to 5.68, and
+    de Ruiter radius < match_der, which defaults to 6.44, and
     have an angular distance < 0.5 * image beam width in arcsec.
     
     Parameters
@@ -21,14 +18,15 @@ def deRuitermatch(src, match_srcs, bmaj, match_der=6.44, min_der=99999.9):
         List of either DetectedSource or CatalogSource
         objects which are candidates for matching to the
         given source.
-    bmaj : float
-        Semi-major axis of the image clean beam in arcseconds.
+    beam : float
+        Semi-major or semi-minor axis of the image clean
+        beam in arcseconds.
     match_der : float, optional
-        The unitless minimum deRuiter distance between two
+        The unitless minimum de Ruiter distance between two
         sources for them to be considered a match. Default
-        is 5.68.
+        is 6.44.
     min_der : float, optional
-        Starting minimum deRuiter distance. Default is 99999.9.
+        Starting minimum de Ruiter distance. Default is 99999.9.
 
     Returns
     -------
@@ -40,34 +38,36 @@ def deRuitermatch(src, match_srcs, bmaj, match_der=6.44, min_der=99999.9):
         which was successfully matched to the given source.
         Otherwise, returns ``None``.
     min_der : float
-        The minimum deRuiter radius found for the given source.
+        The minimum de Ruiter radius found for the given source.
     """
     match = False
     match_src = None
     for msrc in match_srcs:
        # Start by checking if within 15' in declination
         if quickcheck(src.dec, msrc.dec, 0.25):
-            # Calculate deRuiter radius
+            # Calculate de Ruiter radius
             der = deruiter(src.ra, src.dec, src.e_ra, src.e_dec,
                            msrc.ra, msrc.dec, msrc.e_ra, msrc.e_dec)
-            # Check if deRuiter radius < previous minimum
+            # Check if de Ruiter radius < previous minimum
             if der < min_der:
                 min_der = der
                 match_src = msrc
-            # Check if deRuiter radius < required match limit
+            # Check if de Ruiter radius < required match limit
             if der < match_der:
                 # Check if angular distance < 0.5*beam
                 if angdist(src.ra, src.dec,
-                           msrc.ra, msrc.dec) < (0.5 * bmaj):
+                           msrc.ra, msrc.dec) < (0.5 * beam):
                     match = True
                     break
+
     return match, match_src, min_der
 
 
 def quickcheck(dec1, dec2, deglim):
-    """Calculate the angular distance in declination 
-    in degrees between two points (sources) and flag 
-    if less than the specified maximum limit in degrees.
+    """Calculates the angular distance in degrees between
+    the declinations of two points and sets the flag to
+    ``True`` if less than the specified maximum separation
+    limit in degrees.
     
     Parameters
     ----------
@@ -89,13 +89,13 @@ def quickcheck(dec1, dec2, deglim):
     flag = False
     if (abs(dec2 - dec1) < deglim):
       flag = True
+      
     return flag
 
 
 def deruiter(ra1, dec1, e_ra1, e_dec1, ra2, dec2, e_ra2, e_dec2):
-    """Calculate the unitless deRuiter radius between two 
-    points (sources) using RA & Dec coordinates and their 
-    errors in degrees.
+    """Calculate the unitless de Ruiter radius between two 
+    points using RA & Dec coordinates and their errors in degrees.
     
     Parameters
     ----------
@@ -125,24 +125,25 @@ def deruiter(ra1, dec1, e_ra1, e_dec1, ra2, dec2, e_ra2, e_dec2):
     Returns
     -------
     r : float
-        Calculated unitless deRuiter distance between the two
+        Calculated unitless de Ruiter distance between the two
         given sources.
     """
     r = np.sqrt(((((ra1 - ra2)**2.0) * (cosd((dec1 + dec2) / 2.0))**2.0) / \
                  (e_ra1**2.0 + e_ra2**2.0)) + (((dec1 - dec2)**2.0) / \
                                                (e_dec1**2.0 + e_dec2**2.0)))
+
     return r
 
 
 def cosd(angle):
     """Returns the cosine of an angle given in degrees."""
     cosa = np.cos(np.radians(angle))
+    
     return cosa
 
 
 def angdist(ra1, dec1, ra2, dec2):
-    """Returns the angular distance in arcsec 
-    between two points (sources).
+    """Returns the angular distance in arcsec between two points.
 
     Parameters
     ----------
@@ -157,11 +158,12 @@ def angdist(ra1, dec1, ra2, dec2):
 
     Returns
     -------
-    sep.arcsecond : float
+    sep : float
         The separation between the two points on the sky
         in arcseconds.
     """
     p1 = SkyCoord(ra1, dec1, unit="deg")
     p2 = SkyCoord(ra2, dec2, unit="deg")
-    sep = p1.separation(p2)
-    return sep.arcsecond
+    sep = p1.separation(p2).arcsecond
+    
+    return sep
