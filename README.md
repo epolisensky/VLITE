@@ -62,12 +62,17 @@ the indexed database tables.
 running functions
 
 ## Running the Code
-> python p3.py example_config.yaml
-
+```
+python p3.py example_config.yaml
+```
 To see all optional command line arguments, type:
-> python p3.py -h
+```
+python p3.py -h
+```
 or
-> python p3.py --help
+```
+ python p3.py --help
+```
 
 ## Dependencies
 - psycopg2
