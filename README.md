@@ -24,7 +24,7 @@ sources across the entire northern sky.
 ![VLITE 3 years](https://github.com/erichards/VLITE/blob/develop/p3/VLITE_3YEARS_map.png "VLITE 3 years")
 
 ## Files
-This repository contains the follow files under the p3/ directory:
+This repository contains the following files under the p3/ directory:
 
 - **database/createdb.py**: Python functions to create the database tables
 - **database/dbclasses.py**: Python module defining classes used in P3 and
@@ -62,12 +62,12 @@ the indexed database tables.
 running functions
 
 ## Running the Code
->> python p3.py example_config.yaml
+> python p3.py example_config.yaml
 
 To see all optional command line arguments, type:
->> python p3.py -h
+> python p3.py -h
 or
->> python p3.py --help
+> python p3.py --help
 
 ## Dependencies
 - psycopg2
@@ -76,5 +76,5 @@ or
 - astropy
 - ephem
 - pandas
-- `PyBDSF`
+- PyBDSF
 
