@@ -1,7 +1,7 @@
-# VLITE Database Post-Processing Pipeline (P3)
+# VLITE Database Pipeline (VDP)
 ### Scripts for automating source extraction and database storage.
 
-#### Version 1.5
+#### Version 1.6
 
 A post-processing pipeline to adaptively extract and catalog point sources is
 being developed to enhance the scientific value and accessibility of data
@@ -21,15 +21,15 @@ manner, and are cross-matched to other radio sky surveys to aid in the
 detection of transient sources and enable creation of radio flux spectra for
 sources across the entire northern sky.
 
-![VLITE 3 years](https://github.com/erichards/VLITE/blob/develop/p3/VLITE_3YEARS_map.png "VLITE 3 years")
+![VLITE 3 years](https://github.com/erichards/VLITE/blob/develop/VLITE_3YEARS_map.png "VLITE 3 years")
 
 ## Files
-This repository contains the following files under the p3/ directory:
+This repository contains the following files under the vdp/ directory:
 
 - **database/createdb.py**: Python functions to create the database tables
-- **database/dbclasses.py**: Python module defining classes used in P3 and
+- **database/dbclasses.py**: Python module defining classes used in VDP and
 their functions
-- **database/dbio.py**: Python functions which handle database I/O for P3
+- **database/dbio.py**: Python functions which handle database I/O for VDP
 - **database/pybdsfcat.py**: Python function to read list of sources output
 by `PyBDSF`
 - **matching/matchfuncs.py**: Python module containing functions for positional
@@ -43,18 +43,16 @@ schema and insertion of other radio sky survey catalogs
 - **sourcefinding/beam_tools.py**: Python functions to primary beam correct
 VLITE flux measurements
 - **sourcefinding/runbdsf.py**: Python script which runs `PyBDSF` source finding
-- **OUTLINE.md**: outline of the P3 tasks
-- **P3DataFlow.jpg**: P3 data flow chart
-- **P3LogicFlow.jpg**: decision tree demonstrating P3 processing
+- **OUTLINE.md**: outline of the VDP tasks
+- **VDPDataFlow.jpg**: VDP data flow chart
+- **VDPLogicFlow.jpg**: decision tree demonstrating VDP processing
 stages & options
-- **TODO.md**: list of tasks to complete
-- **VLITE-P3_Walkthrough.ipnyb**: P3 IPython notebook demo
 - **errors.py**: Python module containing class definitions for errors
 - **example_config.yaml**: example `YAML` configuration file used to set
-run parameters for P3
+run parameters for VDP
 - **maintenance.py**: Python module containing code to cluster & analyze
 the indexed database tables.
-- **p3.py**: Python module that drives the whole pipeline
+- **vdp.py**: Python module that drives the whole pipeline
 - **test_cmbranches.py**: Python testing script for catalog matching stage
 - **test_sabranches.py**: Python testing script for source association stage
 - **test_sfbranches.py**: Python testing script for source finding stage
@@ -63,15 +61,15 @@ running functions
 
 ## Running the Code
 ```
-python p3.py example_config.yaml
+python vdp.py example_config.yaml
 ```
 To see all optional command line arguments, type:
 ```
-python p3.py -h
+python vdp.py -h
 ```
 or
 ```
- python p3.py --help
+ python vdp.py --help
 ```
 
 ## Dependencies

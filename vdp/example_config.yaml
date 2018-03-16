@@ -1,0 +1,43 @@
+# p3 configuration file
+
+stages:
+                              # processing steps; yes | no  or  True | False
+  source finding: yes         # extract sources from image?
+  source association: yes     # associate sources with previous detections?
+  catalog matching: yes       # cross-match with sky survey catalogs?
+
+options:
+                              # processing options; yes | no or True | False
+  save to database: yes       # save results to database?
+  quality checks: yes         # run image & source count quality checks?
+  overwrite: yes              # overwrite database if exists?
+  reprocess: no               # redo selected stages even if done previously?
+  redo match: no              # redo cross-matching with all sky catalogs?
+  update match: no            # update cross-matching with new sky catalogs?
+
+setup:
+  root directory: /path/to/data/
+  year: 2018
+  month: 3
+  day: [16]                   # list of days to process; [] = all
+  database name: vlite
+  database user: postgres
+  catalogs: []                # [] = all
+
+pybdsf_params:
+  mode: default               # default | minimize_islands
+  scale: 1.0                  # fraction of image size (radius) to use
+  # Specify all PyBDSF parameters here
+  thresh: hard
+  #rms_box: !!python/tuple [100, 30]
+  adaptive_rms_box: True
+  #rms_box_bright: !!python/tuple [20, 10]
+  adaptive_thresh: 10.
+
+image_qa_params:
+  # used when quality checks: yes/True; leave blank for defaults
+  min time on source (s):
+  max noise (mJy/beam):
+  max beam axis ratio:
+  min problem source separation (deg):
+  max source metric:
