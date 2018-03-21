@@ -1,7 +1,7 @@
 # VLITE Database Pipeline (VDP)
 ### Scripts for automating source extraction and database storage.
 
-#### Version 1.6
+#### Version 1.7
 
 A post-processing pipeline to adaptively extract and catalog point sources is
 being developed to enhance the scientific value and accessibility of data
@@ -61,15 +61,15 @@ running functions
 
 ## Running the Code
 ```
-python vdp.py example_config.yaml
+>> python vdp.py example_config.yaml
 ```
 To see all optional command line arguments, type:
 ```
-python vdp.py -h
+>> python vdp.py -h
 ```
 or
 ```
- python vdp.py --help
+>> python vdp.py --help
 ```
 
 ## Dependencies

@@ -550,7 +550,7 @@ class DetectedSource(object):
         self.dist_from_center = None
         # assoc_source attributes
         self.id = None
-        self.beam = None
+        self.res_class = None
         self.ndetect = None
         self.nmatches = None
         # vlite_unique attribute

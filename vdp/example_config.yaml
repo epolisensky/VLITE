@@ -1,4 +1,4 @@
-# p3 configuration file
+# vdp configuration file
 
 stages:
                               # processing steps; yes | no  or  True | False
@@ -19,7 +19,7 @@ setup:
   root directory: /path/to/data/
   year: 2018
   month: 3
-  day: [16]                   # list of days to process; [] = all
+  day: [21]                   # list of days to process; [] = all
   database name: vlite
   database user: postgres
   catalogs: []                # [] = all

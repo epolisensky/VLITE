@@ -23,7 +23,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = 1.6
+__version__ = 1.7
 
 
 def print_run_stats(start_time):
@@ -174,19 +174,20 @@ def cfgparse(cfgfile):
         # If catalogs = [], use all of them
         if len(setup['catalogs']) < 1:
             setup['catalogs'] = catalog_opts
-        # Make sure requested catalogs exist
-        try:
-            for cat in setup['catalogs']:
-                if type(cat) != str:
-                    cat = str(cat)
-                cat = cat.lower()
-                if cat not in catalog_opts:
-                    print('\nCurrently available catalogs: {}\n'.format(
-                        catalog_opts))
-                    raise ConfigError('Catalog {} is not a valid option'.format(
-                        cat))
-        except TypeError:
-            raise ConfigError('Please provide a list of valid sky catalogs.')
+        else:
+            # Make sure requested catalogs exist
+            try:
+                for cat in setup['catalogs']:
+                    if type(cat) != str:
+                        cat = str(cat)
+                        cat = cat.lower()
+                    if cat not in catalog_opts:
+                        print('\nCurrently available catalogs: {}\n'.format(
+                            catalog_opts))
+                        raise ConfigError('Catalog {} is not a valid option'.
+                                          format(cat))
+            except TypeError:
+                raise ConfigError('Please provide a list of valid sky catalogs.')
 
     # Set default QA requirements if not specified
     if opts['quality checks']:
@@ -673,30 +674,29 @@ def catmatch(conn, imobj, sources, catalogs, save):
     print('*********************************')
     print('STAGE 4: MATCHING TO SKY CATALOGS')
     print('*********************************')
+    
+    catalogs = [catalog.lower() for catalog in catalogs]
+    # Filter catalogs by resolution
+    filtered_catalogs = radioxmatch.filter_catalogs(conn, catalogs, imobj.bmin)
+    # Remove catalogs that have already been checked for this image
+    if save:
+        new_catalogs = dbio.update_checked_catalogs(
+            conn, imobj.id, filtered_catalogs)
+    else:
+        new_catalogs = catalogs
+    if not new_catalogs:
+        print('\nAll specified catalogs with appropriate resolution '
+              'have already been checked for matches.')
+        if save:
+            imobj.stage = 4
+            dbio.update_stage(conn, imobj)
+        return
+
+    print('\nUsing the following catalogs for cross-matching: {}'.format(
+        new_catalogs))
 
     if not sources:
         print('\nNo new VLITE sources to match.')
-        if save:
-            imobj.stage = 4
-            dbio.update_stage(conn, imobj)
-        return
-    if save:
-        # Filter out catalogs which have already been checked for this image
-        new_catalogs = dbio.update_checked_catalogs(conn, imobj.id, catalogs)
-    else:
-        new_catalogs = [catalog.lower() for catalog in catalogs]
-    if not new_catalogs:
-        print('\nAll specified catalogs have already been checked for matches.')
-        if save:
-            imobj.stage = 4
-            dbio.update_stage(conn, imobj)
-        return
-    filtered_catalogs = radioxmatch.filter_catalogs(
-        conn, new_catalogs, imobj.bmin)
-    if not filtered_catalogs:
-        # No new catalogs which meet the resolution restrictions
-        print('\nNo new catalogs with appropriate spatial '
-              'resolutions to check.')
         if save:
             imobj.stage = 4
             dbio.update_stage(conn, imobj)
@@ -707,7 +707,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
         match_in_db = False
     else:
         match_in_db = True
-    for catalog in filtered_catalogs:
+    for catalog in new_catalogs:
         try:
             sources, catalog_matched = radioxmatch.catalogmatch(
                 conn, sources, catalog, imobj, imobj.radius, match_in_db)

@@ -285,11 +285,11 @@ def add_assoc(conn, sources):
     
     for src in sources:
         cur.execute('''INSERT INTO assoc_source (
-            ra, e_ra, dec, e_dec, beam, ndetect) VALUES (
+            ra, e_ra, dec, e_dec, res_class, ndetect) VALUES (
             %s, %s, %s, %s, %s, %s)
             RETURNING id''',
                     (src.ra, src.e_ra, src.dec, src.e_dec,
-                     src.beam, src.ndetect))
+                     src.res_class, src.ndetect))
         src.id = cur.fetchone()[0]
         src.assoc_id = src.id
         cur.execute('''UPDATE detected_source SET assoc_id = %s
@@ -390,8 +390,8 @@ def update_checked_catalogs(conn, image_id, catalogs):
         existing_catalogs = []
 
     # Filter out the already checked catalogs
-    new_catalogs = [catalog.lower() for catalog in catalogs \
-                    if catalog.lower() not in existing_catalogs]
+    new_catalogs = [catalog for catalog in catalogs \
+                    if catalog not in existing_catalogs]
 
     # Update catalogs_checked with new catalogs
     all_catalogs = json.dumps(existing_catalogs + new_catalogs)

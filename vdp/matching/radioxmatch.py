@@ -44,7 +44,7 @@ def write_regions(srclist, impath, ext='.reg'):
                 src.ra, src.dec, src.maj, src.min, src.pa + 90.0, src.name))
 
 
-def limit_res(rows, res):
+def limit_res(rows, res_class):
     """Filters out sources extracted from the database
     which originate from images with spatial resolutions
     outside the acceptable range.
@@ -64,13 +64,11 @@ def limit_res(rows, res):
         applying the spatial resolution filtering.
     """
     keep = []
-    for res_range in res_dict.values():
-        if res_range[0] < res <= res_range[1]:
-            print('Limiting to sources with {}" < BMIN <= {}"'.format(
-                res_range[0], res_range[1]))
-            for row in rows:
-                if res_range[0] < row['beam'] <= res_range[1]:
-                    keep.append(row)
+    print('Limiting to sources in resolution class {} ({}" < BMIN <= {}")'.
+          format(res_class, res_dict[res_class][0], res_dict[res_class][1]))
+    for row in rows:
+        if row['res_class'] == res_class:
+            keep.append(row)
 
     print(' -- {} sources remaining'.format(len(keep)))
 
@@ -79,8 +77,8 @@ def limit_res(rows, res):
 
 def check_previous(conn, src, search_radius):
     """Searches the database **image** table for images
-    of similar spatial resolution which cover an area
-    on the sky containing a given point.
+    of the same size which could have contained the source
+    in question in their field-of-view.
 
     Parameters
     ----------
@@ -91,8 +89,7 @@ def check_previous(conn, src, search_radius):
         all previously processed images which could
         have contained it.
     search_radius : float
-        Radius defining the size of the circular search
-        area in degrees.
+        Radius of the image field-of-view in degrees.
 
     Returns
     -------
@@ -100,16 +97,11 @@ def check_previous(conn, src, search_radius):
         List of ids of the images which could have
         contained the given point.
     """
-    for res_range in res_dict.values():
-        if res_range[0] < src.beam <= res_range[1]:
-            reslo = res_range[0]
-            reshi = res_range[1]
-
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute('''SELECT id FROM image 
         WHERE q3c_join(%s, %s, obs_ra, obs_dec, %s) AND
-        bmin > %s AND bmin <= %s''',
-                (src.ra, src.dec, search_radius, reslo, reshi))
+        radius = %s''',
+                (src.ra, src.dec, search_radius, search_radius))
     prev_images = cur.fetchall()
     cur.close()
 
@@ -197,6 +189,11 @@ def associate(conn, detected_sources, imobj, search_radius):
         Any of these non-detections with no sky catalog matches
         (nmatches = 0) are recorded in the **vlite_unique** table.
     """
+    # Find image resolution class
+    for config, res_range in res_dict.items():
+        if res_range[0] < imobj.bmin <= res_range[1]:
+            res_class = config
+    
     # Extract all previously detected sources in the same FOV
     assoc_rows = cone_search(conn, 'assoc_source', imobj.obs_ra,
                              imobj.obs_dec, search_radius)
@@ -204,14 +201,14 @@ def associate(conn, detected_sources, imobj, search_radius):
           format(len(assoc_rows), search_radius))
     # Limit to sources taken from images of similar resolution
     if len(assoc_rows) > 0:
-        limited_assoc_rows = limit_res(assoc_rows, imobj.bmin)
+        limited_assoc_rows = limit_res(assoc_rows, res_class)
     else:
         limited_assoc_rows = []
 
     if not limited_assoc_rows:
         # No previous sources found in that sky region at that resolution
         for src in detected_sources:
-            src.beam = imobj.bmin
+            src.res_class = res_class
             src.ndetect = 1
         detected_matched = []
         detected_unmatched = detected_sources
@@ -279,7 +276,7 @@ def associate(conn, detected_sources, imobj, search_radius):
                 assoc_matched.append(asrc)
             else:
                 # No match -- new source
-                src.beam = imobj.bmin
+                src.res_class = res_class
                 src.ndetect = 1
                 detected_unmatched.append(src)
 
@@ -331,9 +328,6 @@ def filter_catalogs(conn, catalogs, res):
             filtered_catalogs.append(catalog)
 
     cur.close()
-
-    print('\nUsing the following catalogs for cross-matching: {}'.format(
-        filtered_catalogs))
 
     return filtered_catalogs
 

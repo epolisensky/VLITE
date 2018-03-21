@@ -20,6 +20,8 @@ others.
 3.) Add a line to skycatdb.py to call the
 'read_[catalog name]' function.
 
+Adapted from EP's iofuncs.py.
+
 """
 import os
 import pandas as pd

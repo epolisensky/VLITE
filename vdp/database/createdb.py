@@ -100,7 +100,7 @@ def create(conn, params, safe=False):
                 e_ra DOUBLE PRECISION,
                 dec DOUBLE PRECISION,
                 e_dec DOUBLE PRECISION,
-                beam DOUBLE PRECISION,
+                res_class VARCHAR(1),
                 ndetect INTEGER,
                 nmatches INTEGER,
                 PRIMARY KEY (id)
@@ -124,7 +124,7 @@ def create(conn, params, safe=False):
                 bpa REAL,
                 noise REAL,
                 peak REAL,
-                config TEXT,
+                config VARCHAR(1),
                 nvis INTEGER,
                 mjdtime DOUBLE PRECISION,
                 tau_time REAL,
