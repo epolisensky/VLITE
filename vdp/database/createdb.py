@@ -299,7 +299,7 @@ def create(conn, params, safe=False):
             CREATE TRIGGER remove_vu
               AFTER UPDATE OF nmatches ON assoc_source
               FOR EACH ROW
-              WHEN (OLD.nmatches = 0 AND NEW.nmatches = 1)
+              WHEN (OLD.nmatches = 0 AND NEW.nmatches > 0)
               EXECUTE PROCEDURE remove_vu_func();
             ''')
         
@@ -337,7 +337,7 @@ def create(conn, params, safe=False):
               SELECT INTO asid, nm id, nmatches FROM assoc_source
               WHERE id = OLD.assoc_id;
               IF nm = 0 THEN
-                CREATE TABLE new_vu (
+                CREATE TABLE IF NOT EXISTS new_vu (
                   assoc_id INTEGER,
                   nmatches INTEGER
                 );

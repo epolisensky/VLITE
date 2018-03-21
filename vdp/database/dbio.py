@@ -610,12 +610,17 @@ def get_associated(conn, sources):
         based on matching assoc_id and translated
         from row dictionary objects to 
         DetectedSource objects.
-    """
+    """   
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     rows = []
     for src in sources:
-        src_id = src.assoc_id
+        try:
+            # sources = list of objects
+            src_id = src.assoc_id
+        except AttributeError:
+            # sources = list of assoc_ids
+            src_id = src
         cur.execute('SELECT * FROM assoc_source WHERE id = %s',
                     (src_id, ))
         rows.append(cur.fetchone())

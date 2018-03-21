@@ -781,7 +781,8 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
             os.system('mkdir '+pybdsfdir)
 
         # Select only the images that end with 'IPln1.fits'
-        imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
+        #imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
+        imglist = ['1.5GHz.eLARS-07.IPln1.fits']
         # Loop through images to initialize
         imobjlist = []
         for img in imglist:
