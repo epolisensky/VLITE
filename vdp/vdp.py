@@ -180,14 +180,15 @@ def cfgparse(cfgfile):
                 for cat in setup['catalogs']:
                     if type(cat) != str:
                         cat = str(cat)
-                        cat = cat.lower()
+                    cat = cat.lower()
                     if cat not in catalog_opts:
                         print('\nCurrently available catalogs: {}\n'.format(
                             catalog_opts))
                         raise ConfigError('Catalog {} is not a valid option'.
                                           format(cat))
             except TypeError:
-                raise ConfigError('Please provide a list of valid sky catalogs.')
+                raise ConfigError('Please provide a list of valid sky '
+                                  'catalogs.')
 
     # Set default QA requirements if not specified
     if opts['quality checks']:
@@ -615,9 +616,14 @@ def srcassoc(conn, imobj, sources, save):
     print('STAGE 3: SOURCE ASSOCIATION')
     print('***************************')
 
+    if save:
+        match_in_db = True
+    else:
+        match_in_db = False
+
     # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
-        = radioxmatch.associate(conn, sources, imobj, imobj.radius)
+        = radioxmatch.associate(conn, sources, imobj, imobj.radius, match_in_db)
     if save:
         # Update assoc_id col for matched detected sources
         if detected_matched:
@@ -727,7 +733,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
                             
         # Update stage
         imobj.stage = 4
-        dbio.update_stage(conn, imobj)
+        dbio.update_stage(conn, imobj)                
 
     return
 
@@ -781,8 +787,8 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
             os.system('mkdir '+pybdsfdir)
 
         # Select only the images that end with 'IPln1.fits'
-        #imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
-        imglist = ['1.5GHz.eLARS-07.IPln1.fits']
+        imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
+        imglist = imglist[2:]
         # Loop through images to initialize
         imobjlist = []
         for img in imglist:

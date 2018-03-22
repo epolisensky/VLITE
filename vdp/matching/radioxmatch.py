@@ -148,7 +148,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
     return rows
 
 
-def associate(conn, detected_sources, imobj, search_radius):
+def associate(conn, detected_sources, imobj, search_radius, match_in_db):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
     distance less than half the size of semi-minor axis of
@@ -226,59 +226,103 @@ def associate(conn, detected_sources, imobj, search_radius):
               'previously detected in VLITE images...'.format(
                   len(detected_sources), len(assoc_sources)))
 
-        # Match sources if they are separatred by less than half a beam
-        cur = conn.cursor()
-        #sql = '''SELECT a.src_id, b.id FROM detected_source AS a, 
-        #    assoc_source AS b WHERE a.image_id = %s AND b.id IN %s AND
-        #    q3c_join(a.ra, a.dec, b.ra, b.dec, %s)'''
-        sql = '''SELECT a.src_id, bb.id FROM detected_source AS a,
-            LATERAL ( SELECT b.* FROM assoc_source AS b
-            WHERE a.image_id = %s AND b.id IN %s AND
-            q3c_join(a.ra, a.dec, b.ra, b.dec, %s) ORDER BY
-            q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
-        values = (imobj.id, tuple(assoc_ids), (0.5*(imobj.bmin/3600.)))
-        cur.execute(sql, values)
-        rows = cur.fetchall()
-        cur.close()
-
-        # Create dictionary of src_id keys and assoc_id values of matches
-        rowdict = {}
-        for row in rows:
-            rowdict[row[0]] = row[1]
-
-        assoc_unmatched = [asrc for asrc in assoc_sources if \
-                           asrc.id not in rowdict.values()]
-
         detected_matched = []
         detected_unmatched = []
         assoc_matched = []
-        for src in detected_sources:
-            if src.src_id in rowdict.keys():
-                # It's a match!
-                src.assoc_id = rowdict[src.src_id]
-                detected_matched.append(src)
-                # Update the associated source
-                asrc = [msrc for msrc in assoc_sources if \
-                        msrc.id == src.assoc_id][0]
-                # Compute weighted averages
-                cur_sigra_sq = asrc.e_ra * asrc.e_ra
-                cur_sigdec_sq = asrc.e_dec * asrc.e_dec
-                asrc.e_ra = np.sqrt(1. / (
-                    (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
-                asrc.ra = (asrc.e_ra * asrc.e_ra) * (
-                    (asrc.ra / cur_sigra_sq) + (src.ra / (src.e_ra * src.e_ra)))
-                asrc.e_dec = np.sqrt(1. / (
-                    (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
-                asrc.dec = (asrc.e_dec * asrc.e_dec) * (
-                    (asrc.dec / cur_sigdec_sq) + (src.dec / (
-                        src.e_dec * src.e_dec)))
-                asrc.ndetect += 1
-                assoc_matched.append(asrc)
-            else:
-                # No match -- new source
-                src.res_class = res_class
-                src.ndetect = 1
-                detected_unmatched.append(src)
+        assoc_unmatched = []
+
+        if not match_in_db:
+            print('-----------------------------------------------------------'
+                  '--------------------------------------------------------')
+            print('src_id match assoc_id\tra\t\te_ra\t\t\tdec\t\te_dec\t\t'
+                  'separation (arcsec)')
+            print('-----------------------------------------------------------'
+                  '--------------------------------------------------------')
+            for src in detected_sources:
+                match, asrc, min_sep = matchfuncs.simple_match(
+                    src, assoc_sources, imobj.bmin)
+                if match:
+                    src.assoc_id = asrc.id
+                    detected_matched.append(src)
+                    # Compute weighted averages
+                    cur_sigra_sq = asrc.e_ra * asrc.e_ra
+                    cur_sigdec_sq = asrc.e_dec * asrc.e_dec
+                    asrc.e_ra = np.sqrt(1. / (
+                        (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
+                    asrc.ra = (asrc.e_ra * asrc.e_ra) * (
+                        (asrc.ra / cur_sigra_sq) + (src.ra / (
+                            src.e_ra * src.e_ra)))
+                    asrc.e_dec = np.sqrt(1. / (
+                        (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
+                    asrc.dec = (asrc.e_dec * asrc.e_dec) * (
+                        (asrc.dec / cur_sigdec_sq) + (src.dec / (
+                            src.e_dec * src.e_dec)))
+                    asrc.ndetect += 1
+                    assoc_matched.append(asrc)
+                else:
+                    src.ndetect = 1
+                    src.res_class = res_class
+                    detected_unmatched.append(src)
+                try:
+                    print('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
+                        src.src_id, match, asrc.id, asrc.ra, asrc.e_ra,
+                        asrc.dec, asrc.e_dec, min_sep))
+                except AttributeError:
+                    print('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
+                        src.src_id, match, None, src.ra, src.e_ra,
+                        src.dec, src.e_dec, min_sep))
+        else:
+            # Match sources if they are separatred by less than half a beam
+            cur = conn.cursor()
+            #sql = '''SELECT a.src_id, b.id FROM detected_source AS a, 
+            #    assoc_source AS b WHERE a.image_id = %s AND b.id IN %s AND
+            #    q3c_join(a.ra, a.dec, b.ra, b.dec, %s)'''
+            sql = '''SELECT a.src_id, bb.id FROM detected_source AS a,
+                LATERAL ( SELECT b.* FROM assoc_source AS b
+                WHERE a.image_id = %s AND b.id IN %s AND
+                q3c_join(a.ra, a.dec, b.ra, b.dec, %s) ORDER BY
+                q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
+            values = (imobj.id, tuple(assoc_ids), (0.5*(imobj.bmin/3600.)))
+            cur.execute(sql, values)
+            rows = cur.fetchall()
+            cur.close()
+
+            # Create dictionary of src_id keys and assoc_id values of matches
+            rowdict = {}
+            for row in rows:
+                rowdict[row[0]] = row[1]
+
+            assoc_unmatched = [asrc for asrc in assoc_sources if \
+                               asrc.id not in rowdict.values()]
+
+            for src in detected_sources:
+                if src.src_id in rowdict.keys():
+                    # It's a match!
+                    src.assoc_id = rowdict[src.src_id]
+                    detected_matched.append(src)
+                    # Update the associated source
+                    asrc = [msrc for msrc in assoc_sources if \
+                            msrc.id == src.assoc_id][0]
+                    # Compute weighted averages
+                    cur_sigra_sq = asrc.e_ra * asrc.e_ra
+                    cur_sigdec_sq = asrc.e_dec * asrc.e_dec
+                    asrc.e_ra = np.sqrt(1. / (
+                        (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
+                    asrc.ra = (asrc.e_ra * asrc.e_ra) * (
+                        (asrc.ra / cur_sigra_sq) + (src.ra / (
+                            src.e_ra * src.e_ra)))
+                    asrc.e_dec = np.sqrt(1. / (
+                        (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
+                    asrc.dec = (asrc.e_dec * asrc.e_dec) * (
+                        (asrc.dec / cur_sigdec_sq) + (src.dec / (
+                            src.e_dec * src.e_dec)))
+                    asrc.ndetect += 1
+                    assoc_matched.append(asrc)
+                else:
+                    # No match -- new source
+                    src.res_class = res_class
+                    src.ndetect = 1
+                    detected_unmatched.append(src)
 
     print(' -- number of matches: {}'.format(len(detected_matched)))
     print(' -- number of new sources to add: {}'.format(
@@ -391,6 +435,10 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
               'sources from the {} sky catalog...'.format(
                   len(sources), len(catalog_sources), catalog))
         
+        print('-----------------------------------------------------')
+        print('VLITE_src_id match catalog_src_id separation (arcsec)')
+        print('-----------------------------------------------------')
+        
         for src in sources:
             match, csrc, min_sep = matchfuncs.simple_match(
                 src, catalog_sources, imobj.bmin)
@@ -405,6 +453,8 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
             else:
                 if src.nmatches is None:
                     src.nmatches = 0
+            print('{}\t{}\t{}\t{}'.format(src.src_id, match, csrc.id, csrc.sep))
+
 
     # Cross-match inside the DB
     else:
