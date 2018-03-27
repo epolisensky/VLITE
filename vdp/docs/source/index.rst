@@ -1,26 +1,61 @@
-Welcome to the documentation for the VLITE Database Pipeline
-============================================================
-The VLITE Database Pipeline, or **vdp**, is a collection of
+Welcome to the VLITE Database Pipeline Documentation
+====================================================
+The VLITE Database Pipeline, or `VDP`, is a collection of
 Python scripts to automate the measurement and database
 archiving of radio astronomical point sources detected in
 VLITE images.
 
+`VDP` uses the Python Blob Detector and Source Finder
+(`PyBDSF <http://www.astron.nl/citt/pybdsf/>`_;
+Mohan & Rafferty 2015) for source finding and `PostgreSQL`
+for database storage.
+
 This documentation provides a high level overview of how
-to run and use the **vdp**, as well as detailed descriptions
+to run and use the `VDP`, as well as detailed descriptions
 of each stage in the pipeline.
 
 For more information about VLITE in general, see `here.
 <http://vlite.nrao.edu/>`_
 
-Getting started with vdp
-========================
+Quick Start
+-----------
+
+Execution of the pipeline is controlled through a `YAML`
+configuration file. Here's an example file to get you
+started: :download:`example_config.yaml <example_config.yaml>`
+
+The pipeline is started from the command line with the
+configuration file::
+  $ python vdp.py example_config.yaml
+
+Check out the `VDPGuide IPython notebook
+<https://github.com/erichards/VLITE/blob/develop/VDPGuide.ipynb>`_
+for a step-by-step walkthrough of the pipeline stages and
+analysis examples.
+
+
+Getting Started with the `VDP`
+==============================
+
+.. toctree::
+   :maxdepth: 3
+	      
+   basic_usage
+   stages
+   database
+   dev_guide
+
+
+Individual Modules and Functions
+================================
 
 .. toctree::
    :maxdepth: 2
 
+   modules
 
 
-Indices and tables
+Indices and Tables
 ==================
 
 * :ref:`genindex`
