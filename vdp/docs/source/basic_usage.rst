@@ -3,67 +3,71 @@
 Basic Usage
 ===========
 
-The `VDP` requires a `YAML` configuration file which tells it
+**vdp** requires a YAML configuration file which tells it
 where to find the VLITE images and which local database to
-connect to (see :ref:`config_desc`).
-Since it was built specifically for VLITE, the `VDP` assumes
+connect to (see :ref:`config_desc` for details).
+Since it was built specifically for VLITE, **vdp** assumes
 a particular directory structure in which it looks for all
 files ending with "IPln1.fits":
-    | /root_directory/year-month/day/Images/
-    | i.e. /extraid/vpipe/processed/2018-03/26/Images/
+
+  ``/root_directory/year-month/day/Images/``
+
+Or, for example: ``/extraid/vpipe/processed/2018-03/26/Images/``
 
 If you leave the "month" or "year" parameters blank in the
-configuration file, `VDP` will look for VLITE images
-in the /root_directory/Images/ directory. Only one month
-of VLITE images can be processed in a single run of the
-pipeline (see :ref:`batch_proc` below for instructions
-on how to process multiple months).
+configuration file, **vdp** will look for VLITE images
+in ``/root_directory/Images/``.
 
-**IMPORTANT:** The user will need write permissions in the
-Images/ and parent directory.
+.. note:: The user will need write permissions in ``Images/``
+	  and its parent directory.
 
 The database can be created at runtime, so it does not need
 to exist before starting the pipeline. If connecting to an
-existing database, the user must either be the owner or a
-superuser due to the permissions needed while running `VDP`.
-Unless you have a specific reason not to, it is best to
-connect as user 'vpipe', which has already been created on
-the `PostgreSQL` server running on virgo.
+existing database, the user must either be the owner of that
+database or a superuser due to the permissions needed while
+running **vdp**. Unless you have a specific reason not to,
+it is best to connect as user 'vpipe', which has already
+been created on the PostgreSQL server running on virgo.
 
 Running the Code
 ^^^^^^^^^^^^^^^^
-Once the `YAML` configuration file is set, the `VDP` can
+Once the YAML configuration file is set, **vdp** can
 be started from the command line::
+  
   $ python vdp.py config_file.yaml
-The pipeline's progress will be displayed through messages
-printed to the terminal.
 
+where ``config_file.yaml`` is replaced with whatever
+you named your configuration file. The pipeline's progress
+will be displayed through messages printed to the terminal.
+
+*******************************
 Optional Command Line Arguments
 *******************************
 There are some optional command line arguments that enable
-some non-standard functionality for the `VDP`.
-Use the "--help" or "-h" command line option to see all
+some non-standard functionality for **vdp**.
+Use the ``--help`` or ``-h`` command line option to see all
 optional command line arguments::
+  
   $ python vdp.py -h
-  >> usage: vdp.py [-h] [--ignore_prompt] [--remove_catalog_matches]
-              [--remove_source] [--add_catalog]
-              config_file
+  usage: vdp.py [-h] [--ignore_prompt] [--remove_catalog_matches]
+           [--remove_source] [--add_catalog]
+           config_file
 
-     Run the VLITE Database Pipline (vdp)
+  Run the VLITE Database Pipline (vdp)
 
-     positional arguments:
-       config_file           the YAML configuration file
+  positional arguments:
+    config_file           the YAML configuration file
 
-     optional arguments:
-       -h, --help            show this help message and exit
-       --ignore_prompt       ignore prompt to verify database removal/creation
-       --remove_catalog_matches
-                             remove matching results for the specified sky survey
-                             catalog(s)
-       --remove_source       removes the specified source(s) from the database
-                             assoc_source table
-       --add_catalog         adds any new sky survey catalogs to a table in the
-                             database "skycat" schema
+  optional arguments:
+    -h, --help            show this help message and exit
+    --ignore_prompt       ignore prompt to verify database removal/creation
+    --remove_catalog_matches
+                          remove matching results for the specified sky survey
+                          catalog(s)
+    --remove_source       removes the specified source(s) from the database
+                          assoc_source table
+    --add_catalog         adds any new sky survey catalogs to a table in the
+                          database "skycat" schema
 
 ``--ignore_prompt`` overrides the prompt to confirm overwriting
 or creating a new database. This is needed when redirecting all
@@ -98,37 +102,43 @@ See :ref:`add_new_catalog` for more information.
 
 .. _batch_proc:
 
+****************
 Batch Processing
 ****************
+The configuration file enables processing of one ``year-mo``
+directory at a time.
 Processing more than one month of VLITE images can be accomplished
-through successive runs of the `VDP` called from a bash script.
+through successive runs of **vdp** called from a bash script.
 It is recommended that all output that normally gets printed
 to the terminal window be redirected to a text file to retain
 a record of the pipeline's execution. Don't forget to use the
 optional command line argument ``--ignore_prompt`` for the
-first call to `VDP` if creating a new database or overwriting
+first call to **vdp** if creating a new database or overwriting
 an existing one.
 
-Example file batch_vdp.bash:
+Example file ``batch_vdp.bash``:
 ::
+   
   python vdp.py 201801config.yaml --ignore_prompt > 201801.log
   python vdp.py 201802config.yaml > 201802.log
   python vdp.py 201803config.yaml > 201803.log
 
+************************
 Expected Execution Times
 ************************
 Execution time mostly depends on the number and size of the
 images being processed. Expect ~30-60 seconds per image for
 VLA A configuration, 15-45 s/image for B, and 5-15 s/image
 for C & D configurations, on average. The bottleneck is source
-finding/measurement with `PyBDSF`.
+finding/measurement with PyBDSF.
 
+*************
 Data Products
 *************
-A PyBDSF/ directory is created in the Images/ parent directory
-which stores the `PyBDSF` generated log files and `ds9` regions
+A ``PyBDSF/`` directory is created in the ``Images/`` parent directory
+which stores the PyBDSF generated log files and ds9 regions
 files for each image. The database contains all results from
-each stage of the pipeline. See the :ref:`database` for more
+each stage of the pipeline. See :ref:`database` for more
 information.
 
 
@@ -137,7 +147,7 @@ information.
 Description of Configuration File Parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-An example of the required `YAML` configuration file can be
+An example of the required YAML configuration file can be
 found in the VLITE GitHub repository `here.
 <https://github.com/erichards/VLITE/blob/develop/vdp/example_config.yaml>`_
 The contents are described in more detail below.
@@ -147,90 +157,93 @@ The contents are described in more detail below.
   running certain pipeline stages.
 
   *source finding*
-    Run source finding & measurement on image with `PyBDSF`?
-    (See :ref:`source_finding`)
+    Runs source finding & measurement on the image with PyBDSF.
+    (See :ref:`source_finding`).
   *source association*
-    Associate image's detected sources with the existing VLITE
-    catalog contained in the database **assoc_source** table?
-    (See :ref:`source_assoc`)
+    Associates the image's detected sources with the existing VLITE
+    catalog contained in the database **assoc_source** table.
+    (See :ref:`source_assoc`).
   *catalog matching*
-    Cross-match image's detected sources with other radio catalogs?
-    (See :ref:`catalog_matching`)
+    Cross-matches the image's detected sources with sources from
+    other radio catalogs.
+    (See :ref:`catalog_matching`).
 
 **options**
   Accepts boolean ``True``/``False`` or "yes"/"no" to turn on/off
-  certain features for the pipeline and its stages.
+  certain features for the pipeline.
 
   *save to database*
-    Save results of each selected stage to the database?
+    Saves all results to the database.
   *quality checks*
-    Check if the image meets quality requirements before
-    and after source finding? (See :ref:`quality_checks`)
+    Checks if the image meets certain quality standards before
+    and after source finding. (See :ref:`image_qa` and
+    :ref:`source_count_qa`).
   *overwrite*
-    Delete all contents & re-create tables, functions, triggers,
-    and indices in the existing database "public" schema before
-    proceeding?
+    Deletes all contents & re-creates tables, functions, triggers,
+    and indices in the existing database "public" schema.
   *reprocess*
-    Delete existing results for image and re-run stages? Applies
-    only if source finding stage is on.
+    Deletes all existing results for the image and re-runs source
+    finding plus any additional stages specified. Applies only
+    if the source finding stage is turned on.
   *redo match*
-    Delete all matching results for image's detected sources to
-    other radio catalogs? Cross-matching is then run again for
-    those image's sources using the currently specified list of
-    radio catalogs.
+    Deletes all matching results between the image's detected
+    sources and other radio catalogs. Cross-matching is then
+    run again for those image's sources using the currently
+    specified list of radio catalogs.
   *update match*
-    Cross-match image's detected sources with any radio catalogs
-    for which there are no results yet?
+    Cross-matches the image's detected sources with any currently
+    specified radio catalogs for which there are no results yet.
   
 **setup**
   Parameters defining location of VLITE images and database
   connection info.
 
   *root directory*
-    Root path to the VLITE images:
-      **/extraid/vpipe/processed/**\2018-03/26/Images/
+    Root path to the VLITE images (i.e. ``/extraid/vpipe/processed/``).
   *year*
-    Four-digit calendar year:
-      /extraid/vpipe/processed/**2018**\-03/26/Images/
-    If blank, directory path is: /root_directory/Images/
+    Four-digit calendar year (i.e. ``2018``). If blank, directory
+    path is ``/root_directory/Images/``
   *month*
-    One- or two-digit numerical calendar month:
-      /extraid/vpipe/processed/2018-**03**/26/Images/
-    If blank, directory path is: /root_directory/Images/
+    One- or two-digit numerical calendar month (i.e. ``03``).
+    If blank, directory path is ``/root_directory/Images/``
   *day*
-    List of two-digit daily directories to process under the year-month
-    parent directory:
-      /extraid/vpipe/processed/2018-03/**26**/Images/
-    To process all, leave as empty list: []. Otherwise: [01, 02].  
+    List of two-digit daily directories to process under the
+    ``year-mo`` parent directory. To process all, leave as
+    empty list, ``[]``. Otherwise, ``[01, 02, 03, etc.]``.  
   *database name*
     Name of new or existing database.
   *database user*
-    Name of the `PostgreSQL` user.
+    Name of the PostgreSQL database user.
   *catalogs*
     List of other radio catalogs to use for cross-matching. To use all
-    available catalogs, leave as empty list: []. Otherwise: [FIRST, NVSS].
+    available catalogs, leave as empty list, ``[]``.
+    Otherwise, ``[FIRST, TGSS, NVSS, WENSS, VLSSr, etc.]``.
 
 **pybdsf_params**
   Parameters used in source finding.
 
   *mode*
     Required -- choose either 'default' or 'minimize_islands'.
-    Determines whether `PyBDSF` is run once per image ('default'),
-    or multiple times with different 'rms_box' parameters to
+    Determines whether PyBDSF is run once per image ('default'),
+    or multiple times with different ``rms_box`` parameters to
     find the fewest number of islands ('minimize_islands').  
   *scale*
-    Required -- number between 0 and 1. Fraction of image's
+    Required -- number between 0 and 1. Fraction of the image's
     field-of-view to use. The length of the radius describing
     the image's circular field-of-view is multiplied by this number.
-  Below this point, any number of `PyBDSF` parameters may be
+
+  Below this point, any number of PyBDSF parameters may be
   specified. See `their documentation <http://www.astron.nl/citt/pybdsm/process_image.html#general-reduction-parameters>`_ for descriptions of
   all available options. The parameters shown below have been
   found to work best for VLITE images:
-    - thresh: hard
-    - adaptive_rms_box: True
-    - adaptive_thresh: 10.
-  If you want to specify any `PyBDSF` parameter that accepts a
-  tuple, like 'rms_box', it needs to be formatted as such:
+  
+    - ``thresh``: 'hard'
+    - ``adaptive_rms_box``: ``True``
+    - ``adaptive_thresh``: 10.
+      
+  If you want to specify any PyBDSF parameter that accepts a
+  tuple, like ``rms_box``, it needs to be formatted as such:
+  
     rms_box: !!python/tuple [100, 30]
   
 **image_qa_params**
@@ -239,9 +252,9 @@ The contents are described in more detail below.
 
   *min time on source (s)*
     Minimum allowed integration time on source. Image header
-    keyword 'TAU_TIME'. Default is 60 seconds.
+    keyword ``TAU_TIME``. Default is 60 seconds.
   *max noise (mJy/beam)*
-    Maximum allowed image noise. Image header keyword 'ACTNOISE'.
+    Maximum allowed image noise. Image header keyword ``ACTNOISE``.
     Default is 1000 mJy/beam.
   *max beam axis ratio*
     Maximum allowed ratio between the beam semi-major and
@@ -252,5 +265,5 @@ The contents are described in more detail below.
     Default is 20 degrees.
   *max source metric*
     Maximum allowed metric for source counts. Defined as:
-      ``(actual_num_sources - expected_num_sources) / expected_num_sources``
+    (actual_num_sources - expected_num_sources) / expected_num_sources.
     Default is 10.

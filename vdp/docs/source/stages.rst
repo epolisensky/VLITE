@@ -1,7 +1,7 @@
 .. _stages:
 
-`VDP` Stages
-===========================
+Pipeline Stages
+===============
 WIP
 
 .. _read_image:
@@ -23,6 +23,7 @@ Stage 2: Source Finding
 
 
 .. _source_count_qa:
+
 Source Count Quality Checks & Requirements
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

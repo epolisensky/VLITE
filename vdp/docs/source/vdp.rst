@@ -1,5 +1,5 @@
-The `VDP` Driver Module
-=======================
+The **vdp** Module
+==================
 ``vdp.py`` is what drives the VLITE Database Pipeline.
 It parses the configuration file and directs the flow
 of data through the specified stages and options.
