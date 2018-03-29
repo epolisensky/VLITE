@@ -1,0 +1,1304 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>vdp &mdash; VLITE Database Pipeline 1.6 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="VLITE Database Pipeline 1.6 documentation" href="../index.html"/>
+        <link rel="up" title="Module code" href="index.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> VLITE Database Pipeline
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../basic_usage.html">Basic Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../stages.html">Pipeline Stages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../database.html">Database Contents &amp; Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dev_guide.html">Developer Guide</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">Modules</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">VLITE Database Pipeline</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="index.html">Module code</a> &raquo;</li>
+        
+      <li>vdp</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for vdp</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;This is the main script for the VLITE Database</span>
+<span class="sd">Pipeline (vdp). It is responsible for reading in the</span>
+<span class="sd">configuration file, connecting to the the `PostgreSQL` database,</span>
+<span class="sd">and calling the processing stages.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">psycopg2</span>
+<span class="kn">from</span> <span class="nn">psycopg2.extensions</span> <span class="k">import</span> <span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">errors</span> <span class="k">import</span> <span class="n">ConfigError</span>
+<span class="kn">from</span> <span class="nn">database</span> <span class="k">import</span> <span class="n">createdb</span><span class="p">,</span> <span class="n">dbclasses</span><span class="p">,</span> <span class="n">dbio</span>
+<span class="kn">from</span> <span class="nn">sourcefinding</span> <span class="k">import</span> <span class="n">runbdsf</span>
+<span class="kn">from</span> <span class="nn">matching</span> <span class="k">import</span> <span class="n">radioxmatch</span>
+<span class="kn">from</span> <span class="nn">skycatalog</span> <span class="k">import</span> <span class="n">catalogio</span><span class="p">,</span> <span class="n">skycatdb</span>
+<span class="kn">from</span> <span class="nn">yaml</span> <span class="k">import</span> <span class="n">load</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">yaml</span> <span class="k">import</span> <span class="n">CLoader</span> <span class="k">as</span> <span class="n">Loader</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">yaml</span> <span class="k">import</span> <span class="n">Loader</span>
+
+
+<span class="n">__version__</span> <span class="o">=</span> <span class="mf">1.7</span>
+
+
+<span class="k">def</span> <span class="nf">print_run_stats</span><span class="p">(</span><span class="n">start_time</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Prints general information about the just completed run </span>
+<span class="sd">    of the Post-Processing Pipeline, including the number of</span>
+<span class="sd">    images initialized and the total execution time.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    start_time : datetime.datetime instance</span>
+<span class="sd">        Time when the run was started.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    nimgs : integer</span>
+<span class="sd">        Number of image files initialized as Image objects.</span>
+<span class="sd">    runtime : datetime.timedelta instance</span>
+<span class="sd">        Total execution time of the just completed pipeline run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;--------------------------------------</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Run statistics:&#39;</span><span class="p">)</span>
+    <span class="c1"># Count the number of images processed</span>
+    <span class="n">nimgs</span> <span class="o">=</span> <span class="n">dbclasses</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">image_count</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Processed </span><span class="si">{}</span><span class="s1"> images.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nimgs</span><span class="p">))</span>
+    <span class="c1"># Print the runtime</span>
+    <span class="n">runtime</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Total runtime: </span><span class="si">{}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">runtime</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">nimgs</span><span class="p">,</span> <span class="n">runtime</span>
+
+
+<div class="viewcode-block" id="cfgparse"><a class="viewcode-back" href="../vdp.html#vdp.cfgparse">[docs]</a><span class="k">def</span> <span class="nf">cfgparse</span><span class="p">(</span><span class="n">cfgfile</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This function reads the `YAML` configuration file provided</span>
+<span class="sd">    as a command line argument when `vdp.py` is called and parses</span>
+<span class="sd">    each section of the file into dictionaries.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cfgfile : str</span>
+<span class="sd">        Name of the configuration file.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    stages : dict</span>
+<span class="sd">        Keys are the processing stages (source finding, source assocation,</span>
+<span class="sd">        and catalog matrching) and values are boolean ``True`` or ``False``.</span>
+<span class="sd">    opts : dict</span>
+<span class="sd">        Keys are the processing options (save to database, quality checks,</span>
+<span class="sd">        overwrite, reprocess, redo match, and update match) and values are</span>
+<span class="sd">        boolean ``True`` or ``False``.</span>
+<span class="sd">    setup : dict</span>
+<span class="sd">        Keys are the setup parameters (root directory, year, month, day,</span>
+<span class="sd">        database name, database user, and catalogs) and values are the</span>
+<span class="sd">        user-supplied inputs.</span>
+<span class="sd">    sfparams : dict</span>
+<span class="sd">        Keys are the source finding (mode and scale) and `PyBDSF` parameters</span>
+<span class="sd">        and values are the user inputs.</span>
+<span class="sd">    qaparams : dict</span>
+<span class="sd">        Keys are the image quality parameters (min time on source (s),</span>
+<span class="sd">        max noise (mJy/beam), max beam axis ratio, min problem source</span>
+<span class="sd">        separation (deg), and max source metric) and values are the user</span>
+<span class="sd">        inputs. Defaults are defined if none are specified.        </span>
+<span class="sd">    dirs : list</span>
+<span class="sd">        List of strings specifying paths to daily image directories</span>
+<span class="sd">        to be processed during the run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>    
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">cfgfile</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">load</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">Loader</span><span class="p">)</span>
+        <span class="n">stages</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;stages&#39;</span><span class="p">]</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;options&#39;</span><span class="p">]</span>
+        <span class="n">setup</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;setup&#39;</span><span class="p">]</span>
+        <span class="n">sfparams</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;pybdsf_params&#39;</span><span class="p">]</span>
+        <span class="n">qaparams</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;image_qa_params&#39;</span><span class="p">]</span>
+
+    <span class="n">rootdir</span> <span class="o">=</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;root directory&#39;</span><span class="p">]</span>
+    <span class="n">yr</span> <span class="o">=</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;year&#39;</span><span class="p">]</span>
+    <span class="n">mo</span> <span class="o">=</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;month&#39;</span><span class="p">]</span>
+    <span class="n">days</span> <span class="o">=</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;day&#39;</span><span class="p">]</span>
+
+    <span class="c1"># Raise error if the configuration says to do nothing</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">stages</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;save to database&#39;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Nothing to do -- change options: save to database: &#39;</span>
+                          <span class="s1">&#39;to &quot;yes&quot; in the configuration file to write images &#39;</span>
+                          <span class="s1">&#39;to the database or add a processing stage.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Perform checks on path to images</span>
+    <span class="k">if</span> <span class="n">yr</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">mo</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">procdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">rootdir</span><span class="p">,</span> <span class="s1">&#39;Images/&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">procdir</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Directory does not exist: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">procdir</span><span class="p">))</span>
+        <span class="n">dirs</span> <span class="o">=</span> <span class="p">[</span><span class="n">procdir</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mo</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">mo</span><span class="p">),</span> <span class="s1">&#39;02&#39;</span><span class="p">)</span> <span class="c1"># force 2-digits</span>
+        <span class="k">except</span><span class="p">:</span> <span class="c1"># Value/TypeError will be caught in isdir exception below</span>
+            <span class="k">pass</span>
+
+        <span class="n">yrmo</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">-</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">yr</span><span class="p">,</span> <span class="n">mo</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">monthdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">rootdir</span><span class="p">,</span> <span class="n">yrmo</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Please provide a valid data root directory.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">monthdir</span><span class="p">):</span> <span class="c1"># check path with year-month</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Directory does not exist: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">monthdir</span><span class="p">))</span>
+
+        <span class="c1"># If days = [], process every day in month directory</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">days</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">days</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">monthdir</span><span class="p">))[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;setup: day: must be a list (i.e. [</span><span class="si">{}</span><span class="s1">])&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="n">days</span><span class="p">))</span>
+
+        <span class="c1"># Define path to processing directories</span>
+        <span class="n">dirs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">day</span> <span class="ow">in</span> <span class="n">days</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">day</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">day</span><span class="p">),</span> <span class="s1">&#39;02&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">procdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">monthdir</span><span class="p">,</span> <span class="n">day</span><span class="p">,</span> <span class="s1">&#39;Images/&#39;</span><span class="p">)</span>
+            <span class="c1"># Check full image path</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">procdir</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Skipping non-existent directory </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">procdir</span><span class="p">))</span>
+                <span class="k">continue</span>
+            <span class="n">dirs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">procdir</span><span class="p">)</span>
+
+    <span class="c1"># Make sure stage &amp; option inputs are boolean</span>
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">stages</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stage</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;stage inputs must be True/False or yes/no.&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">pass</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;option inputs must be True/False or yes/no.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Catch case when no database is given</span>
+    <span class="k">if</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database name&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database user&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Please provide a database name/user.&#39;</span><span class="p">)</span>
+    <span class="c1"># Force database name to all lowercase</span>
+    <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="c1"># Check list of sky catalogs</span>
+    <span class="k">if</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;catalog matching&#39;</span><span class="p">]:</span>
+        <span class="n">catalog_opts</span> <span class="o">=</span> <span class="n">catalogio</span><span class="o">.</span><span class="n">catalog_list</span> <span class="c1"># all available catalogs</span>
+        <span class="c1"># If catalogs = [], use all of them</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">setup</span><span class="p">[</span><span class="s1">&#39;catalogs&#39;</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;catalogs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">catalog_opts</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Make sure requested catalogs exist</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;catalogs&#39;</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">str</span><span class="p">:</span>
+                        <span class="n">cat</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cat</span><span class="p">)</span>
+                    <span class="n">cat</span> <span class="o">=</span> <span class="n">cat</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">cat</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">catalog_opts</span><span class="p">:</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Currently available catalogs: </span><span class="si">{}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="n">catalog_opts</span><span class="p">))</span>
+                        <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Catalog </span><span class="si">{}</span><span class="s1"> is not a valid option&#39;</span><span class="o">.</span>
+                                          <span class="nb">format</span><span class="p">(</span><span class="n">cat</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Please provide a list of valid sky &#39;</span>
+                                  <span class="s1">&#39;catalogs.&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Set default QA requirements if not specified</span>
+    <span class="k">if</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;quality checks&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min time on source (s)&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min time on source (s)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">60.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min time on source (s)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                    <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min time on source (s)&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;min time on source must be a number.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max noise (mJy/beam)&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max noise (mJy/beam)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1000.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max noise (mJy/beam)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                    <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max noise (mJy/beam)&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;max noise must be a number.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max beam axis ratio&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max beam axis ratio&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">4.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max beam axis ratio&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                    <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max beam axis ratio&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;max beam axis ratio must be a number.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min problem source separation (deg)&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min problem source separation (deg)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">20.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min problem source separation (deg)&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                    <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;min problem source separation (deg)&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;min problem source separation must be a &#39;</span>
+                                  <span class="s1">&#39;number.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max source metric&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max source metric&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">10.</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max source metric&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+                    <span class="n">qaparams</span><span class="p">[</span><span class="s1">&#39;max source metric&#39;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;max source metric must be a number.&#39;</span><span class="p">)</span>
+            
+    <span class="k">return</span> <span class="n">stages</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">setup</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">dirs</span></div>
+
+
+<div class="viewcode-block" id="dbinit"><a class="viewcode-back" href="../vdp.html#vdp.dbinit">[docs]</a><span class="k">def</span> <span class="nf">dbinit</span><span class="p">(</span><span class="n">dbname</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">safe_override</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Creates a `psycopg2` connection object to communicate</span>
+<span class="sd">    with the `PostgreSQL` database. If no database with the</span>
+<span class="sd">    provided name exists, the user is prompted to create a</span>
+<span class="sd">    new one. The &quot;skycat&quot; schema which holds all the sky survey</span>
+<span class="sd">    catalogs in tables is created at this stage if it does not</span>
+<span class="sd">    already exist. The user will be prompted to verify deletion</span>
+<span class="sd">    of all current tables if the database exists and the *overwrite*</span>
+<span class="sd">    option in the configuration file is ``True``. All necessary</span>
+<span class="sd">    tables, functions, and triggers are created through a call to </span>
+<span class="sd">    `database.createdb.create()`.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dbname : str</span>
+<span class="sd">        Name of the `PostgreSQL` database.</span>
+<span class="sd">    user : str</span>
+<span class="sd">        Username for the `PostgreSQL` database connection.</span>
+<span class="sd">    overwrite : bool</span>
+<span class="sd">        If ``True``, tables and data will be deleted and re-created,</span>
+<span class="sd">        assuming there is a pre-existing database of name &quot;dbname&quot;.</span>
+<span class="sd">        If ``False``, the existing database with &quot;dbname&quot; is used.</span>
+<span class="sd">    qaparams : dict</span>
+<span class="sd">        The dictionary of image quality cuts specified by the user</span>
+<span class="sd">        in the configuration file. The values are written to the</span>
+<span class="sd">        database **error** table.</span>
+<span class="sd">    safe_override : bool, optional</span>
+<span class="sd">        If ``True``, this overrides the safe boolean. Implemented</span>
+<span class="sd">        for testing purposes. Default value is ``False``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># DB exists</span>
+        <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="n">dbname</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Connected to database </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dbname</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Using existing database </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dbname</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Overwriting existing database tables.&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">safe_override</span><span class="p">:</span>
+                <span class="n">createdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">safe</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># This will prompt warning in create function</span>
+                <span class="n">createdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">safe</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># Check for sky catalogs by verifying schema exists</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;&#39;&#39;SELECT EXISTS(SELECT 1 FROM pg_namespace </span>
+<span class="s1">            WHERE nspname = &#39;skycat&#39;);&#39;&#39;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cur</span><span class="o">.</span><span class="n">fetchone</span><span class="p">()[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">No sky catalogs found in database. &#39;</span>
+                  <span class="s1">&#39;Creating them now...&#39;</span><span class="p">)</span>
+            <span class="n">skycatdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">except</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">OperationalError</span><span class="p">:</span>
+        <span class="c1"># DB does not yet exist</span>
+        <span class="k">if</span> <span class="n">safe_override</span><span class="p">:</span>
+            <span class="n">makenew</span> <span class="o">=</span> <span class="s1">&#39;yes&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">makenew</span> <span class="o">=</span> <span class="n">raw_input</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Create new database </span><span class="si">{}</span><span class="s1">? &#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dbname</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">makenew</span> <span class="o">==</span> <span class="s1">&#39;y&#39;</span> <span class="ow">or</span> <span class="n">makenew</span> <span class="o">==</span> <span class="s1">&#39;yes&#39;</span><span class="p">:</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s1">&#39;postgres&#39;</span><span class="p">,</span>
+                                    <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">set_isolation_level</span><span class="p">(</span><span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span><span class="p">)</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s1">&#39;CREATE DATABASE &#39;</span> <span class="o">+</span> <span class="n">dbname</span><span class="p">)</span>
+            <span class="n">cur</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">conn</span> <span class="o">=</span> <span class="n">psycopg2</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="n">dbname</span><span class="p">,</span>
+                                    <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Connected to new database </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dbname</span><span class="p">))</span>
+            <span class="n">createdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">safe</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Creating new sky catalog tables...&#39;</span><span class="p">)</span>
+            <span class="n">skycatdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">No new database created.</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">ConfigError</span><span class="p">(</span><span class="s1">&#39;Cannot access database </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dbname</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">conn</span></div>
+
+
+<div class="viewcode-block" id="vlite_unique"><a class="viewcode-back" href="../vdp.html#vdp.vlite_unique">[docs]</a><span class="k">def</span> <span class="nf">vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">image_id</span><span class="p">,</span> <span class="n">radius</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This function adds a VLITE unique (VU) source, or a source</span>
+<span class="sd">    with no sky catalog matches, to the **vlite_unique** table. </span>
+<span class="sd">    After adding a new VU source, the **image** table is queried</span>
+<span class="sd">    to find all previously processed images in which the VU source</span>
+<span class="sd">    could have been detected based on field-of-view (FOV) and spatial</span>
+<span class="sd">    resolution. The **vlite_unique** table, therefore, keeps a record</span>
+<span class="sd">    of every image in which a VU source was in the FOV and whether it</span>
+<span class="sd">    was detected.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    src : database.dbclasses.DetectedSource instance</span>
+<span class="sd">        The VU source from the **assoc_source** table.</span>
+<span class="sd">    image_id : int</span>
+<span class="sd">        Id number of the image in which the VU source</span>
+<span class="sd">        was detected.</span>
+<span class="sd">    radius : float</span>
+<span class="sd">        Radius (in degrees) of the image&#39;s FOV. Used in</span>
+<span class="sd">        querying the **image** table.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    src : database.dbclasses.DetectedSource instance</span>
+<span class="sd">        The same VU src with updated `detected` attribute.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Start by checking if the VU source is already in the VU table</span>
+    <span class="n">existing</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">check_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">existing</span><span class="p">:</span> <span class="c1"># returned empty list</span>
+        <span class="c1"># Newly detected VU source</span>
+        <span class="n">src</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="c1"># Add source to vlite_unique table</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">image_id</span><span class="p">)</span>
+        <span class="c1"># Find previous images where VU source is in FOV</span>
+        <span class="n">src</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">prev_images</span> <span class="o">=</span> <span class="n">radioxmatch</span><span class="o">.</span><span class="n">check_previous</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">radius</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">previd</span> <span class="ow">in</span> <span class="n">prev_images</span><span class="p">:</span>
+            <span class="c1"># Ignore current image</span>
+            <span class="k">if</span> <span class="n">previd</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">image_id</span><span class="p">:</span>
+                <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">previd</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># VU source already in table, check if new image</span>
+        <span class="n">existing_imgids</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">existing</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">image_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">existing_imgids</span><span class="p">:</span>
+            <span class="c1"># Add if new image</span>
+            <span class="n">src</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">image_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># previously undetected VU source, now detected</span>
+            <span class="c1"># (i.e. after re-doing source finding)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">existing</span> <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">image_id</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]:</span> <span class="c1"># if not detected</span>
+                <span class="c1"># Update entry to detected = True</span>
+                <span class="n">src</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">image_id</span><span class="p">,</span> <span class="n">update</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">src</span></div>
+
+
+<div class="viewcode-block" id="iminit"><a class="viewcode-back" href="../vdp.html#vdp.iminit">[docs]</a><span class="k">def</span> <span class="nf">iminit</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">save</span><span class="p">,</span> <span class="n">qa</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">reproc</span><span class="p">,</span> <span class="n">stages</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This function handles ingestion of the image metadata</span>
+<span class="sd">    into the database **image** table and represents the first</span>
+<span class="sd">    stage in the Post-Processing Pipeline.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with attribute values</span>
+<span class="sd">        set from the header info.</span>
+<span class="sd">    save : bool</span>
+<span class="sd">        If ``True``, the image info is written and saved</span>
+<span class="sd">        to the database **image** table.</span>
+<span class="sd">    qa : bool</span>
+<span class="sd">        If ``True``, quality checks are run on the image data.</span>
+<span class="sd">    qaparams : dict</span>
+<span class="sd">        Dictionary of image quality requirements and their</span>
+<span class="sd">        user-specified values from the configuration file.</span>
+<span class="sd">    reproc : bool</span>
+<span class="sd">        If ``True``, any existing entry for this image in the</span>
+<span class="sd">        database **image** table is updated. If ``False`` and</span>
+<span class="sd">        there is an existing entry, no further processing is</span>
+<span class="sd">        done and the code moves on to the next image in the list.</span>
+<span class="sd">    stages : dict</span>
+<span class="sd">        Dictionary specifying which processing stages are to be run.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Image object with `id` attribute updated after insertion into</span>
+<span class="sd">        the database **image** table, or ``None`` if the image</span>
+<span class="sd">        has already been processed and will not be reprocessed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># STAGE 1 -- Add image to table, 1st quality check</span>
+    <span class="nb">print</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;**********************&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;STAGE 1: READING IMAGE&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;**********************&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Run image quality checks</span>
+    <span class="k">if</span> <span class="n">qa</span><span class="p">:</span>
+        <span class="n">imobj</span><span class="o">.</span><span class="n">image_qa</span><span class="p">(</span><span class="n">qaparams</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="c1"># Is the image in the database?</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">status_check</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+
+    <span class="c1"># Only adding image to DB - add or update w/o deleting sources</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">stages</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># image not in DB, so add it</span>
+            <span class="n">imobj</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">add_image</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span> <span class="c1"># branch 2</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">reproc</span><span class="p">:</span>
+                <span class="c1"># already processed, but re-doing -- sources NOT deleted</span>
+                <span class="n">imobj</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">add_image</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span> <span class="c1"># branch 4</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># already processed &amp; not re-doing</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Image already in database. Moving on...&#39;</span><span class="p">)</span>
+                <span class="n">imobj</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># branch 3</span>
+    <span class="k">else</span><span class="p">:</span> <span class="c1"># Running at least one stage</span>
+        <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;source finding&#39;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+                    <span class="c1"># image not in DB; planning to source find &amp; write to DB</span>
+                    <span class="n">imobj</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">add_image</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">status</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># just initialize if not writing to DB</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Initializing image.&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># image not in DB, but not running source finding --&gt; quit</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">ERROR: Image </span><span class="si">{}</span><span class="s1"> not yet processed. Source finding &#39;</span>
+                      <span class="s1">&#39;must be run before other stages.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                <span class="n">imobj</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># branch 5</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;source finding&#39;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="n">reproc</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+                        <span class="c1"># image in DB; re-doing SF, so old sources are removed</span>
+                        <span class="n">imobj</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">add_image</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">status</span><span class="p">,</span>
+                                               <span class="n">delete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="c1"># just initialize if not writing to DB</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Initializing image.&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># image already in DB &amp; not re-processing</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Image already processed. Moving on...&#39;</span><span class="p">)</span>
+                    <span class="n">imobj</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># branch 9</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># not running SF -- stage must be &gt; 1</span>
+                <span class="k">if</span> <span class="n">status</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Initializing image.&#39;</span><span class="p">)</span>
+                    <span class="n">imobj</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">status</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="n">status</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">imobj</span><span class="o">.</span><span class="n">radius</span> <span class="o">=</span> <span class="n">status</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">ERROR: Image </span><span class="si">{}</span><span class="s1"> does not have sources extracted &#39;</span>
+                          <span class="s1">&#39;yet. Source finding must be run before other &#39;</span>
+                          <span class="s1">&#39;stages.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                    <span class="n">imobj</span> <span class="o">=</span> <span class="kc">None</span> <span class="c1"># branch 7</span>
+
+    <span class="c1"># Uncomment below when ready to stop flagged images (after testing)</span>
+    <span class="c1">#if imobj.error_id is not None:</span>
+    <span class="c1"># For now, just stop if header keywords are missing</span>
+    <span class="k">if</span> <span class="n">imobj</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">imobj</span><span class="o">.</span><span class="n">error_id</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">imobj</span> <span class="o">=</span> <span class="kc">None</span>
+    
+    <span class="k">return</span> <span class="n">imobj</span></div>
+
+
+<div class="viewcode-block" id="srcfind"><a class="viewcode-back" href="../vdp.html#vdp.srcfind">[docs]</a><span class="k">def</span> <span class="nf">srcfind</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">save</span><span class="p">,</span> <span class="n">qa</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Runs `PyBDSF` source finding, writes out results,</span>
+<span class="sd">    and inserts source fit parameters into database </span>
+<span class="sd">    **detected_source**, **detected_island**, and </span>
+<span class="sd">    **corrected_flux** tables, if the *save to database*</span>
+<span class="sd">    option is set to ``True``. This function represents</span>
+<span class="sd">    the second stage of the Post-Processing Pipeline.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with attribute values</span>
+<span class="sd">        set from header info.</span>
+<span class="sd">    sfparams : dict</span>
+<span class="sd">        Specifies any non-default `PyBDSF` parameters to be </span>
+<span class="sd">        used in source finding.</span>
+<span class="sd">    save : bool</span>
+<span class="sd">        If ``True``, the source fit parameters are written and saved</span>
+<span class="sd">        to the database **detected_island*, **detected_source**, and</span>
+<span class="sd">        **corrected_flux** tables. The `PyBDSF` files are always </span>
+<span class="sd">        written out.</span>
+<span class="sd">    qa : bool</span>
+<span class="sd">        If ``True``, quality checks are run on the source finding</span>
+<span class="sd">        results.</span>
+<span class="sd">    qaparams : dict</span>
+<span class="sd">        User-specified requirements from the configuration file for</span>
+<span class="sd">        the source finding quality checks.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with updated attributes</span>
+<span class="sd">        from the source finding results.</span>
+<span class="sd">    sources : list</span>
+<span class="sd">        List of database.dbclasses.DetectedSource objects.</span>
+<span class="sd">        Attributes of each object are set from the `PyBDSF`</span>
+<span class="sd">        output object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># STAGE 2 -- Source finding + 2nd quality check</span>
+    <span class="nb">print</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;**********************&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;STAGE 2: SOURCE FINDNG&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;**********************&#39;</span><span class="p">)</span>
+    
+    <span class="c1"># Initialize source finding image object</span>
+    <span class="n">bdsfim</span> <span class="o">=</span> <span class="n">runbdsf</span><span class="o">.</span><span class="n">BDSFImage</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="o">**</span><span class="n">sfparams</span><span class="p">)</span>
+    <span class="c1"># Run PyBDSF source finding</span>
+    <span class="k">if</span> <span class="n">sfparams</span><span class="p">[</span><span class="s1">&#39;mode&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;minimize_islands&#39;</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">bdsfim</span><span class="o">.</span><span class="n">minimize_islands</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">bdsfim</span><span class="o">.</span><span class="n">find_sources</span><span class="p">()</span>
+
+    <span class="c1"># Set new radius attribute for Image object &amp; update stage</span>
+    <span class="n">imobj</span><span class="o">.</span><span class="n">radius</span> <span class="o">=</span> <span class="n">bdsfim</span><span class="o">.</span><span class="n">radius</span>
+    <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="mi">2</span>
+   
+    <span class="k">if</span> <span class="n">out</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Write PyBDSF files to daily directory</span>
+        <span class="n">runbdsf</span><span class="o">.</span><span class="n">write_sources</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+        <span class="c1"># Translate `PyBDSF` output to DetectedSource objects</span>
+        <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span> <span class="o">=</span> <span class="n">dbclasses</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">imobj</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+        <span class="c1"># Run quality checks, part 2</span>
+        <span class="k">if</span> <span class="n">qa</span><span class="p">:</span>
+            <span class="n">imobj</span><span class="o">.</span><span class="n">source_qa</span><span class="p">(</span><span class="n">sources</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># PyBDSF failed to process</span>
+        <span class="n">sources</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">imobj</span><span class="o">.</span><span class="n">error_id</span> <span class="o">=</span> <span class="mi">6</span>
+
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="c1"># Add source fit parameters to database tables</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">add_sources</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sources</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Compute beam corrected fluxes &amp; write to corrected_flux table</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Correcting all flux measurements for primary beam &#39;</span>
+                  <span class="s1">&#39;response.&#39;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+                <span class="n">src</span><span class="o">.</span><span class="n">correct_flux</span><span class="p">(</span><span class="n">imobj</span><span class="p">)</span>
+                <span class="n">dbio</span><span class="o">.</span><span class="n">add_corrected</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span></div>
+
+
+<div class="viewcode-block" id="srcassoc"><a class="viewcode-back" href="../vdp.html#vdp.srcassoc">[docs]</a><span class="k">def</span> <span class="nf">srcassoc</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">save</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Associates through positional cross-matching sources</span>
+<span class="sd">    extracted from the current image with previously detected</span>
+<span class="sd">    VLITE sources stored in the **assoc_source** database table.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with attribute values</span>
+<span class="sd">        set from header info &amp; updated with source finding results.</span>
+<span class="sd">    sources : list</span>
+<span class="sd">        List of database.dbclasses.DetectedSource objects.</span>
+<span class="sd">        Attributes of each object are from the `PyBDSF` fit results.</span>
+<span class="sd">    save : bool</span>
+<span class="sd">        If ``True``, the **assoc_source** table is updated with the</span>
+<span class="sd">        association results and the &#39;assoc_id&#39; is updated in the</span>
+<span class="sd">        **detected_source** table. If ``False``, no results are</span>
+<span class="sd">        saved to the database.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    detected_unmatched : list</span>
+<span class="sd">        List of new VLITE detected sources. </span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with updated `stage` attribute.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># STAGE 3 -- Source association</span>
+    <span class="nb">print</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;***************************&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;STAGE 3: SOURCE ASSOCIATION&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;***************************&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="n">match_in_db</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">match_in_db</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># Associate current sources with existing VLITE catalog </span>
+    <span class="n">detected_matched</span><span class="p">,</span> <span class="n">detected_unmatched</span><span class="p">,</span> <span class="n">assoc_matched</span><span class="p">,</span> <span class="n">assoc_unmatched</span> \
+        <span class="o">=</span> <span class="n">radioxmatch</span><span class="o">.</span><span class="n">associate</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">radius</span><span class="p">,</span> <span class="n">match_in_db</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="c1"># Update assoc_id col for matched detected sources</span>
+        <span class="k">if</span> <span class="n">detected_matched</span><span class="p">:</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">update_detected_associd</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">detected_matched</span><span class="p">)</span>
+        <span class="c1"># Add new (unmatched) detected sources to assoc_source table</span>
+        <span class="k">if</span> <span class="n">detected_unmatched</span><span class="p">:</span>
+            <span class="c1"># Updates assoc_id attribute</span>
+            <span class="n">detected_unmatched</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">add_assoc</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">detected_unmatched</span><span class="p">)</span>
+        <span class="c1"># Update matched assoc_source positions</span>
+        <span class="k">if</span> <span class="n">assoc_matched</span><span class="p">:</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">update_matched_assoc</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">assoc_matched</span><span class="p">)</span>
+        <span class="c1"># Check for VLITE unique (VU) sources that weren&#39;t detected in image</span>
+        <span class="k">for</span> <span class="n">asrc</span> <span class="ow">in</span> <span class="n">assoc_unmatched</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">asrc</span><span class="o">.</span><span class="n">nmatches</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">asrc</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="c1"># Update vlite_unique table with image/source non-detection</span>
+                <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">asrc</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="c1"># Check for VU sources that were detected in image</span>
+        <span class="k">for</span> <span class="n">asrc</span> <span class="ow">in</span> <span class="n">assoc_matched</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">asrc</span><span class="o">.</span><span class="n">nmatches</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">asrc</span><span class="o">.</span><span class="n">detected</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">dbio</span><span class="o">.</span><span class="n">add_vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">asrc</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+        <span class="c1"># Update stage in image table</span>
+        <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="mi">3</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">update_stage</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">detected_unmatched</span><span class="p">,</span> <span class="n">imobj</span></div>
+
+
+<div class="viewcode-block" id="catmatch"><a class="viewcode-back" href="../vdp.html#vdp.catmatch">[docs]</a><span class="k">def</span> <span class="nf">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">save</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Performs positional cross-matching of VLITE </span>
+<span class="sd">    detected sources to other radio sky survey catalogs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    imobj : database.dbclasses.Image instance</span>
+<span class="sd">        Initialized Image object with attribute values</span>
+<span class="sd">        set from header info.</span>
+<span class="sd">    sources : list</span>
+<span class="sd">        VLITE detected sources to be matched to sky catalog sources.</span>
+<span class="sd">    catalogs : list</span>
+<span class="sd">        Names of the sky survey catalogs to use.</span>
+<span class="sd">    save : bool</span>
+<span class="sd">        If ``True``, match results are recorded in the</span>
+<span class="sd">        **catalog_match** table and the **assoc_source** table is</span>
+<span class="sd">        updated. VLITE unique sources with no sky catalog match are</span>
+<span class="sd">        inserted into the **vlite_unique** table.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># STAGE 4 -- Sky catalog cross-matching</span>
+    <span class="nb">print</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;*********************************&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;STAGE 4: MATCHING TO SKY CATALOGS&#39;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;*********************************&#39;</span><span class="p">)</span>
+    
+    <span class="n">catalogs</span> <span class="o">=</span> <span class="p">[</span><span class="n">catalog</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">catalog</span> <span class="ow">in</span> <span class="n">catalogs</span><span class="p">]</span>
+    <span class="c1"># Filter catalogs by resolution</span>
+    <span class="n">filtered_catalogs</span> <span class="o">=</span> <span class="n">radioxmatch</span><span class="o">.</span><span class="n">filter_catalogs</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">bmin</span><span class="p">)</span>
+    <span class="c1"># Remove catalogs that have already been checked for this image</span>
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="n">new_catalogs</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">update_checked_catalogs</span><span class="p">(</span>
+            <span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">filtered_catalogs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">new_catalogs</span> <span class="o">=</span> <span class="n">catalogs</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">new_catalogs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">All specified catalogs with appropriate resolution &#39;</span>
+              <span class="s1">&#39;have already been checked for matches.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+            <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="mi">4</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">update_stage</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Using the following catalogs for cross-matching: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">new_catalogs</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">sources</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">No new VLITE sources to match.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+            <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="mi">4</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">update_stage</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="c1"># Cross-match VLITE sources with each catalog</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">save</span><span class="p">:</span>
+        <span class="n">match_in_db</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">match_in_db</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">for</span> <span class="n">catalog</span> <span class="ow">in</span> <span class="n">new_catalogs</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sources</span><span class="p">,</span> <span class="n">catalog_matched</span> <span class="o">=</span> <span class="n">radioxmatch</span><span class="o">.</span><span class="n">catalogmatch</span><span class="p">(</span>
+                <span class="n">conn</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">catalog</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">radius</span><span class="p">,</span> <span class="n">match_in_db</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="c1"># No sky catalog sources extracted, move on to next catalog</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+            <span class="c1"># Add results to catalog_match table</span>
+            <span class="n">dbio</span><span class="o">.</span><span class="n">add_catalog_match</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">catalog_matched</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">save</span><span class="p">:</span>
+        <span class="c1"># Update assoc_source nmatches</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">update_assoc_nmatches</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span>
+        <span class="c1"># Check for new VLITE unique (VU) sources from this image</span>
+        <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">nmatches</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">src</span> <span class="o">=</span> <span class="n">vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">radius</span><span class="p">)</span>
+                            
+        <span class="c1"># Update stage</span>
+        <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">update_stage</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">)</span>                
+
+    <span class="k">return</span></div>
+
+
+<div class="viewcode-block" id="process"><a class="viewcode-back" href="../vdp.html#vdp.process">[docs]</a><span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">stages</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This function handles the logic and transitions between</span>
+<span class="sd">    processing stages. All individual processing functions</span>
+<span class="sd">    are called from here. Input parameters come from output</span>
+<span class="sd">    of `cfgparse`.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    conn : psycopg2.extensions.connect instance</span>
+<span class="sd">        The `PostgreSQL` database connection object.</span>
+<span class="sd">    stages : dict</span>
+<span class="sd">        Keys are the processing stages (source finding, source assocation,</span>
+<span class="sd">        and catalog matrching) and values are boolean ``True`` or ``False``.</span>
+<span class="sd">    opts : dict</span>
+<span class="sd">        Keys are the processing options (save to database, quality checks,</span>
+<span class="sd">        overwrite, reprocess, redo match, and update match) and values are</span>
+<span class="sd">        boolean ``True`` or ``False``.</span>
+<span class="sd">    dirs : list</span>
+<span class="sd">        List of strings specifying paths to daily image directories</span>
+<span class="sd">        to be processed during the run.</span>
+<span class="sd">    catalogs : list</span>
+<span class="sd">        Names of radio sky survey catalogs to use when running</span>
+<span class="sd">        catalog matching.</span>
+<span class="sd">    sfparams : dict</span>
+<span class="sd">        Specifies any non-default `PyBDSF` parameters to be used in source</span>
+<span class="sd">        finding.</span>
+<span class="sd">    qaparams : dict</span>
+<span class="sd">        User-specified quality requirements or default values defined</span>
+<span class="sd">        and set in `cfgparse`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Define booleans from stages &amp; opts dictionaries</span>
+    <span class="n">sf</span> <span class="o">=</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;source finding&#39;</span><span class="p">]</span>
+    <span class="n">sa</span> <span class="o">=</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;source association&#39;</span><span class="p">]</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">stages</span><span class="p">[</span><span class="s1">&#39;catalog matching&#39;</span><span class="p">]</span>
+    <span class="n">save</span> <span class="o">=</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;save to database&#39;</span><span class="p">]</span>
+    <span class="n">qa</span> <span class="o">=</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;quality checks&#39;</span><span class="p">]</span>
+    <span class="n">reproc</span> <span class="o">=</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;reprocess&#39;</span><span class="p">]</span>
+    <span class="n">rematch</span> <span class="o">=</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;redo match&#39;</span><span class="p">]</span>
+    <span class="n">updatematch</span> <span class="o">=</span> <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;update match&#39;</span><span class="p">]</span>
+    
+    <span class="c1"># Begin loop through daily directories</span>
+    <span class="k">for</span> <span class="n">imgdir</span> <span class="ow">in</span> <span class="n">dirs</span><span class="p">:</span>
+        <span class="c1"># Define/make directory for PyBDSF output</span>
+        <span class="n">daydir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">imgdir</span><span class="p">,</span> <span class="s1">&#39;..&#39;</span><span class="p">))</span>
+        <span class="n">pybdsfdir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">daydir</span><span class="p">,</span> <span class="s1">&#39;PyBDSF/&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">pybdsfdir</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;mkdir &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="p">)</span>
+
+        <span class="c1"># Select only the images that end with &#39;IPln1.fits&#39;</span>
+        <span class="n">imglist</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">imgdir</span><span class="p">)</span> <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;IPln1.fits&#39;</span><span class="p">)]</span>
+        <span class="c1"># Loop through images to initialize</span>
+        <span class="n">imobjlist</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">img</span> <span class="ow">in</span> <span class="n">imglist</span><span class="p">:</span>
+            <span class="n">impath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">imgdir</span><span class="p">,</span> <span class="n">img</span><span class="p">)</span>
+            <span class="c1"># Initialize Image object &amp; set attributes from header</span>
+            <span class="n">imobjlist</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dbio</span><span class="o">.</span><span class="n">init_image</span><span class="p">(</span><span class="n">impath</span><span class="p">))</span>
+
+        <span class="c1"># Sort imobjlist by mjdtime</span>
+        <span class="n">imobjlist</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">mjdtime</span><span class="p">)</span>
+
+        <span class="c1"># Begin loop through time-sorted images</span>
+        <span class="k">for</span> <span class="n">imobj</span> <span class="ow">in</span> <span class="n">imobjlist</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;_&#39;</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span> <span class="o">+</span> <span class="mi">10</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Starting </span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+            <span class="c1"># STAGE 1 -- Add image to database</span>
+            <span class="n">imobj</span> <span class="o">=</span> <span class="n">iminit</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">save</span><span class="p">,</span> <span class="n">qa</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">reproc</span><span class="p">,</span> <span class="n">stages</span><span class="p">)</span>
+            <span class="c1"># Move on to next image if imobj is None</span>
+            <span class="k">if</span> <span class="n">imobj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            
+            <span class="c1"># STAGE 2 -- Source finding</span>
+            <span class="k">if</span> <span class="n">sf</span><span class="p">:</span>
+                <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span> <span class="o">=</span> <span class="n">srcfind</span><span class="p">(</span>
+                    <span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">save</span><span class="p">,</span> <span class="n">qa</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">)</span>
+                <span class="c1"># Remove temp fits file</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;rm &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*.crop.fits&#39;</span><span class="p">)</span>
+                <span class="c1"># Do this so PyBDSF warning messages get printed to log</span>
+                <span class="c1"># when re-directing out put to text file</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;grep &quot;WARNING&quot; &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*.log&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">sources</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="c1"># Image failed to process</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;failed.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">img</span><span class="o">+</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Move PyBDSF output files to PyBDSF directory</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*pybdsf.log &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*pybdsm*&#39;</span><span class="p">):</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span><span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*pybdsm* &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                <span class="c1"># STAGE 3 -- Source association</span>
+                <span class="k">if</span> <span class="n">sa</span><span class="p">:</span>
+                    <span class="n">new_sources</span><span class="p">,</span> <span class="n">imobj</span> <span class="o">=</span> <span class="n">srcassoc</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                    <span class="c1"># STAGE 4 -- Sky survey catalog cross-matching</span>
+                    <span class="k">if</span> <span class="n">cm</span><span class="p">:</span> <span class="c1"># sf + sa + cm - branch 12, 15</span>
+                        <span class="c1"># Cross-match new sources only</span>
+                        <span class="n">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">new_sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg&#39;</span><span class="p">):</span>
+                            <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span>
+                                <span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source finding, association, &#39;</span>
+                              <span class="s1">&#39;and sky catalog cross-matching on image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="c1"># sf + sa - branch 11, 14</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source finding and association on &#39;</span>
+                              <span class="s1">&#39;image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">cm</span><span class="p">:</span> <span class="c1"># sf + cm - branch 10, 13</span>
+                        <span class="n">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg&#39;</span><span class="p">):</span>
+                            <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span>
+                                <span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source finding and sky catalog &#39;</span>
+                              <span class="s1">&#39;cross-matching to the extracted&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;sources from image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="c1"># sf only - branch 6, 8</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source finding on image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+            <span class="k">else</span><span class="p">:</span> <span class="c1"># no sf</span>
+                <span class="k">if</span> <span class="n">sa</span><span class="p">:</span>
+                    <span class="c1"># Get sources from detected_source table</span>
+                    <span class="n">sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_image_sources</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                    <span class="c1"># Already caught case of no sf but stage &lt; 2 in iminit</span>
+                    <span class="k">if</span> <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span> <span class="c1"># no sa has been run yet</span>
+                        <span class="n">new_sources</span><span class="p">,</span> <span class="n">imobj</span> <span class="o">=</span> <span class="n">srcassoc</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span>
+                                                      <span class="n">sources</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">cm</span><span class="p">:</span> <span class="c1"># sa + cm - branch 20</span>
+                            <span class="c1"># Cross-match new sources only</span>
+                            <span class="n">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">new_sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg&#39;</span><span class="p">):</span>
+                                <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span>
+                                    <span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source association and sky &#39;</span>
+                                  <span class="s1">&#39;catalog cross-matching to the newly&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;detected sources from image&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span> <span class="c1"># sa only - branch 19</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed source association for image&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="c1"># stage &gt; 2</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">NOTE: </span><span class="si">{}</span><span class="s2">&#39;s&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;sources have already been associated with the &#39;</span>
+                              <span class="s1">&#39;existing VLITE catalog.&#39;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">cm</span><span class="p">:</span> <span class="c1"># cm only - branch 21</span>
+                            <span class="n">assoc_sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_associated</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">rematch</span><span class="p">:</span>
+                                <span class="c1"># Delete &amp; redo matching</span>
+                                <span class="n">assoc_sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">delete_matches</span><span class="p">(</span>
+                                    <span class="n">conn</span><span class="p">,</span> <span class="n">assoc_sources</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="k">if</span> <span class="ow">not</span> <span class="n">updatematch</span><span class="p">:</span>
+                                    <span class="c1"># Cross-match new/un-matched sources only</span>
+                                    <span class="n">assoc_sources</span> <span class="o">=</span> <span class="p">[</span><span class="n">src</span> <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> \
+                                                     <span class="n">assoc_sources</span> <span class="k">if</span> \
+                                                     <span class="n">src</span><span class="o">.</span><span class="n">nmatches</span> <span class="ow">is</span> <span class="kc">None</span> \
+                                                     <span class="ow">or</span> <span class="n">src</span><span class="o">.</span><span class="n">nmatches</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+                                <span class="k">else</span><span class="p">:</span>
+                                    <span class="c1"># Use all sources if updating</span>
+                                    <span class="k">pass</span>
+                            <span class="n">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">assoc_sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg&#39;</span><span class="p">):</span>
+                                <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span>
+                                    <span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed sky catalog cross-matching for &#39;</span>
+                                  <span class="s1">&#39;image&#39;</span><span class="p">)</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span> <span class="k">continue</span> <span class="c1"># branch 18</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">cm</span><span class="p">:</span> <span class="c1"># cm only - branch 17</span>
+                        <span class="k">pass</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="c1"># branches 2, 4 continued</span>
+                        <span class="k">continue</span>
+                    <span class="k">if</span> <span class="n">imobj</span><span class="o">.</span><span class="n">stage</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="c1"># Get detected, then assoc sources</span>
+                        <span class="n">sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_image_sources</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                        <span class="n">assoc_sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_associated</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">sources</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">rematch</span><span class="p">:</span>
+                            <span class="c1"># Delete &amp; redo matching</span>
+                            <span class="n">assoc_sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">delete_matches</span><span class="p">(</span>
+                                <span class="n">conn</span><span class="p">,</span> <span class="n">assoc_sources</span><span class="p">,</span> <span class="n">imobj</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="ow">not</span> <span class="n">updatematch</span><span class="p">:</span>
+                                <span class="c1"># Cross-match new/un-matched sources only</span>
+                                <span class="n">assoc_sources</span> <span class="o">=</span> <span class="p">[</span><span class="n">src</span> <span class="k">for</span> <span class="n">src</span> <span class="ow">in</span> <span class="n">assoc_sources</span> \
+                                                 <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">nmatches</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> \
+                                                 <span class="n">src</span><span class="o">.</span><span class="n">nmatches</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="c1"># Use all sources if updating</span>
+                                <span class="k">pass</span>
+                        <span class="n">catmatch</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">imobj</span><span class="p">,</span> <span class="n">assoc_sources</span><span class="p">,</span> <span class="n">catalogs</span><span class="p">,</span> <span class="n">save</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg&#39;</span><span class="p">):</span>
+                            <span class="n">os</span><span class="o">.</span><span class="n">system</span><span class="p">(</span>
+                                <span class="s1">&#39;mv &#39;</span><span class="o">+</span><span class="n">imgdir</span><span class="o">+</span><span class="s1">&#39;*matches.reg &#39;</span><span class="o">+</span><span class="n">pybdsfdir</span><span class="o">+</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Completed sky catalog cross-matching for image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="c1"># branch 16</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">ERROR: Source association must be run &#39;</span>
+                              <span class="s1">&#39;before catalog cross-matching for image&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">.</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">imobj</span><span class="o">.</span><span class="n">filename</span><span class="p">))</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Alternatively, run source finding with catalog &#39;</span>
+                              <span class="s1">&#39;matching to cross-match detected&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;VLITE sources with other radio sky surveys.&#39;</span><span class="p">)</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">=====================================&#39;</span>
+                              <span class="s1">&#39;==========================================</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+                        <span class="k">continue</span>
+
+    <span class="k">return</span></div>
+
+
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;One function to rule them all.&quot;&quot;&quot;</span>
+    <span class="c1"># Set required &amp; optional command line arguments</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s1">&#39;Run the VLITE Database Pipline (vdp)&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;config_file&#39;</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s1">&#39;the YAML configuration file&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--ignore_prompt&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;ignore prompt to verify database &#39;</span>
+                        <span class="s1">&#39;removal/creation&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--remove_catalog_matches&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;remove matching results for the specified &#39;</span>
+                        <span class="s1">&#39;sky survey catalog(s)&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--remove_source&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;removes the specified source(s) from the &#39;</span>
+                        <span class="s1">&#39;database assoc_source table&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;--add_catalog&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;adds any new sky survey catalogs to a table in &#39;</span>
+                        <span class="s1">&#39;the database &quot;skycat&quot; schema&#39;</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+    
+    <span class="c1"># Start the timer</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+
+    <span class="c1"># Parse run configuration file</span>
+    <span class="n">stages</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">setup</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">dirs</span> <span class="o">=</span> <span class="n">cfgparse</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">config_file</span><span class="p">)</span>
+
+    <span class="c1"># Find existing/create/overwrite database</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">([</span><span class="n">args</span><span class="o">.</span><span class="n">remove_catalog_matches</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">remove_source</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">add_catalog</span><span class="p">]):</span>
+        <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;overwrite&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">dbinit</span><span class="p">(</span><span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database name&#39;</span><span class="p">],</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;database user&#39;</span><span class="p">],</span>
+                  <span class="n">opts</span><span class="p">[</span><span class="s1">&#39;overwrite&#39;</span><span class="p">],</span> <span class="n">qaparams</span><span class="p">,</span> <span class="n">safe_override</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">ignore_prompt</span><span class="p">)</span>
+
+    <span class="c1"># Option to remove matching results for sky catalogs</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">remove_catalog_matches</span><span class="p">:</span>
+        <span class="n">catalogs</span> <span class="o">=</span> <span class="n">raw_input</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">For which catalogs would you like to remove &#39;</span>
+                             <span class="s1">&#39;matching results? (List catalogs separated by &#39;</span>
+                             <span class="s1">&#39;a comma.)</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">cat_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">cat</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">for</span> <span class="n">cat</span> <span class="ow">in</span> <span class="n">catalogs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">)]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Removing matching results for </span><span class="si">{}</span><span class="s1">...&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">catalogs</span><span class="p">))</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">remove_catalog</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">cat_list</span><span class="p">)</span>
+        <span class="c1"># Find all assoc_sources whose nmatches dropped to 0</span>
+        <span class="n">vu_assoc_sources</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_new_vu</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">vu_assoc_sources</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">vu_asrc</span> <span class="ow">in</span> <span class="n">vu_assoc_sources</span><span class="p">:</span>
+                <span class="c1"># Get image_ids, radii for the new VU source</span>
+                <span class="n">vu_image_list</span> <span class="o">=</span> <span class="n">dbio</span><span class="o">.</span><span class="n">get_vu_image</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">vu_asrc</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">vu_image</span> <span class="ow">in</span> <span class="n">vu_image_list</span><span class="p">:</span>
+                    <span class="n">src</span> <span class="o">=</span> <span class="n">vlite_unique</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">vu_asrc</span><span class="p">,</span> <span class="n">vu_image</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">vu_image</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Option to remove sources from the **assoc_source** database table</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">remove_source</span><span class="p">:</span>
+        <span class="n">inp</span> <span class="o">=</span> <span class="n">raw_input</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Please enter the id number(s) (i.e. 1, 2, 3) &#39;</span>
+                        <span class="s1">&#39;of the source(s) you wish to remove &#39;</span>
+                        <span class="s1">&#39;from the database assoc_source table, or provide &#39;</span>
+                        <span class="s1">&#39;a path to a text file with a list of id numbers &#39;</span>
+                        <span class="s1">&#39;separated by new lines:</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">asid_list</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">asid</span><span class="p">)</span> <span class="k">for</span> <span class="n">asid</span> <span class="ow">in</span> <span class="n">inp</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;[]&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="p">)]</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">asid_list</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">asid</span><span class="p">)</span> <span class="k">for</span> <span class="n">asid</span> <span class="ow">in</span> <span class="n">inp</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;[]&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)]</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">text</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                <span class="n">asid_list</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">asid</span><span class="p">)</span> <span class="k">for</span> <span class="n">asid</span> <span class="ow">in</span> <span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">Removing row(s) </span><span class="si">{}</span><span class="s1"> from the assoc_source table...&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">asid_list</span><span class="p">))</span>
+        <span class="n">dbio</span><span class="o">.</span><span class="n">remove_sources</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">asid_list</span><span class="p">))</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Option to add a new sky survey catalog to the database &quot;skycat&quot; schema</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">add_catalog</span><span class="p">:</span>
+        <span class="n">skycatdb</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    
+    <span class="c1"># Process images</span>
+    <span class="n">process</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">stages</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">setup</span><span class="p">[</span><span class="s1">&#39;catalogs&#39;</span><span class="p">],</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">)</span>
+
+    <span class="n">nimages</span><span class="p">,</span> <span class="n">exec_time</span> <span class="o">=</span> <span class="n">print_run_stats</span><span class="p">(</span><span class="n">start_time</span><span class="p">)</span>
+
+    <span class="c1"># Record run configuration parameters</span>
+    <span class="n">dbio</span><span class="o">.</span><span class="n">record_config</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">config_file</span><span class="p">,</span> <span class="n">start_time</span><span class="p">,</span> <span class="n">exec_time</span><span class="p">,</span>
+                       <span class="n">nimages</span><span class="p">,</span> <span class="n">stages</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">setup</span><span class="p">,</span> <span class="n">sfparams</span><span class="p">,</span> <span class="n">qaparams</span><span class="p">)</span>
+
+    <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Emily Richards, Emil Polisensky.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'1.6',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

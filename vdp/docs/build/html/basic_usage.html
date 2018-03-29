@@ -1,0 +1,503 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Basic Usage &mdash; VLITE Database Pipeline 1.6 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="VLITE Database Pipeline 1.6 documentation" href="index.html"/>
+        <link rel="next" title="Pipeline Stages" href="stages.html"/>
+        <link rel="prev" title="Welcome to the VLITE Database Pipeline Documentation" href="index.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> VLITE Database Pipeline
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Basic Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#running-the-code">Running the Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#optional-command-line-arguments">Optional Command Line Arguments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#batch-processing">Batch Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#expected-execution-times">Expected Execution Times</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#data-products">Data Products</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#description-of-configuration-file-parameters">Description of Configuration File Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="stages.html">Pipeline Stages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="database.html">Database Contents &amp; Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guide.html">Developer Guide</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">VLITE Database Pipeline</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Basic Usage</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/basic_usage.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="basic-usage">
+<span id="id1"></span><h1>Basic Usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h1>
+<p><strong>vdp</strong> requires a YAML configuration file which tells it
+where to find the VLITE images and which local database to
+connect to (see <a class="reference internal" href="#config-desc"><span class="std std-ref">Description of Configuration File Parameters</span></a> for details).
+Since it was built specifically for VLITE, <strong>vdp</strong> assumes
+a particular directory structure in which it looks for all
+files ending with &#8220;IPln1.fits&#8221;:</p>
+<blockquote>
+<div><code class="docutils literal"><span class="pre">/root_directory/year-month/day/Images/</span></code></div></blockquote>
+<p>Or, for example: <code class="docutils literal"><span class="pre">/extraid/vpipe/processed/2018-03/26/Images/</span></code></p>
+<p>If you leave the &#8220;month&#8221; or &#8220;year&#8221; parameters blank in the
+configuration file, <strong>vdp</strong> will look for VLITE images
+in <code class="docutils literal"><span class="pre">/root_directory/Images/</span></code>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The user will need write permissions in <code class="docutils literal"><span class="pre">Images/</span></code>
+and its parent directory.</p>
+</div>
+<p>The database can be created at runtime, so it does not need
+to exist before starting the pipeline. If connecting to an
+existing database, the user must either be the owner of that
+database or a superuser due to the permissions needed while
+running <strong>vdp</strong>. Unless you have a specific reason not to,
+it is best to connect as user &#8216;vpipe&#8217;, which has already
+been created on the PostgreSQL server running on virgo.</p>
+<div class="section" id="running-the-code">
+<h2>Running the Code<a class="headerlink" href="#running-the-code" title="Permalink to this headline">¶</a></h2>
+<p>Once the YAML configuration file is set, <strong>vdp</strong> can
+be started from the command line:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ python vdp.py config_file.yaml
+</pre></div>
+</div>
+<p>where <code class="docutils literal"><span class="pre">config_file.yaml</span></code> is replaced with whatever
+you named your configuration file. The pipeline&#8217;s progress
+will be displayed through messages printed to the terminal.</p>
+<div class="section" id="optional-command-line-arguments">
+<h3>Optional Command Line Arguments<a class="headerlink" href="#optional-command-line-arguments" title="Permalink to this headline">¶</a></h3>
+<p>There are some optional command line arguments that enable
+some non-standard functionality for <strong>vdp</strong>.
+Use the <code class="docutils literal"><span class="pre">--help</span></code> or <code class="docutils literal"><span class="pre">-h</span></code> command line option to see all
+optional command line arguments:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ python vdp.py -h
+usage: vdp.py [-h] [--ignore_prompt] [--remove_catalog_matches]
+         [--remove_source] [--add_catalog]
+         config_file
+
+Run the VLITE Database Pipline (vdp)
+
+positional arguments:
+  config_file           the YAML configuration file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --ignore_prompt       ignore prompt to verify database removal/creation
+  --remove_catalog_matches
+                        remove matching results for the specified sky survey
+                        catalog(s)
+  --remove_source       removes the specified source(s) from the database
+                        assoc_source table
+  --add_catalog         adds any new sky survey catalogs to a table in the
+                        database &quot;skycat&quot; schema
+</pre></div>
+</div>
+<p><code class="docutils literal"><span class="pre">--ignore_prompt</span></code> overrides the prompt to confirm overwriting
+or creating a new database. This is needed when redirecting all
+terminal output to a log file, as is recommended when batch
+processing (see <a class="reference internal" href="#batch-proc"><span class="std std-ref">Batch Processing</span></a>).</p>
+<p><code class="docutils literal"><span class="pre">--remove_catalog_matches</span></code> will prompt the user to input the
+name(s) of all radio catalogs whose matching results are to be
+removed from the databse. This will likely only be used in a
+scenario where an updated version of a radio catalog is released
+and you wish to replace the old matching results with new ones.</p>
+<p><code class="docutils literal"><span class="pre">--remove_source</span></code> prompts the user for a list or text file
+containing a list of id numbers corresponding to the rows to
+remove in the database <strong>assoc_source</strong> table. Use this when
+you want to remove sources you have determined to be artifacts
+from the VLITE catalog. These sources will remain in the
+database <strong>detected_source</strong> table, but are given an &#8216;assoc_id&#8217;
+value of -1.</p>
+<p><code class="docutils literal"><span class="pre">--add_catalog</span></code> cross-checks the list of available radio
+catalogs defined in <code class="docutils literal"><span class="pre">skycatalog.catalogio.catalog_list</span></code>
+with the table names that exist in the database &#8220;skycat&#8221;
+schema. If a catalog is found in the list that does not
+yet exist in the &#8220;skycat&#8221; schema, a new table is created
+for it and the <strong>skycat.catalogs</strong> table is updated accordingly.
+It will only be necessary to run this option after you have
+added code to <code class="docutils literal"><span class="pre">skycatalog.catalogio</span></code> and
+<code class="docutils literal"><span class="pre">skycatalog.skycatdb</span></code> to read a new radio catalog and need
+to add it to an existing database&#8217;s &#8220;skycat&#8221; schema.
+See <a class="reference internal" href="dev_guide.html#add-new-catalog"><span class="std std-ref">Instructions for Adding a New Radio Catalog</span></a> for more information.</p>
+</div>
+<div class="section" id="batch-processing">
+<span id="batch-proc"></span><h3>Batch Processing<a class="headerlink" href="#batch-processing" title="Permalink to this headline">¶</a></h3>
+<p>The configuration file enables processing of one <code class="docutils literal"><span class="pre">year-mo</span></code>
+directory at a time.
+Processing more than one month of VLITE images can be accomplished
+through successive runs of <strong>vdp</strong> called from a bash script.
+It is recommended that all output that normally gets printed
+to the terminal window be redirected to a text file to retain
+a record of the pipeline&#8217;s execution. Don&#8217;t forget to use the
+optional command line argument <code class="docutils literal"><span class="pre">--ignore_prompt</span></code> for the
+first call to <strong>vdp</strong> if creating a new database or overwriting
+an existing one.</p>
+<p>Example file <code class="docutils literal"><span class="pre">batch_vdp.bash</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">vdp</span><span class="o">.</span><span class="n">py</span> <span class="mi">201801</span><span class="n">config</span><span class="o">.</span><span class="n">yaml</span> <span class="o">--</span><span class="n">ignore_prompt</span> <span class="o">&gt;</span> <span class="mf">201801.</span><span class="n">log</span>
+<span class="n">python</span> <span class="n">vdp</span><span class="o">.</span><span class="n">py</span> <span class="mi">201802</span><span class="n">config</span><span class="o">.</span><span class="n">yaml</span> <span class="o">&gt;</span> <span class="mf">201802.</span><span class="n">log</span>
+<span class="n">python</span> <span class="n">vdp</span><span class="o">.</span><span class="n">py</span> <span class="mi">201803</span><span class="n">config</span><span class="o">.</span><span class="n">yaml</span> <span class="o">&gt;</span> <span class="mf">201803.</span><span class="n">log</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="expected-execution-times">
+<h3>Expected Execution Times<a class="headerlink" href="#expected-execution-times" title="Permalink to this headline">¶</a></h3>
+<p>Execution time mostly depends on the number and size of the
+images being processed. Expect ~30-60 seconds per image for
+VLA A configuration, 15-45 s/image for B, and 5-15 s/image
+for C &amp; D configurations, on average. The bottleneck is source
+finding/measurement with PyBDSF.</p>
+</div>
+<div class="section" id="data-products">
+<h3>Data Products<a class="headerlink" href="#data-products" title="Permalink to this headline">¶</a></h3>
+<p>A <code class="docutils literal"><span class="pre">PyBDSF/</span></code> directory is created in the <code class="docutils literal"><span class="pre">Images/</span></code> parent directory
+which stores the PyBDSF generated log files and ds9 regions
+files for each image. The database contains all results from
+each stage of the pipeline. See <a class="reference internal" href="database.html#database"><span class="std std-ref">Database Contents &amp; Structure</span></a> for more
+information.</p>
+</div>
+</div>
+<div class="section" id="description-of-configuration-file-parameters">
+<span id="config-desc"></span><h2>Description of Configuration File Parameters<a class="headerlink" href="#description-of-configuration-file-parameters" title="Permalink to this headline">¶</a></h2>
+<p>An example of the required YAML configuration file can be
+found in the VLITE GitHub repository <a class="reference external" href="https://github.com/erichards/VLITE/blob/develop/vdp/example_config.yaml">here.</a>
+The contents are described in more detail below.</p>
+<dl class="docutils">
+<dt><strong>stages</strong></dt>
+<dd><p class="first">Accepts boolean <code class="docutils literal"><span class="pre">True</span></code>/<code class="docutils literal"><span class="pre">False</span></code> or &#8220;yes&#8221;/&#8221;no&#8221; to turn on/off
+running certain pipeline stages.</p>
+<dl class="last docutils">
+<dt><em>source finding</em></dt>
+<dd>Runs source finding &amp; measurement on the image with PyBDSF.
+(See <a class="reference internal" href="stages.html#source-finding"><span class="std std-ref">Stage 2: Source Finding</span></a>).</dd>
+<dt><em>source association</em></dt>
+<dd>Associates the image&#8217;s detected sources with the existing VLITE
+catalog contained in the database <strong>assoc_source</strong> table.
+(See <a class="reference internal" href="stages.html#source-assoc"><span class="std std-ref">Stage 3: Source Association</span></a>).</dd>
+<dt><em>catalog matching</em></dt>
+<dd>Cross-matches the image&#8217;s detected sources with sources from
+other radio catalogs.
+(See <a class="reference internal" href="stages.html#catalog-matching"><span class="std std-ref">Stage 4: Catalog Matching</span></a>).</dd>
+</dl>
+</dd>
+<dt><strong>options</strong></dt>
+<dd><p class="first">Accepts boolean <code class="docutils literal"><span class="pre">True</span></code>/<code class="docutils literal"><span class="pre">False</span></code> or &#8220;yes&#8221;/&#8221;no&#8221; to turn on/off
+certain features for the pipeline.</p>
+<dl class="last docutils">
+<dt><em>save to database</em></dt>
+<dd>Saves all results to the database.</dd>
+<dt><em>quality checks</em></dt>
+<dd>Checks if the image meets certain quality standards before
+and after source finding. (See <a class="reference internal" href="stages.html#image-qa"><span class="std std-ref">Image Quality Checks &amp; Requirements</span></a> and
+<a class="reference internal" href="stages.html#source-count-qa"><span class="std std-ref">Source Count Quality Checks &amp; Requirements</span></a>).</dd>
+<dt><em>overwrite</em></dt>
+<dd>Deletes all contents &amp; re-creates tables, functions, triggers,
+and indices in the existing database &#8220;public&#8221; schema.</dd>
+<dt><em>reprocess</em></dt>
+<dd>Deletes all existing results for the image and re-runs source
+finding plus any additional stages specified. Applies only
+if the source finding stage is turned on.</dd>
+<dt><em>redo match</em></dt>
+<dd>Deletes all matching results between the image&#8217;s detected
+sources and other radio catalogs. Cross-matching is then
+run again for those image&#8217;s sources using the currently
+specified list of radio catalogs.</dd>
+<dt><em>update match</em></dt>
+<dd>Cross-matches the image&#8217;s detected sources with any currently
+specified radio catalogs for which there are no results yet.</dd>
+</dl>
+</dd>
+<dt><strong>setup</strong></dt>
+<dd><p class="first">Parameters defining location of VLITE images and database
+connection info.</p>
+<dl class="last docutils">
+<dt><em>root directory</em></dt>
+<dd>Root path to the VLITE images (i.e. <code class="docutils literal"><span class="pre">/extraid/vpipe/processed/</span></code>).</dd>
+<dt><em>year</em></dt>
+<dd>Four-digit calendar year (i.e. <code class="docutils literal"><span class="pre">2018</span></code>). If blank, directory
+path is <code class="docutils literal"><span class="pre">/root_directory/Images/</span></code></dd>
+<dt><em>month</em></dt>
+<dd>One- or two-digit numerical calendar month (i.e. <code class="docutils literal"><span class="pre">03</span></code>).
+If blank, directory path is <code class="docutils literal"><span class="pre">/root_directory/Images/</span></code></dd>
+<dt><em>day</em></dt>
+<dd>List of two-digit daily directories to process under the
+<code class="docutils literal"><span class="pre">year-mo</span></code> parent directory. To process all, leave as
+empty list, <code class="docutils literal"><span class="pre">[]</span></code>. Otherwise, <code class="docutils literal"><span class="pre">[01,</span> <span class="pre">02,</span> <span class="pre">03,</span> <span class="pre">etc.]</span></code>.</dd>
+<dt><em>database name</em></dt>
+<dd>Name of new or existing database.</dd>
+<dt><em>database user</em></dt>
+<dd>Name of the PostgreSQL database user.</dd>
+<dt><em>catalogs</em></dt>
+<dd>List of other radio catalogs to use for cross-matching. To use all
+available catalogs, leave as empty list, <code class="docutils literal"><span class="pre">[]</span></code>.
+Otherwise, <code class="docutils literal"><span class="pre">[FIRST,</span> <span class="pre">TGSS,</span> <span class="pre">NVSS,</span> <span class="pre">WENSS,</span> <span class="pre">VLSSr,</span> <span class="pre">etc.]</span></code>.</dd>
+</dl>
+</dd>
+<dt><strong>pybdsf_params</strong></dt>
+<dd><p class="first">Parameters used in source finding.</p>
+<dl class="docutils">
+<dt><em>mode</em></dt>
+<dd>Required &#8211; choose either &#8216;default&#8217; or &#8216;minimize_islands&#8217;.
+Determines whether PyBDSF is run once per image (&#8216;default&#8217;),
+or multiple times with different <code class="docutils literal"><span class="pre">rms_box</span></code> parameters to
+find the fewest number of islands (&#8216;minimize_islands&#8217;).</dd>
+<dt><em>scale</em></dt>
+<dd>Required &#8211; number between 0 and 1. Fraction of the image&#8217;s
+field-of-view to use. The length of the radius describing
+the image&#8217;s circular field-of-view is multiplied by this number.</dd>
+</dl>
+<p>Below this point, any number of PyBDSF parameters may be
+specified. See <a class="reference external" href="http://www.astron.nl/citt/pybdsm/process_image.html#general-reduction-parameters">their documentation</a> for descriptions of
+all available options. The parameters shown below have been
+found to work best for VLITE images:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal"><span class="pre">thresh</span></code>: &#8216;hard&#8217;</li>
+<li><code class="docutils literal"><span class="pre">adaptive_rms_box</span></code>: <code class="docutils literal"><span class="pre">True</span></code></li>
+<li><code class="docutils literal"><span class="pre">adaptive_thresh</span></code>: 10.</li>
+</ul>
+</div></blockquote>
+<p>If you want to specify any PyBDSF parameter that accepts a
+tuple, like <code class="docutils literal"><span class="pre">rms_box</span></code>, it needs to be formatted as such:</p>
+<blockquote class="last">
+<div>rms_box: !!python/tuple [100, 30]</div></blockquote>
+</dd>
+<dt><strong>image_qa_params</strong></dt>
+<dd><p class="first">Sets quality requirements for images. Applies only if quality checks
+are turned on. Leave any parameter blank to use the default value.</p>
+<dl class="last docutils">
+<dt><em>min time on source (s)</em></dt>
+<dd>Minimum allowed integration time on source. Image header
+keyword <code class="docutils literal"><span class="pre">TAU_TIME</span></code>. Default is 60 seconds.</dd>
+<dt><em>max noise (mJy/beam)</em></dt>
+<dd>Maximum allowed image noise. Image header keyword <code class="docutils literal"><span class="pre">ACTNOISE</span></code>.
+Default is 1000 mJy/beam.</dd>
+<dt><em>max beam axis ratio</em></dt>
+<dd>Maximum allowed ratio between the beam semi-major and
+semi-minor axes. Default is 4.</dd>
+<dt><em>min problem source separation (deg)</em></dt>
+<dd>Minimum allowed angular separation between the image
+pointing center and a known problem source/area.
+Default is 20 degrees.</dd>
+<dt><em>max source metric</em></dt>
+<dd>Maximum allowed metric for source counts. Defined as:
+(actual_num_sources - expected_num_sources) / expected_num_sources.
+Default is 10.</dd>
+</dl>
+</dd>
+</dl>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="stages.html" class="btn btn-neutral float-right" title="Pipeline Stages" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral" title="Welcome to the VLITE Database Pipeline Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Emily Richards, Emil Polisensky.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.6',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,572 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Database Contents &amp; Structure &mdash; VLITE Database Pipeline 1.6 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="VLITE Database Pipeline 1.6 documentation" href="index.html"/>
+        <link rel="next" title="Developer Guide" href="dev_guide.html"/>
+        <link rel="prev" title="Pipeline Stages" href="stages.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> VLITE Database Pipeline
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stages.html">Pipeline Stages</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Database Contents &amp; Structure</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tables">Tables</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#assoc-source">assoc_source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#catalog-match">catalog_match</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#corrected-flux">corrected_flux</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#detected-island">detected_island</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#detected-source">detected_source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#error">error</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#image">image</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-config">run_config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#vlite-unique">vlite_unique</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#the-skycat-schema">The &#8220;skycat&#8221; Schema</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guide.html">Developer Guide</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">VLITE Database Pipeline</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Database Contents &amp; Structure</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/database.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="database-contents-structure">
+<span id="database"></span><h1>Database Contents &amp; Structure<a class="headerlink" href="#database-contents-structure" title="Permalink to this headline">¶</a></h1>
+<p>The <strong>vdp</strong> database keeps a record of every VLITE image,
+detected source, association between detections of the
+same source, and match to sources from other radio catalogs.
+The <a class="reference internal" href="#tables"><span class="std std-ref">Tables</span></a> section below lists every table in the
+database along with a description of the columns.
+A graphical view of the database organization can be
+seen <a class="reference external" href="https://docs.google.com/spreadsheets/d/e/2PACX-1vR20qGzJ7U3hFBNYZ1IUJWcFpdlOmfjQKv_8pk6aRW7BuljZ6VGNWyagHnsMVkZ6_Y9-Dl1vEwNv8Bg/pubhtml">here.</a></p>
+<div class="section" id="tables">
+<span id="id1"></span><h2>Tables<a class="headerlink" href="#tables" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="assoc-source">
+<span id="id2"></span><h3>assoc_source<a class="headerlink" href="#assoc-source" title="Permalink to this headline">¶</a></h3>
+<p>This is the VLITE catalog. It contains a single entry for every
+source detected by associating detections from multiple images
+in the same spatial resolution class.</p>
+<ul class="simple">
+<li><em>id</em>: unique row id number</li>
+<li><em>ra</em>: weighted average of all right ascension measurements (degrees)</li>
+<li><em>e_ra</em>: error on the right ascension weighted average (degrees)</li>
+<li><em>dec</em>: weighted average of all declination measurements (degrees)</li>
+<li><em>e_dec</em>: error on the declination weighted average (degrees)</li>
+<li><em>res_class</em>: spatial resolution class (see <a class="reference internal" href="stages.html#source-assoc"><span class="std std-ref">Stage 3: Source Association</span></a>)</li>
+<li><em>ndetect</em>: number of images in which the source was detected</li>
+<li><em>nmatches</em>: number of matches to other radio catalog sources</li>
+</ul>
+</div>
+<div class="section" id="catalog-match">
+<span id="id3"></span><h3>catalog_match<a class="headerlink" href="#catalog-match" title="Permalink to this headline">¶</a></h3>
+<p>This table keeps a record of each radio catalog source that
+was successfully cross-matched with a VLITE source in the
+<strong>assoc_source</strong> table.</p>
+<ul class="simple">
+<li><em>id</em>: unique row id number</li>
+<li><em>catalog_id</em>: references the <em>id</em> column of the <strong>skycat.catalogs</strong>
+table</li>
+<li><em>src_id</em>: references the <em>id</em> column of the radio catalog
+table (i.e. <strong>skycat.nvss</strong>) which corresponds to the
+<em>catalog_id</em></li>
+<li><em>assoc_id</em>: references the <em>id</em> column of the <strong>assoc_source</strong>
+table; deletion of row in <strong>assoc_source</strong> table cascades to
+all <strong>catalog_match</strong> rows with that <em>assoc_id</em></li>
+<li><em>separation</em>: angular separation between the weighted average
+VLITE source position and the other radio catalog source
+position (arcseconds)</li>
+</ul>
+</div>
+<div class="section" id="corrected-flux">
+<span id="id4"></span><h3>corrected_flux<a class="headerlink" href="#corrected-flux" title="Permalink to this headline">¶</a></h3>
+<p>All flux measurements from PyBDSF are corrected for VLITE&#8217;s primary
+beam response. A scale factor is applied to account for
+decreasing sensitivity with increasing distance from the image&#8217;s
+pointing center. A 20% systematic uncertainty is also added
+(in quadrature) to the PyBDSF statistical uncertainties for every
+flux measurement error.</p>
+<ul class="simple">
+<li><em>src_id</em>: non-unique id number assigned by PyBDSF to each detected
+source in an image; uniquely referenced by combination of
+(<em>src_id</em>, <em>image_id</em>), same as in <strong>detected_source</strong> table
+(deletions cascade from that table)</li>
+<li><em>isl_id</em>: non-unique id number assigned by PyBDSF to each detected
+island in an image; uniquely referenced by combination of
+(<em>isl_id</em>, <em>image_id</em>), same as in the <strong>detected_source</strong> and
+<strong>detected_island</strong> tables (deletions cascade from <strong>detected_island</strong>)</li>
+<li><em>image_id</em>: unique number identifying the image; references the
+<em>id</em> column in the <strong>image</strong> table and the <em>image_id</em> columns
+in the <strong>detected_source</strong> and <strong>detected_island</strong> tables</li>
+<li><em>total_flux</em>: primary beam corrected total integrated flux (mJy)</li>
+<li><em>e_total_flux</em>: 1-sigma statistical + 20% systematic error on the
+corrected total integrated flux (mJy)</li>
+<li><em>peak_flux</em>: primary beam corrected peak flux density per beam (mJy/beam)</li>
+<li><em>e_peak_flux</em>: 1-sigma statistical + 20% systematic error on the
+corrected peak flux (mJy/beam)</li>
+<li><em>isl_total_flux</em>: primary beam corrected total integrated flux density
+of the island in which the source is located (mJy)</li>
+<li><em>isl_e_total_flux</em>: 1-sigma statistical + 20% systematic error on the
+corrected island integrated flux (mJy)</li>
+<li><em>isl_rms</em>: average background rms noise of the island (mJy/beam)</li>
+<li><em>isl_mean</em>: avearage background mean value of the island (mJy/beam)</li>
+<li><em>isl_resid_rms</em>: average residual background rms noise of the island
+(mJy/beam)</li>
+<li><em>isl_resid_mean</em>: average residual background mean value of the
+island (mJy/beam)</li>
+<li><em>distance_from_center</em>: angular separation between the source position
+and the image pointing center (degrees)</li>
+<li><em>snr</em>: signal-to-noise ratio of the source detection; defined as
+(<em>peak_flux</em> - <em>isl_mean</em>) / <em>isl_rms</em></li>
+</ul>
+</div>
+<div class="section" id="detected-island">
+<span id="id5"></span><h3>detected_island<a class="headerlink" href="#detected-island" title="Permalink to this headline">¶</a></h3>
+<p>PyBDSF finds contiguous groups of pixels with flux values above a certain
+detection threshold which it identifies as islands. Sources are extracted
+from these islands by fitting them with Gaussians. This table stores
+all PyBDSF output pertaining to the islands detected in an image (see
+<a class="reference external" href="http://www.astron.nl/citt/pybdsm/write_catalog.html#definition-of-output-columns">the PyBDSF documentation</a> for a complete list).</p>
+<ul class="simple">
+<li><em>isl_id</em>: non-unique id number assigned by PyBDSF to each detected
+island in an image; uniquely referenced by combination of
+(<em>isl_id</em>, <em>image_id</em>) &amp; deletions cascade to <strong>corrected_flux</strong> table</li>
+<li><em>image_id</em>: unique number identifying the image; references the
+<em>id</em> column in the <strong>image</strong> table (deletions cascade from that table)</li>
+<li><em>total_flux</em>: total integrated flux density of the island (mJy);
+PyBDSF output column <em>Isl_Total_flux</em></li>
+<li><em>e_total_flux</em>: 1-sigma statistical error on the total integrated
+flux density (mJy); PyBDSF output column <em>E_Isl_Total_flux</em></li>
+<li><em>rms</em>: average background rms noise of the island (mJy/beam);
+PyBDSF output column <em>Isl_rms</em></li>
+<li><em>mean</em>: average background mean value of the island (mJy/beam);
+PyBDSF output column <em>Isl_mean</em></li>
+<li><em>resid_rms</em>: average residual background rms noise of the island
+(mJy/beam); PyBDSF output column <em>Resid_Isl_rms</em></li>
+<li><em>resid_mean</em>: average residual background mean value of the island
+(mJy/beam); PyBDSF output column <em>Resid_Isl_mean</em></li>
+</ul>
+</div>
+<div class="section" id="detected-source">
+<span id="id6"></span><h3>detected_source<a class="headerlink" href="#detected-source" title="Permalink to this headline">¶</a></h3>
+<p>Properties of sources detected in an image are derived from Gaussian
+fits to islands of pixels. This table records PyBDSF output
+pertaining to the sources formed from fitting Gaussians (see
+<a class="reference external" href="http://www.astron.nl/citt/pybdsm/write_catalog.html#definition-of-output-columns">the PyBDSF documentation</a> for a complete list). Descriptions
+are either adapted or straight from their documentation.</p>
+<ul class="simple">
+<li><em>src_id</em>: non-unique id number assigned by PyBDSF to each detected
+source in an image; uniquely referenced by combination of
+(<em>src_id</em>, <em>image_id</em>) &amp; deletions cascade to <strong>corrected_flux</strong> table</li>
+<li><em>isl_id</em>: non-unique id number assigned by PyBDSF to each detected
+island in an image; uniquely referenced by combination of
+(<em>isl_id</em>, <em>image_id</em>) &amp; deletions cascade to <strong>corrected_flux</strong> table
+&amp; from <strong>detected_island</strong> table</li>
+<li><em>image_id</em>: unique number identifying the image; references the
+<em>id</em> column in the <strong>image</strong> table</li>
+<li><em>ra</em>: source right ascension (degrees); PyBDSF output column <em>RA</em></li>
+<li><em>e_ra</em>: error on the right ascension (degrees); PyBDSF output
+column <em>E_RA</em></li>
+<li><em>dec</em>: source declination (degrees); PyBDSF output column <em>DEC</em></li>
+<li><em>e_dec</em>: error on the declination (degrees); PyBDSF output column
+<em>E_DEC</em></li>
+<li><em>total_flux</em>: total integrated flux (mJy); PyBDSF output
+column <em>Total_flux</em></li>
+<li><em>e_total_flux</em>: 1-sigma statistical error on the total integrated
+flux; PyBDSF output column <em>E_Total_flux</em></li>
+<li><em>peak_flux</em>: peak flux density per beam of the source (mJy/beam);
+PyBDSF output column <em>Peak_flux</em></li>
+<li><em>e_peak_flux</em>: 1-sigma statistical error on the peak flux (mJy/beam);
+PyBDSF output column <em>E_Peak_flux</em></li>
+<li><em>ra_max</em>: right ascension of the maximum of the source (degrees);
+PyBDSF output column <em>RA_max</em></li>
+<li><em>e_ra_max</em>: 1-sigma statistical error on the right ascension of
+the maximum (degrees); PyBDSF output column <em>E_RA_max</em></li>
+<li><em>dec_max</em>: declination of the maximum of the source (degrees);
+PyBDSF output column <em>DEC_max</em></li>
+<li><em>e_dec_max</em>: 1-sigma statistical error on the declination of
+the maximum (degrees); PyBDSF output column <em>E_DEC_max</em></li>
+<li><em>maj</em>: the FWHM of the major axis of the source (arcsec);
+PyBDSF output column <em>Maj</em></li>
+<li><em>e_maj</em>: 1-sigma statistical error on the FWHM of the source
+major axis (arcsec); PyBDSF output column <em>E_Maj</em></li>
+<li><em>min</em>: the FWHM of the minor axis of the source (arcsec);
+PyBDSF output column <em>Min</em></li>
+<li><em>e_min</em>: 1-sigma statistical error on the FWHM of the source
+minor axis (arcsec); PyBDSF output column <em>E_Min</em></li>
+<li><em>pa</em>: position angle of the source major axis measured east
+of north (degrees); PyBDSF output column <em>PA</em></li>
+<li><em>e_pa</em>: 1-sigma statistical error on the source major axis
+position angle (degrees); PyBDSF output column <em>E_PA</em></li>
+<li><em>dc_maj</em>: the FWHM of the deconvolved major axis of the source
+(arcsec); PyBDSF output column <em>DC_Maj</em></li>
+<li><em>e_dc_maj</em>: 1-sigma statistical error on the FWHM of the source
+deconvolved major axis (arcsec); PyBDSF output column <em>E_DC_Maj</em></li>
+<li><em>dc_min</em>: the FWHM of the deconvolved minor axis of the source
+(arcsec); PyBDSF output column <em>DC_Min</em></li>
+<li><em>e_dc_min</em>: 1-sigma statistical error on the FWHM of the source
+deconvolved minor axis (arcsec); PyBDSF output column <em>E_DC_Min</em></li>
+<li><em>dc_pa</em>: position angle of the source deconvolved major axis
+measured east of north (degrees); PyBDSF output column <em>DC_PA</em></li>
+<li><em>e_dc_pa</em>: 1-sigma statistical error on the source deconvolved
+major axis position angle (degrees); PyBDSF output column <em>E_DC_PA</em></li>
+<li><em>code</em>: defines the source structure:<ul>
+<li>&#8216;S&#8217; = a single-Gaussian source that is the only source in the island</li>
+<li>&#8216;C&#8217; = a single-Gaussian source in an island with other sources</li>
+<li>&#8216;M&#8217; = a multi-Gaussian source</li>
+</ul>
+</li>
+<li><em>assoc_id</em>: references the <em>id</em> column of the <strong>assoc_source</strong>;
+rows with the same <em>assoc_id</em> value are associated detections
+of the same source in different images</li>
+</ul>
+</div>
+<div class="section" id="error">
+<span id="id8"></span><h3>error<a class="headerlink" href="#error" title="Permalink to this headline">¶</a></h3>
+<p>This is a look-up table containing explanations for each possible
+<em>error_id</em> in the <strong>image</strong> table.</p>
+<ul class="simple">
+<li><em>id</em>: referenced by the <em>error_id</em> column in the <strong>image</strong> table;
+updates cascade to that table</li>
+<li><em>reason</em>: reason why an image was given that particular <em>error_id</em></li>
+</ul>
+</div>
+<div class="section" id="image">
+<span id="id9"></span><h3>image<a class="headerlink" href="#image" title="Permalink to this headline">¶</a></h3>
+<p>This table provides a record of every image processed by <strong>vdp</strong>.
+The more useful metadata from the image header is summarized
+in the table, as well.</p>
+<ul class="simple">
+<li><em>id</em>: unique identifier for each new image; deletions cascade to
+the <strong>detected_island</strong> and <strong>vlite_unique</strong> tables</li>
+<li><em>filename</em>: image filename with full directory path</li>
+<li><em>imsize</em>: image size in pixels (pixels); header keywords
+(<code class="docutils literal"><span class="pre">NAXIS1</span></code>, <code class="docutils literal"><span class="pre">NAXIS2</span></code>)</li>
+<li><em>obs_ra</em>: right ascension of image pointing center (degrees);
+header keyword <code class="docutils literal"><span class="pre">OBSRA</span></code></li>
+<li><em>obs_dec</em>: declination of image pointing center (degrees);
+header keyword <code class="docutils literal"><span class="pre">OBSDEC</span></code></li>
+<li><em>pixel_scale</em>: number of arcseconds spanned by each pixel in the
+image (arcsec/pixel); header keyword <code class="docutils literal"><span class="pre">CDELT1</span></code> or <code class="docutils literal"><span class="pre">CDELT2</span></code></li>
+<li><em>object</em>: name of the object being observed as given by the
+primary observer; header keyword <code class="docutils literal"><span class="pre">OBJECT</span></code></li>
+<li><em>obs_date</em>: date observations were acquired formatted as
+yyyy-mm-dd; header keyword <code class="docutils literal"><span class="pre">DATE-OBS</span></code></li>
+<li><em>map_date</em>: date image was created formatted as yyyy-mm-dd;
+header keyword <code class="docutils literal"><span class="pre">DATE-MAP</span></code></li>
+<li><em>obs_freq</em>: rest frequency of the VLITE observations (MHz);
+header keyword <code class="docutils literal"><span class="pre">RESTFREQ</span></code> or <code class="docutils literal"><span class="pre">CRVAL3</span></code> or <code class="docutils literal"><span class="pre">CRVAL4</span></code></li>
+<li><em>primary_freq</em>: frequency of the primary observations (GHz);
+taken from VLITE image filename</li>
+<li><em>bmaj</em>: image beam semi-major axis (arcsec); header keyword
+<code class="docutils literal"><span class="pre">BMAJ</span></code> or <code class="docutils literal"><span class="pre">CLEANBMJ</span></code></li>
+<li><em>bmin</em>: image beam semi-minor axis (arcsec); header keyword
+<code class="docutils literal"><span class="pre">BMIN</span></code> or <code class="docutils literal"><span class="pre">CLEANBMN</span></code></li>
+<li><em>bpa</em>: image beam position angle measured east of north (degrees);
+header keyword <code class="docutils literal"><span class="pre">BPA</span></code> or <code class="docutils literal"><span class="pre">CLEANBPA</span></code></li>
+<li><em>noise</em>: estimate of the rms noise measured in the center of the
+image (mJy/beam); header keyword <code class="docutils literal"><span class="pre">ACTNOISE</span></code></li>
+<li><em>peak</em>: flux value of the brightest pixel in the image (mJy/beam);
+header keyword <code class="docutils literal"><span class="pre">DATAMAX</span></code></li>
+<li><em>config</em>: VLA configuration; header keyword <code class="docutils literal"><span class="pre">CONFIG</span></code></li>
+<li><em>nvis</em>: number of visibilities in the data before imaging; header
+keyword <code class="docutils literal"><span class="pre">NVIS</span></code></li>
+<li><em>mjdtime</em>: Modified Julian Date at the start of the observations;
+header keyword <code class="docutils literal"><span class="pre">MJDTIME</span></code> + header keyword <code class="docutils literal"><span class="pre">STARTIME</span></code></li>
+<li><em>tau_time</em>: total integration time on source (sec); header
+keyword <code class="docutils literal"><span class="pre">TAU_TIME</span></code></li>
+<li><em>duration</em>: total duration of the observations (sec); header
+keyword <code class="docutils literal"><span class="pre">DURATION</span></code></li>
+<li><em>radius</em>: size of the circular field-of-view used in source finding
+(degrees); calculated as ((<code class="docutils literal"><span class="pre">NAXIS2</span></code> / 2.) * <em>scale</em>) * <code class="docutils literal"><span class="pre">CDELT2</span></code>,
+where <em>scale</em> is defined in the <strong>pybdsf_params</strong> section of the
+configuration file</li>
+<li><em>nsrc</em>: number of sources found in the image by PyBDSF</li>
+<li><em>rms_box</em>: size and step size of the box used by PyBDSF to estimate
+the image background mean and noise (pixels)</li>
+<li><em>stage</em>: value of the highest <strong>vdp</strong> stage completed on the image:<ul>
+<li>1 = reading the image</li>
+<li>2 = source finding</li>
+<li>3 = source association</li>
+<li>4 = catalog matching</li>
+</ul>
+</li>
+<li><em>catalogs_checked</em>: list of the names of other radio catalogs that
+have been checked for sources which can be positionally matched to
+the sources detected in this image</li>
+<li><em>error_id</em>: value assigned if the image fails one of the quality
+checks; references the <em>id</em> column of the <strong>error</strong> table &amp; is
+updated if that table is updated</li>
+<li><em>nearest_problem</em>: name of the nearest source/area which is known
+to cause imaging problems for VLITE</li>
+<li><em>separation</em>: angular separation between the VLITE image pointing
+center and the nearest known problem source/area (degrees)</li>
+</ul>
+</div>
+<div class="section" id="run-config">
+<span id="id10"></span><h3>run_config<a class="headerlink" href="#run-config" title="Permalink to this headline">¶</a></h3>
+<p>The contents of the configuration file are stored in this table
+each time the pipeline is executed. Other information about the
+run of the pipeline like the start time, execution time, and number
+of images read are is also recorded.</p>
+<ul class="simple">
+<li><em>id</em>: unique identifier corresponding to each run of <strong>vdp</strong></li>
+<li><em>file</em>: name of the configuration file used for the run</li>
+<li><em>start_time</em>: date and time the run was started; formatted as
+yyyy-mm-dd hh:mm:ss</li>
+<li><em>execution_time</em>: length of the time taken to execute the full
+run; formatted as hh:mm:ss.s</li>
+<li><em>nimages</em>: number of images read during the run</li>
+<li><em>stages</em>: contents of the configuration file <strong>stages</strong> section
+stored as key-value pairs</li>
+<li><em>options</em>: contents of the configuration file <strong>options</strong> section
+stored as key-value pairs</li>
+<li><em>setup</em>: contents of the configuration file <strong>setup</strong> section
+stored as key-value pairs</li>
+<li><em>pybdsf_params</em>: contents of the configuration file <strong>pybdsf_params</strong>
+section stored as key-value pairs</li>
+<li><em>image_qa_params</em>:contents of the configuration file <strong>image_qa_params</strong>
+section stored as key-value pairs</li>
+</ul>
+</div>
+<div class="section" id="vlite-unique">
+<span id="id11"></span><h3>vlite_unique<a class="headerlink" href="#vlite-unique" title="Permalink to this headline">¶</a></h3>
+<p>Sources detected in VLITE images which are not successfully matched with
+any sources in other radio catalogs are deemed to be &#8220;VLITE unique&#8221;, or VU,
+sources. These sources are placed into their own table to quickly isolate
+transient candidates, steep spectrum, or other sources of potential interest.
+A VLITE source is first added to this table when no matches are found during
+the catalog matching stage. A new entry for the VU source is added to the
+table for every image which could have or does contain the same VU source.</p>
+<ul class="simple">
+<li><em>id</em>: unique row id number</li>
+<li><em>image_id</em>: unique identifier for the VLITE image; references the <em>id</em>
+column of the <strong>image</strong> table &amp; deletions cascade from that table</li>
+<li><em>assoc_id</em>: references the <em>id</em> column of the <strong>assoc_source</strong> table
+in which the source has <em>nmatches</em> = 0; deletions cascade from that
+table</li>
+<li><em>detected</em>: boolean <code class="docutils literal"><span class="pre">True</span></code> or <code class="docutils literal"><span class="pre">False</span></code> identifying whether or not
+the source was detected in the image</li>
+</ul>
+</div>
+</div>
+<div class="section" id="the-skycat-schema">
+<span id="sky-catalogs"></span><h2>The &#8220;skycat&#8221; Schema<a class="headerlink" href="#the-skycat-schema" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="dev_guide.html" class="btn btn-neutral float-right" title="Developer Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="stages.html" class="btn btn-neutral" title="Pipeline Stages" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Emily Richards, Emil Polisensky.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.6',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

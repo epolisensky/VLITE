@@ -1,0 +1,330 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Welcome to the VLITE Database Pipeline Documentation &mdash; VLITE Database Pipeline 1.6 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="VLITE Database Pipeline 1.6 documentation" href="#"/>
+        <link rel="next" title="Basic Usage" href="basic_usage.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="#" class="icon icon-home"> VLITE Database Pipeline
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.6
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stages.html">Pipeline Stages</a></li>
+<li class="toctree-l1"><a class="reference internal" href="database.html">Database Contents &amp; Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guide.html">Developer Guide</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">VLITE Database Pipeline</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#">Docs</a> &raquo;</li>
+        
+      <li>Welcome to the VLITE Database Pipeline Documentation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="welcome-to-the-vlite-database-pipeline-documentation">
+<h1>Welcome to the VLITE Database Pipeline Documentation<a class="headerlink" href="#welcome-to-the-vlite-database-pipeline-documentation" title="Permalink to this headline">¶</a></h1>
+<p>The VLITE Database Pipeline, or <strong>vdp</strong>, is a collection of
+Python scripts to automate the measurement and database
+archiving of radio astronomical point sources detected in
+VLITE images.</p>
+<p><strong>vdp</strong> uses the Python Blob Detector and Source Finder
+(<a class="reference external" href="http://www.astron.nl/citt/pybdsf/">PyBDSF</a>;
+Mohan &amp; Rafferty 2015) for source finding and PostgreSQL
+for database storage.</p>
+<p>This documentation provides a high level overview of how
+to run <strong>vdp</strong>, as well as detailed descriptions
+of each stage in the pipeline.</p>
+<p>For more information about VLITE in general, see <a class="reference external" href="http://vlite.nrao.edu/">here.</a></p>
+<div class="section" id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h2>
+<p>Execution of the pipeline is controlled through a YAML
+configuration file. Here&#8217;s an example file to get you
+started: <a class="reference download internal" href="_downloads/example_config.yaml" download=""><code class="xref download docutils literal"><span class="pre">example_config.yaml</span></code></a></p>
+<p>The pipeline is started from the command line with the
+configuration file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ python vdp.py example_config.yaml
+</pre></div>
+</div>
+<p>Check out the <a class="reference external" href="https://github.com/erichards/VLITE/blob/develop/VDPGuide.ipynb">VDPGuide IPython notebook</a>
+for a step-by-step walkthrough of the pipeline stages and
+analysis examples.</p>
+</div>
+</div>
+<div class="section" id="getting-started-with-the-vlite-database-pipeline">
+<h1>Getting Started with the VLITE Database Pipeline<a class="headerlink" href="#getting-started-with-the-vlite-database-pipeline" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="basic_usage.html#running-the-code">Running the Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="basic_usage.html#optional-command-line-arguments">Optional Command Line Arguments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basic_usage.html#batch-processing">Batch Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basic_usage.html#expected-execution-times">Expected Execution Times</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basic_usage.html#data-products">Data Products</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="basic_usage.html#description-of-configuration-file-parameters">Description of Configuration File Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="stages.html">Pipeline Stages</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="stages.html#stage-1-reading-the-image">Stage 1: Reading the Image</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="stages.html#image-quality-checks-requirements">Image Quality Checks &amp; Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="stages.html#stage-2-source-finding">Stage 2: Source Finding</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="stages.html#source-count-quality-checks-requirements">Source Count Quality Checks &amp; Requirements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="stages.html#stage-3-source-association">Stage 3: Source Association</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stages.html#stage-4-catalog-matching">Stage 4: Catalog Matching</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="database.html">Database Contents &amp; Structure</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="database.html#tables">Tables</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="database.html#assoc-source">assoc_source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#catalog-match">catalog_match</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#corrected-flux">corrected_flux</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#detected-island">detected_island</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#detected-source">detected_source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#error">error</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#image">image</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#run-config">run_config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="database.html#vlite-unique">vlite_unique</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="database.html#the-skycat-schema">The &#8220;skycat&#8221; Schema</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dev_guide.html">Developer Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dev_guide.html#instructions-for-adding-a-new-radio-catalog">Instructions for Adding a New Radio Catalog</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="modules">
+<h1>Modules<a class="headerlink" href="#modules" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vdp.html">The <strong>vdp</strong> Module</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and Tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="basic_usage.html" class="btn btn-neutral float-right" title="Basic Usage" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2018, Emily Richards, Emil Polisensky.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'1.6',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: ''
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
