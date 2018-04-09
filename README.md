@@ -1,7 +1,7 @@
 # VLITE Database Pipeline (VDP)
 ### Scripts for automating source extraction and database storage.
 
-#### Version 1.7
+#### Version 1.8
 
 A post-processing pipeline to adaptively extract and catalog point sources is
 being developed to enhance the scientific value and accessibility of data
@@ -44,9 +44,6 @@ schema and insertion of other radio sky survey catalogs
 VLITE flux measurements
 - **sourcefinding/runbdsf.py**: Python script which runs `PyBDSF` source finding
 - **OUTLINE.md**: outline of the VDP tasks
-- **VDPDataFlow.jpg**: VDP data flow chart
-- **VDPLogicFlow.jpg**: decision tree demonstrating VDP processing
-stages & options
 - **errors.py**: Python module containing class definitions for errors
 - **example_config.yaml**: example `YAML` configuration file used to set
 run parameters for VDP

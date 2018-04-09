@@ -66,6 +66,10 @@ optional command line arguments::
                           catalog(s)
     --remove_source       removes the specified source(s) from the database
                           assoc_source table
+    --remove_image        removes the specified image(s) and associated results
+                          from the database entirely
+    --manually_add_match  manually add catalog matching results for VLITE
+                          source(s) after follow-up
     --add_catalog         adds any new sky survey catalogs to a table in the
                           database "skycat" schema
 
@@ -87,6 +91,24 @@ you want to remove sources you have determined to be artifacts
 from the VLITE catalog. These sources will remain in the
 database **detected_source** table, but are given an 'assoc_id'
 value of -1.
+
+``--remove_image`` prompts the user for a list or text file
+containing the filenames of the images to delete from the database.
+All results from the specified images are removed from every
+affected table. The image filenames must contain the full
+directory path starting at least from the year-month directory
+structure.
+
+``--manually_add_match`` enables the user to add matching results
+between VLITE and other radio catalog sources that failed to be
+matched due to the angular separation being just over the limit.
+The id of the VLITE source in the **assoc_source** table and the
+name of the catalog must be provided at a minimum. The catalog
+source id and angular separation may also be included. The required
+inputs can be provided on the command line, one assoc_id, catalog
+name combination at a time, pressing "q" when finished.
+Alternatively, a text file containing the necessary information
+may be given.
 
 ``--add_catalog`` cross-checks the list of available radio
 catalogs defined in ``skycatalog.catalogio.catalog_list``
@@ -209,7 +231,11 @@ The contents are described in more detail below.
   *day*
     List of two-digit daily directories to process under the
     ``year-mo`` parent directory. To process all, leave as
-    empty list, ``[]``. Otherwise, ``[01, 02, 03, etc.]``.  
+    empty list, ``[]``. Otherwise, ``[01, 02, 03, etc.]``.
+  *files*
+    Lists of files to process in each daily directory. To process
+    all, leave as empty nested list, ``[[]]``. Otherwise,
+    ``[[f1.fits, f2.fits, etc.], [f1.fits, etc.], etc.]``
   *database name*
     Name of new or existing database.
   *database user*
@@ -224,9 +250,10 @@ The contents are described in more detail below.
 
   *mode*
     Required -- choose either 'default' or 'minimize_islands'.
-    Determines whether PyBDSF is run once per image ('default'),
-    or multiple times with different ``rms_box`` parameters to
-    find the fewest number of islands ('minimize_islands').  
+    Determines whether PyBDSF is run once per image
+    ('default'; recommended), or multiple times with different
+    ``rms_box`` parameters to find the fewest number of islands
+    ('minimize_islands').  
   *scale*
     Required -- number between 0 and 1. Fraction of the image's
     field-of-view to use. The length of the radius describing

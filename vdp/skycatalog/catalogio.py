@@ -4,21 +4,23 @@ Each catalog source is initialized as a CatalogSource
 object to create a uniform set of properties for each
 sky survey's sources. When reading the catalogs for the
 first time, sources with the uniform set of attributes
-are written to text files called '[catalog_name]_psql.txt'
-which is used to insert the sources into the `PostgreSQL`
+are written to text files called "[catalog_name]_psql.txt"
+which is used to insert the sources into the PostgreSQL
 database in an efficient way. 
 
 Instructions for adding a new catalog:
-1.) Add catalog name in all lowercase to the end of
-the catalog list. It's important that it is inserted
-at the end so the catalog ids for the sources stored
-in the already existing text files aren't incorrect.
+1.) Add catalog name in all lowercase and a new id number
+to the catalog dictionary. DO NOT re-order the id numbers
+unless you plan on re-writing all the "*_psql.txt" files
+and the entire "skycat" schema. Otherwise, the id number
+of the catalog in the **skycat.catalogs** table will not
+match the 'catalog_id' of the sources in the catalog's table.
 2.) Write a function called 'read_[catalog name]' for
 reading in the catalog and writing to the text file
 if it doesn't exist using the same format as all the
 others.
 3.) Add a line to skycatdb.py to call the
-'read_[catalog name]' function.
+``read_[catalog name]`` function.
 
 Adapted from EP's iofuncs.py.
 
@@ -30,22 +32,19 @@ import pandas as pd
 #catalogdir = '/home/vpipe/vlite-emily/data/SkyCatalogs'
 catalogdir = '/home/erichards/work/data/SkyCatalogs'
 
-# If adding a new catalog, don't forget to add it to the end of this list!
+# If adding a new catalog, don't forget to add it to this dictionary!
 # Note: catalog name must be lowercase, cannot lead with a number, and
 # cannot contain "."
-# New catalogs MUST be added to the END of the list. Otherwise the
-# catalog_id numbering will get messed up.
-catalog_list = ['cosmos', 'first', 'gleam', 'gpsr1', 'gpsr5', 'lazio04',
-                'lofar_hba', 'lofar_lba', 'lotss', 'm31_glg04', 'nordgc',
-                'nrl_nvss', 'nvss', 'sevenc', 'sumss', 'tgss', 'txs',
-                'vlssr', 'wenss']
-
-# Dictionary to hold info to be put into the skycat.catalogs table
-cat_dict = {}
-id = 1
-for catalog in catalog_list:
-    cat_dict[catalog] = {'id' : id}
-    id += 1
+catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
+                'gleam' : {'id' : 3}, 'gpsr1' : {'id' : 4},
+                'gpsr5' : {'id' : 5}, 'lazio04' : {'id' : 6},
+                'lofar_hba' : {'id' : 7}, 'lofar_lba' : {'id' : 8},
+                'lotss' : {'id' : 9}, 'm31_glg04' : {'id' : 10},
+                'nordgc' : {'id' : 11}, 'nrl_nvss' : {'id' : 12},
+                'nvss' : {'id' : 13}, 'sevenc' : {'id' : 14},
+                'sumss' : {'id' : 15}, 'tgss' : {'id' : 16},
+                'txs' : {'id' : 17}, 'vlssr' : {'id' : 18},
+                'wenss': {'id' : 19}}
 
 
 def dms2deg(d, m, s):
@@ -127,10 +126,10 @@ def read_tgss(return_sources=False):
     Spatial resolution: 25'' 
 
     """
-    cat_dict['tgss']['telescope'] = 'GMRT'
-    cat_dict['tgss']['frequency'] = 150.
-    cat_dict['tgss']['resolution'] = 25.
-    cat_dict['tgss']['reference'] = 'Intema et al. (2017)'
+    catalog_dict['tgss']['telescope'] = 'GMRT'
+    catalog_dict['tgss']['frequency'] = 150.
+    catalog_dict['tgss']['resolution'] = 25.
+    catalog_dict['tgss']['reference'] = 'Intema et al. (2017)'
     
     psqlf = os.path.join(catalogdir, 'tgss_psql.txt')
     if os.path.isfile(psqlf):
@@ -171,7 +170,7 @@ def read_tgss(return_sources=False):
         sources[-1].rms = float(d[16]) # mJy/beam
         sources[-1].Code = d[17]
         sources[-1].field = d[18]
-        sources[-1].catalog_id = cat_dict['tgss']['id']
+        sources[-1].catalog_id = catalog_dict['tgss']['id']
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
@@ -195,10 +194,10 @@ def read_first(return_sources=False):
     Spatial resolution: 5'' 
 
     """
-    cat_dict['first']['telescope'] = 'VLA'
-    cat_dict['first']['frequency'] = 1400.
-    cat_dict['first']['resolution'] = 5.
-    cat_dict['first']['reference'] = 'White et al. (1997)'
+    catalog_dict['first']['telescope'] = 'VLA'
+    catalog_dict['first']['frequency'] = 1400.
+    catalog_dict['first']['resolution'] = 5.
+    catalog_dict['first']['reference'] = 'White et al. (1997)'
     
     psqlf = os.path.join(catalogdir, 'first_psql.txt')
     if os.path.isfile(psqlf):
@@ -246,7 +245,7 @@ def read_first(return_sources=False):
                 # fpa = float(line[15]) # deg
                 sources[-1].e_ra = dfMin # deg
                 sources[-1].e_dec = dfMaj # deg
-                sources[-1].catalog_id = cat_dict['first']['id']
+                sources[-1].catalog_id = catalog_dict['first']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -271,10 +270,10 @@ def read_sumss(return_sources=False):
     Spatial resolution: 45'' 
 
     """
-    cat_dict['sumss']['telescope'] = 'MOST'
-    cat_dict['sumss']['frequency'] = 843.
-    cat_dict['sumss']['resolution'] = 45.
-    cat_dict['sumss']['reference'] = 'Mauch et al. (2003)'
+    catalog_dict['sumss']['telescope'] = 'MOST'
+    catalog_dict['sumss']['frequency'] = 843.
+    catalog_dict['sumss']['resolution'] = 45.
+    catalog_dict['sumss']['reference'] = 'Mauch et al. (2003)'
     
     psqlf = os.path.join(catalogdir, 'sumss_psql.txt')
     if os.path.isfile(psqlf):
@@ -309,7 +308,7 @@ def read_sumss(return_sources=False):
             sources[-1].maj = float(line[12]) # arcsec
             sources[-1].min = float(line[13]) # arcsec
             sources[-1].pa = float(line[14])
-            sources[-1].catalog_id = cat_dict['sumss']['id']
+            sources[-1].catalog_id = catalog_dict['sumss']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -334,10 +333,10 @@ def read_wenss(return_sources=False):
     Spatial resolution: 54'' 
     
     """
-    cat_dict['wenss']['telescope'] = 'WSRT'
-    cat_dict['wenss']['frequency'] = 325.
-    cat_dict['wenss']['resolution'] = 54.
-    cat_dict['wenss']['reference'] = 'Rengelink et al. (1997)'
+    catalog_dict['wenss']['telescope'] = 'WSRT'
+    catalog_dict['wenss']['frequency'] = 325.
+    catalog_dict['wenss']['resolution'] = 54.
+    catalog_dict['wenss']['reference'] = 'Rengelink et al. (1997)'
     
     psqlf = os.path.join(catalogdir, 'wenss_psql.txt')
     if os.path.isfile(psqlf):
@@ -373,7 +372,7 @@ def read_wenss(return_sources=False):
             sources[-1].maj = float(line[9]) # arcsec
             sources[-1].min = float(line[10]) # arcsec
             sources[-1].pa = float(line[11])
-            sources[-1].catalog_id = cat_dict['wenss']['id']
+            sources[-1].catalog_id = catalog_dict['wenss']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -398,10 +397,10 @@ def read_nvss(return_sources=False):
     Spatial resolution: 45'' 
 
     """
-    cat_dict['nvss']['telescope'] = 'VLA'
-    cat_dict['nvss']['frequency'] = 1400.
-    cat_dict['nvss']['resolution'] = 45.
-    cat_dict['nvss']['reference'] = 'Condon et al. (1998)'
+    catalog_dict['nvss']['telescope'] = 'VLA'
+    catalog_dict['nvss']['frequency'] = 1400.
+    catalog_dict['nvss']['resolution'] = 45.
+    catalog_dict['nvss']['reference'] = 'Condon et al. (1998)'
     
     psqlf = os.path.join(catalogdir, 'nvss_psql.txt')
     if os.path.isfile(psqlf):
@@ -475,7 +474,7 @@ def read_nvss(return_sources=False):
             else:
                 sources[-1].e_dec = float(dms2deg(0,0,line[19:23]))
             sources[-1].e_total_flux = float(line[27:30]) # error flux (mJy)
-            sources[-1].catalog_id = cat_dict['nvss']['id']
+            sources[-1].catalog_id = catalog_dict['nvss']['id']
     fread.close()
     sources = set_error(sources, ['e_ra', 'e_dec'])
     with open(psqlf, 'w') as fwrite:
@@ -501,10 +500,10 @@ def read_gleam(return_sources=False):
     Spatial resolution: ~100'' 
 
     """
-    cat_dict['gleam']['telescope'] = 'MWA'
-    cat_dict['gleam']['frequency'] = 150.
-    cat_dict['gleam']['resolution'] = 100.
-    cat_dict['gleam']['reference'] = 'Hurley-Walker et al. (2017)'
+    catalog_dict['gleam']['telescope'] = 'MWA'
+    catalog_dict['gleam']['frequency'] = 150.
+    catalog_dict['gleam']['resolution'] = 100.
+    catalog_dict['gleam']['reference'] = 'Hurley-Walker et al. (2017)'
     
     psqlf = os.path.join(catalogdir, 'gleam_psql.txt')
     if os.path.isfile(psqlf):
@@ -547,7 +546,7 @@ def read_gleam(return_sources=False):
         sources[-1].pa = float(d[22]) # deg
         sources[-1].e_pa = float(d[23]) # deg
         # sources[-1].rms = float(d[16]) # mJy/beam
-        sources[-1].catalog_id = cat_dict['gleam']['id']
+        sources[-1].catalog_id = catalog_dict['gleam']['id']
     sources = set_error(sources, ['e_ra', 'e_dec'])
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -573,10 +572,10 @@ def read_cosmos(return_sources=False):
     Spatial resolution: ~6''
 
     """
-    cat_dict['cosmos']['telescope'] = 'VLA'
-    cat_dict['cosmos']['frequency'] = 320.
-    cat_dict['cosmos']['resolution'] = 6.
-    cat_dict['cosmos']['reference'] = 'Smolcic et al. (2014)'
+    catalog_dict['cosmos']['telescope'] = 'VLA'
+    catalog_dict['cosmos']['frequency'] = 320.
+    catalog_dict['cosmos']['resolution'] = 6.
+    catalog_dict['cosmos']['reference'] = 'Smolcic et al. (2014)'
     
     psqlf = os.path.join(catalogdir, 'cosmos_psql.txt')
     if os.path.isfile(psqlf):
@@ -628,7 +627,7 @@ def read_cosmos(return_sources=False):
                 sources[-1].sep = float(line[24])/3600.0 # deg
             if sources[-1].maj < 1.: sources[-1].maj = 1.
             if sources[-1].min < 1.: sources[-1].min = 1.
-            sources[-1].catalog_id = cat_dict['cosmos']['id']
+            sources[-1].catalog_id = catalog_dict['cosmos']['id']
     fin.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -654,10 +653,10 @@ def read_vlssr(return_sources=False):
     Spatial resolution: ~75''
 
     """
-    cat_dict['vlssr']['telescope'] = 'VLA'
-    cat_dict['vlssr']['frequency'] = 74.
-    cat_dict['vlssr']['resolution'] = 75.
-    cat_dict['vlssr']['reference'] = 'Lane et al. (2014)'
+    catalog_dict['vlssr']['telescope'] = 'VLA'
+    catalog_dict['vlssr']['frequency'] = 74.
+    catalog_dict['vlssr']['resolution'] = 75.
+    catalog_dict['vlssr']['reference'] = 'Lane et al. (2014)'
     
     psqlf = os.path.join(catalogdir, 'vlssr_psql.txt')
     if os.path.isfile(psqlf):
@@ -693,7 +692,7 @@ def read_vlssr(return_sources=False):
         sources[-1].e_ra = 15. * dms2deg(0, 0, line[6:11]) # deg
         sources[-1].e_dec = dms2deg(0, 0, line[19:23]) # deg
         sources[-1].e_total_flux = float(line[30:36]) * 1000.0 # mJy
-        sources[-1].catalog_id = cat_dict['vlssr']['id']
+        sources[-1].catalog_id = catalog_dict['vlssr']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -718,10 +717,10 @@ def read_txs(return_sources=False):
     Spatial resolution: 100"? 
 
     """
-    cat_dict['txs']['telescope'] = 'Texas Interferometer'
-    cat_dict['txs']['frequency'] = 365.
-    cat_dict['txs']['resolution'] = 100.
-    cat_dict['txs']['reference'] = 'Douglas et al. (1996)'
+    catalog_dict['txs']['telescope'] = 'Texas Interferometer'
+    catalog_dict['txs']['frequency'] = 365.
+    catalog_dict['txs']['resolution'] = 100.
+    catalog_dict['txs']['reference'] = 'Douglas et al. (1996)'
     
     psqlf = os.path.join(catalogdir, 'txs_psql.txt')
     if os.path.isfile(psqlf):
@@ -752,7 +751,7 @@ def read_txs(return_sources=False):
         sources[-1].e_dec = float(line[4]) # deg
         sources[-1].total_flux = float(line[5]) # mJy
         sources[-1].e_total_flux = float(line[6]) # mJy
-        sources[-1].catalog_id = cat_dict['txs']['id']
+        sources[-1].catalog_id = catalog_dict['txs']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -777,10 +776,10 @@ def read_sevenc(return_sources=False):
     Spatial resolution: ~70''
 
     """
-    cat_dict['sevenc']['telescope'] = 'CLFST'
-    cat_dict['sevenc']['frequency'] = 151.
-    cat_dict['sevenc']['resolution'] = 70.
-    cat_dict['sevenc']['reference'] = 'Riley at al. (1999)'
+    catalog_dict['sevenc']['telescope'] = 'CLFST'
+    catalog_dict['sevenc']['frequency'] = 151.
+    catalog_dict['sevenc']['resolution'] = 70.
+    catalog_dict['sevenc']['reference'] = 'Riley at al. (1999)'
     
     psqlf = os.path.join(catalogdir, 'sevenc_psql.txt')
     if os.path.isfile(psqlf):
@@ -814,7 +813,7 @@ def read_sevenc(return_sources=False):
             sources[-1].total_flux = float(line[6])
             sources[-1].e_total_flux = float(line[7])
             sources[-1].snr = float(line[8])
-            sources[-1].catalog_id = cat_dict['sevenc']['id']
+            sources[-1].catalog_id = catalog_dict['sevenc']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -839,10 +838,10 @@ def read_gpsr5(return_sources=False):
     Spatial resolution: ~4''
 
     """
-    cat_dict['gpsr5']['telescope'] = 'VLA'
-    cat_dict['gpsr5']['frequency'] = 5000.
-    cat_dict['gpsr5']['resolution'] = 4.
-    cat_dict['gpsr5']['reference'] = 'Becker et al. (1994)'
+    catalog_dict['gpsr5']['telescope'] = 'VLA'
+    catalog_dict['gpsr5']['frequency'] = 5000.
+    catalog_dict['gpsr5']['resolution'] = 4.
+    catalog_dict['gpsr5']['reference'] = 'Becker et al. (1994)'
     
     psqlf = os.path.join(catalogdir, 'gpsr5_psql.txt')
     if os.path.isfile(psqlf):
@@ -881,7 +880,7 @@ def read_gpsr5(return_sources=False):
             sources[-1].maj = sources[-1].size * 0.5 # arcsec
             sources[-1].min = sources[-1].size * 0.5 # arcsec
         sources[-1].pa = 0.0 # deg
-        sources[-1].catalog_id = cat_dict['gpsr5']['id']
+        sources[-1].catalog_id = catalog_dict['gpsr5']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -907,10 +906,10 @@ def read_gpsr1(return_sources=False):
     Spatial resolution: ~5''
 
     """
-    cat_dict['gpsr1']['telescope'] = 'VLA'
-    cat_dict['gpsr1']['frequency'] = 1400.
-    cat_dict['gpsr1']['resolution'] = 5.
-    cat_dict['gpsr1']['reference'] = 'Zoonematkermani et al. (1990)'
+    catalog_dict['gpsr1']['telescope'] = 'VLA'
+    catalog_dict['gpsr1']['frequency'] = 1400.
+    catalog_dict['gpsr1']['resolution'] = 5.
+    catalog_dict['gpsr1']['reference'] = 'Zoonematkermani et al. (1990)'
     
     psqlf = os.path.join(catalogdir, 'gpsr1_psql.txt')
     if os.path.isfile(psqlf):
@@ -949,7 +948,7 @@ def read_gpsr1(return_sources=False):
             sources[-1].maj = sources[-1].size * 0.5 # arcsec
             sources[-1].min = sources[-1].size * 0.5 # arcsec
         sources[-1].pa = 0.0 # deg
-        sources[-1].catalog_id = cat_dict['gpsr1']['id']
+        sources[-1].catalog_id = catalog_dict['gpsr1']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -978,10 +977,10 @@ def read_nordgc(return_sources=False):
     Spatial resolution: ~10''
 
     """
-    cat_dict['nordgc']['telescope'] = 'VLA'
-    cat_dict['nordgc']['frequency'] = 330.
-    cat_dict['nordgc']['resolution'] = 10.
-    cat_dict['nordgc']['reference'] = 'Nord et al. (2004)'
+    catalog_dict['nordgc']['telescope'] = 'VLA'
+    catalog_dict['nordgc']['frequency'] = 330.
+    catalog_dict['nordgc']['resolution'] = 10.
+    catalog_dict['nordgc']['reference'] = 'Nord et al. (2004)'
     
     psqlf = os.path.join(catalogdir, 'nordgc_psql.txt')
     if os.path.isfile(psqlf):
@@ -1035,7 +1034,7 @@ def read_nordgc(return_sources=False):
         sources[-1].maj = 0.5 * 13. # arcsec
         sources[-1].min = 0.5 * 4.5 # arcsec
         sources[-1].pa = 0. # deg
-        sources[-1].catalog_id = cat_dict['nordgc']['id']
+        sources[-1].catalog_id = catalog_dict['nordgc']['id']
     fread.close()
     #print 'Read %d Nord GC 330 MHz catalog sources' % len(sources)
     with open(psqlf, 'w') as fwrite:
@@ -1062,10 +1061,10 @@ def read_lazio04(return_sources=False):
     Spatial resolution: 6?''
 
     """
-    cat_dict['lazio04']['telescope'] = 'VLA'
-    cat_dict['lazio04']['frequency'] = 330.
-    cat_dict['lazio04']['resolution'] = 6.
-    cat_dict['lazio04']['reference'] = 'Lazio (2004)'
+    catalog_dict['lazio04']['telescope'] = 'VLA'
+    catalog_dict['lazio04']['frequency'] = 330.
+    catalog_dict['lazio04']['resolution'] = 6.
+    catalog_dict['lazio04']['reference'] = 'Lazio (2004)'
     
     psqlf = os.path.join(catalogdir, 'lazio04_psql.txt')
     if os.path.isfile(psqlf):
@@ -1102,7 +1101,7 @@ def read_lazio04(return_sources=False):
         sources[-1].maj = 0.5 # arcsec
         sources[-1].min = 0.5 # arcsec 
         sources[-1].pa = 0. # deg
-        sources[-1].catalog_id = cat_dict['lazio04']['id']
+        sources[-1].catalog_id = catalog_dict['lazio04']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -1128,10 +1127,10 @@ def read_m31_glg04(return_sources=False):
     Spatial resolution: 6''
 
     """
-    cat_dict['m31_glg04']['telescope'] = 'VLA'
-    cat_dict['m31_glg04']['frequency'] = 325.
-    cat_dict['m31_glg04']['resolution'] = 6.
-    cat_dict['m31_glg04']['reference'] = 'Gelfand, Lazio, & Gaensler (2004)'
+    catalog_dict['m31_glg04']['telescope'] = 'VLA'
+    catalog_dict['m31_glg04']['frequency'] = 325.
+    catalog_dict['m31_glg04']['resolution'] = 6.
+    catalog_dict['m31_glg04']['reference'] = 'Gelfand, Lazio, & Gaensler (2004)'
     
     psqlf = os.path.join(catalogdir, 'm31_glg04_psql.txt')
     if os.path.isfile(psqlf):
@@ -1176,7 +1175,7 @@ def read_m31_glg04(return_sources=False):
         sources[-1].total_flux = float(line[20]) # mJy
         sources[-1].e_total_flux = float(line[21]) # mJy
         sources[-1].rms = float(line[22]) # mJy/bm
-        sources[-1].catalog_id = cat_dict['m31_glg04']['id']
+        sources[-1].catalog_id = catalog_dict['m31_glg04']['id']
         #if sources[-1].maj < 3e-4: 
         #    print '  %s %e' % (sources[-1].id, sources[-1].maj)
         #if sources[-1].min < 3e-4: 
@@ -1206,10 +1205,10 @@ def read_lotss(return_sources=False):
     Spatial resolution: 25''
 
     """
-    cat_dict['lotss']['telescope'] = 'LOFAR'
-    cat_dict['lotss']['frequency'] = 150
-    cat_dict['lotss']['resolution'] = 25.
-    cat_dict['lotss']['reference'] = 'Shimwell et al. (2017)'
+    catalog_dict['lotss']['telescope'] = 'LOFAR'
+    catalog_dict['lotss']['frequency'] = 150
+    catalog_dict['lotss']['resolution'] = 25.
+    catalog_dict['lotss']['reference'] = 'Shimwell et al. (2017)'
     
     psqlf = os.path.join(catalogdir, 'lotss_psql.txt')
     if os.path.isfile(psqlf):
@@ -1248,7 +1247,7 @@ def read_lotss(return_sources=False):
         sources[-1].maj = 12.5 # arcsec
         sources[-1].min = 12.5 # arcsec
         sources[-1].pa = 0. # deg
-        sources[-1].catalog_id = cat_dict['lotss']['id']
+        sources[-1].catalog_id = catalog_dict['lotss']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -1273,10 +1272,10 @@ def read_lofar_lba(return_sources=False):
     Spatial resolution: 30-56''
 
     """
-    cat_dict['lofar_lba']['telescope'] = 'LOFAR'
-    cat_dict['lofar_lba']['frequency'] = 62
-    cat_dict['lofar_lba']['resolution'] = 40.
-    cat_dict['lofar_lba']['reference'] = 'van Weeren et al. (2014)'
+    catalog_dict['lofar_lba']['telescope'] = 'LOFAR'
+    catalog_dict['lofar_lba']['frequency'] = 62
+    catalog_dict['lofar_lba']['resolution'] = 40.
+    catalog_dict['lofar_lba']['reference'] = 'van Weeren et al. (2014)'
     
     psqlf = os.path.join(catalogdir, 'lofar_lba_psql.txt')
     if os.path.isfile(psqlf):
@@ -1311,7 +1310,7 @@ def read_lofar_lba(return_sources=False):
         sources[-1].maj = 10. # arcsec
         sources[-1].min = 10. # arcsec
         sources[-1].pa = 0. # deg
-        sources[-1].catalog_id = cat_dict['lofar_lba']['id']
+        sources[-1].catalog_id = catalog_dict['lofar_lba']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -1337,10 +1336,10 @@ def read_lofar_hba(return_sources=False):
     Spatial resolution: 6''
 
     """
-    cat_dict['lofar_hba']['telescope'] = 'LOFAR'
-    cat_dict['lofar_hba']['frequency'] = 150
-    cat_dict['lofar_hba']['resolution'] = 6.
-    cat_dict['lofar_hba']['reference'] = 'Williams et al. (2016)'
+    catalog_dict['lofar_hba']['telescope'] = 'LOFAR'
+    catalog_dict['lofar_hba']['frequency'] = 150
+    catalog_dict['lofar_hba']['resolution'] = 6.
+    catalog_dict['lofar_hba']['reference'] = 'Williams et al. (2016)'
     
     psqlf = os.path.join(catalogdir, 'lofar_hba_psql.txt')
     if os.path.isfile(psqlf):
@@ -1384,7 +1383,7 @@ def read_lofar_hba(return_sources=False):
             sources[-1].maj = 3.5 # arcsec
             sources[-1].min = 3.5 # arcsec
             sources[-1].pa = 0. # deg
-            sources[-1].catalog_id = cat_dict['lofar_hba']['id']
+            sources[-1].catalog_id = catalog_dict['lofar_hba']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
@@ -1413,10 +1412,10 @@ def read_nrl_nvss(return_sources=False):
     Spatial resolution: 45''
 
     """
-    cat_dict['nrl_nvss']['telescope'] = 'VLA'
-    cat_dict['nrl_nvss']['frequency'] = 1400
-    cat_dict['nrl_nvss']['resolution'] = 45.
-    cat_dict['nrl_nvss']['reference'] = ''
+    catalog_dict['nrl_nvss']['telescope'] = 'VLA'
+    catalog_dict['nrl_nvss']['frequency'] = 1400
+    catalog_dict['nrl_nvss']['resolution'] = 45.
+    catalog_dict['nrl_nvss']['reference'] = ''
     
     psqlf = os.path.join(catalogdir, 'nrl_nvss_psql.txt')
     if os.path.isfile(psqlf):
@@ -1454,7 +1453,7 @@ def read_nrl_nvss(return_sources=False):
         sources[-1].min = float(line[10])*3600. # arcsec
         sources[-1].pa = float(line[11]) # deg
         sources[-1].field = line[0][:8]
-        sources[-1].catalog_id = cat_dict['nrl_nvss']['id']
+        sources[-1].catalog_id = catalog_dict['nrl_nvss']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:

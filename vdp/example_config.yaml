@@ -18,15 +18,17 @@ options:
 setup:
   root directory: /path/to/data/
   year: 2018
-  month: 3
-  day: [21]                   # list of days to process; [] = all
+  month: 4
+  day: [9]                    # list of days to process; [] = all
+  # list files to process - put different days in separate lists; [[]] = all
+  files: [[]]
   database name: vlite
   database user: postgres
   catalogs: []                # [] = all
 
 pybdsf_params:
   mode: default               # default | minimize_islands
-  scale: 1.0                  # fraction of image size (radius) to use
+  scale: 1.0                  # fraction (0-1) of image size (radius) to use
   # Specify all PyBDSF parameters here
   thresh: hard
   #rms_box: !!python/tuple [100, 30]

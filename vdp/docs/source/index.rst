@@ -8,7 +8,12 @@ VLITE images.
 **vdp** uses the Python Blob Detector and Source Finder
 (`PyBDSF <http://www.astron.nl/citt/pybdsf/>`_;
 Mohan & Rafferty 2015) for source finding and PostgreSQL
-for database storage.
+for database storage. The sky indexing scheme `Q3C
+<https://github.com/segasai/q3c>`_ (Koposov, S., &
+Bartunov, O. 2006) implemented for PostgreSQL is
+utilized to enable high performance queries and
+positional matching across tables as the VLITE catalog
+grows.
 
 This documentation provides a high level overview of how
 to run **vdp**, as well as detailed descriptions
@@ -44,7 +49,8 @@ Getting Started with the VLITE Database Pipeline
    basic_usage
    stages
    database
-   dev_guide
+   examples
+   instructions
 
    
 Modules

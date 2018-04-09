@@ -363,7 +363,7 @@ def filter_catalogs(conn, catalogs, res):
     filtered_catalogs = []
     for catalog in catalogs:
         try:
-            catalog_res = catalogio.cat_dict[catalog]['resolution']
+            catalog_res = catalogio.catalog_dict[catalog]['resolution']
         except KeyError:
             cur.execute('''SELECT resolution FROM skycat.catalogs
                 WHERE name = %s''', (catalog, ))

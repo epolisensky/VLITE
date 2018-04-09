@@ -146,20 +146,23 @@ def add_image(conn, img, status, delete=False):
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
             nvis = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, rms_box = %s, stage = %s, error_id = %s, 
-            nearest_problem = %s, separation = %s WHERE id = %s'''
+            nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
+            error_id = %s, nearest_problem = %s, separation = %s
+            WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
-                img.stage, img.error_id, img.nearest_problem,
+                img.stage, None, img.error_id, img.nearest_problem,
                 img.separation, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
             print('\nRemoving previous sources...')
             cur.execute('DELETE FROM detected_island WHERE image_id = %s', (
+                img.id, ))
+            cur.execute('DELETE FROM vlite_unique WHERE image_id = %s', (
                 img.id, ))
 
     conn.commit()
@@ -450,13 +453,24 @@ def update_assoc_nmatches(conn, sources):
         The `PostgreSQL` database connection object.
     sources : list
         DetectedSource objects with updated nmatches
-        attribute after running sky catalog matching.
+        attribute after running sky catalog matching,
+        or list of assoc_ids.
     """
     cur = conn.cursor()
 
     for src in sources:
+        try:
+            # sources = list of objects
+            src_id = src.id
+            nmatches = src.nmatches
+        except AttributeError:
+            # sources = list of assoc_ids
+            src_id = src
+            cur.execute('SELECT nmatches FROM assoc_source WHERE id = %s',
+                        (src_id, ))
+            nmatches = cur.fetchone()[0] + 1
         cur.execute('UPDATE assoc_source SET nmatches = %s WHERE id = %s',
-                    (src.nmatches, src.id))
+                    (nmatches, src_id))
 
     conn.commit()
     cur.close()
@@ -473,15 +487,29 @@ def add_catalog_match(conn, sources):
         The `PostgreSQL` database connection object.
     sources : list
         List of CatalogSource objects matched to VLITE
-        DetectedSource objects.
+        DetectedSource objects, or list of tuples.
     """
     cur = conn.cursor()
 
     for src in sources:
+        try:
+            # sources = list of objects
+            catalog_id = src.catalog_id
+            src_id = src.id
+            assoc_id = src.assoc_id
+            sep = src.sep
+        except AttributeError:
+            # sources = list of tuples
+            cur.execute('SELECT id FROM skycat.catalogs WHERE name = %s',
+                        (src[0], ))
+            catalog_id = cur.fetchone()[0]
+            src_id = src[1]
+            assoc_id = src[2]
+            sep = src[3]
         cur.execute('''INSERT INTO catalog_match (
             catalog_id, src_id, assoc_id, separation) VALUES (
             %s, %s, %s, %s)''',
-                    (src.catalog_id, src.id, src.assoc_id, src.sep))
+                    (catalog_id, src_id, assoc_id, sep))
 
     conn.commit()
     cur.close()
@@ -641,7 +669,7 @@ def get_associated(conn, sources):
 def delete_matches(conn, sources, image_id):
     """Deletes all previous sky catalog cross-matching
     results for a given set of sources. This function
-    is called when the config. file option "redo match"
+    is called when the config. file option *redo match*
     is ``True``.
 
     Parameters
@@ -670,7 +698,7 @@ def delete_matches(conn, sources, image_id):
                 (None, image_id))
 
     for src in sources:
-        src.nmatches = None
+        src.nmatches = 0
         cur.execute('UPDATE assoc_source SET nmatches = %s WHERE id = %s',
                     (src.nmatches, src.id))
         cur.execute('DELETE FROM catalog_match WHERE assoc_id = %s',
@@ -851,3 +879,32 @@ def remove_sources(conn, assoc_ids):
 
     conn.commit()
     cur.close()
+
+
+def remove_images(conn, images):
+    """Deletes the specified images from the database.
+    Removal propagates to all affected tables.
+
+    Parameters
+    ----------
+    conn : psycopg2.extensions.connect instance
+        The `PostgreSQL` database connection object.
+    images : list
+        List of image filenames to be removed from
+        the database **image** table.
+    """
+    cur = conn.cursor()
+
+    for image in images:
+        cur.execute('SELECT id FROM image WHERE filename LIKE %s',
+                    ('%'+image, ))
+        try:
+            image_id = cur.fetchone()[0]
+        except TypeError:
+            print('WARNING: Image {} is not in the database.'.format(image))
+        cur.execute('DELETE FROM image WHERE id = %s',
+                    (image_id, ))
+    
+    conn.commit()
+    cur.close()
+

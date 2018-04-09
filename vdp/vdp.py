@@ -7,6 +7,7 @@ and calling the processing stages.
 import os
 import sys
 import glob
+import re
 import argparse
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -23,7 +24,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = 1.7
+__version__ = 1.8
 
 
 def print_run_stats(start_time):
@@ -100,7 +101,7 @@ def cfgparse(cfgfile):
     rootdir = setup['root directory']
     yr = setup['year']
     mo = setup['month']
-    days = setup['day']
+    days = sorted(setup['day'])
 
     # Raise error if the configuration says to do nothing
     if not any(stages.values()) and not opts['save to database']:
@@ -131,7 +132,7 @@ def cfgparse(cfgfile):
         # If days = [], process every day in month directory
         try:
             if len(days) < 1:
-                days = next(os.walk(monthdir))[1]
+                days = sorted(next(os.walk(monthdir))[1])
         except TypeError:
             raise ConfigError('setup: day: must be a list (i.e. [{}])'.format(
                 days))
@@ -170,7 +171,7 @@ def cfgparse(cfgfile):
 
     # Check list of sky catalogs
     if stages['catalog matching']:
-        catalog_opts = catalogio.catalog_list # all available catalogs
+        catalog_opts = catalogio.catalog_dict.keys() # all available catalogs
         # If catalogs = [], use all of them
         if len(setup['catalogs']) < 1:
             setup['catalogs'] = catalog_opts
@@ -463,18 +464,25 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                 imobj = None # branch 5
         else:
             if stages['source finding']:
-                if reproc:
+                if status[1] == 1:
+                    # image in DB, but no SF yet
                     if save:
-                        # image in DB; re-doing SF, so old sources are removed
-                        imobj = dbio.add_image(conn, imobj, status,
-                                               delete=True)
+                        imobj = dbio.add_image(conn, imobj, status)
                     else:
-                        # just initialize if not writing to DB
                         print('\nInitializing image.')
                 else:
-                    # image already in DB & not re-processing
-                    print('\nImage already processed. Moving on...')
-                    imobj = None # branch 9
+                    if reproc:
+                        if save:
+                            # image in DB, delete old SF results
+                            imobj = dbio.add_image(conn, imobj, status,
+                                                   delete=True)
+                        else:
+                            # just initialize if not writing to DB
+                            print('\nInitializing image.')
+                    else:
+                        # image has SF results & not re-processing
+                        print('\nImage already processed. Moving on...')
+                        imobj = None # branch 9
             else:
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
@@ -738,7 +746,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
     return
 
 
-def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
+def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     """This function handles the logic and transitions between
     processing stages. All individual processing functions
     are called from here. Input parameters come from output
@@ -758,6 +766,8 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
     dirs : list
         List of strings specifying paths to daily image directories
         to be processed during the run.
+    files : list
+        List of files to process in each daily directory.
     catalogs : list
         Names of radio sky survey catalogs to use when running
         catalog matching.
@@ -779,6 +789,7 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
     updatematch = opts['update match']
     
     # Begin loop through daily directories
+    i = 0
     for imgdir in dirs:
         # Define/make directory for PyBDSF output
         daydir = os.path.abspath(os.path.join(imgdir, '..'))
@@ -786,9 +797,14 @@ def process(conn, stages, opts, dirs, catalogs, sfparams, qaparams):
         if not os.path.isdir(pybdsfdir):
             os.system('mkdir '+pybdsfdir)
 
-        # Select only the images that end with 'IPln1.fits'
-        imglist = [f for f in os.listdir(imgdir) if f.endswith('IPln1.fits')]
-        imglist = imglist[2:]
+        if not files[0]:
+            # Select all images that end with 'IPln1.fits'
+            imglist = [f for f in os.listdir(imgdir) if \
+                       f.endswith('IPln1.fits')]
+        else:
+            imglist = [f for f in files[i]]
+        i += 1
+
         # Loop through images to initialize
         imobjlist = []
         for img in imglist:
@@ -1000,6 +1016,12 @@ def main():
     parser.add_argument('--remove_source', action='store_true',
                         help='removes the specified source(s) from the '
                         'database assoc_source table')
+    parser.add_argument('--remove_image', action='store_true',
+                        help='removes the specified image(s) and associated '
+                        'results from the database entirely')
+    parser.add_argument('--manually_add_match', action='store_true',
+                        help='manually add catalog matching results for '
+                        'VLITE source(s) after follow-up')
     parser.add_argument('--add_catalog', action='store_true',
                         help='adds any new sky survey catalogs to a table in '
                         'the database "skycat" schema')
@@ -1012,7 +1034,8 @@ def main():
     stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
 
     # Find existing/create/overwrite database
-    if any([args.remove_catalog_matches, args.remove_source, args.add_catalog]):
+    if any([args.remove_catalog_matches, args.remove_source,
+            args.remove_image, args.manually_add_match, args.add_catalog]):
         opts['overwrite'] = False
     conn = dbinit(setup['database name'], setup['database user'],
                   opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
@@ -1038,12 +1061,12 @@ def main():
 
     # Option to remove sources from the **assoc_source** database table
     if args.remove_source:
-        inp = raw_input('\nPlease enter the id number(s) (separated by '
-                        'commas) of the source(s) you wish to remove '
-                        'from the database assoc_source table or provide '
-                        'a path to a text file with the id numbers:\n')
+        inp = raw_input('\nPlease enter the id number(s) (i.e. 1, 2, 3) '
+                        'of the source(s) you wish to remove from the '
+                        'database assoc_source table, or provide a text '
+                        'file with one id number per line:\n')
         try:
-            asid_list = [int(asid) for asid in inp.strip('[]').split(', ')]
+            asid_list = [int(asid) for asid in inp.strip('[]').split(',')]
         except ValueError:
             with open(inp, 'r') as f:
                 text = f.read()
@@ -1054,6 +1077,81 @@ def main():
         conn.close()
         sys.exit(0)
 
+    # Option to remove images
+    if args.remove_image:
+        inp = raw_input('\nPlease enter the image(s) filename(s) starting '
+                        'at least with the year-month directory (i.e. '
+                        '2018-01/15/Images/10GHz.Mrk110.IPln1.fits), or '
+                        'provide a text file with one filename per line:\n')
+        try:
+            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img \
+                      in inp.split(',')]
+        except IndexError:
+            with open(inp, 'r') as f:
+                text = f.read()
+            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img \
+                      in text.strip().split('\n')]
+        print('\nPreparing to remove image(s) {} from the database.'.format(
+            images))
+        confirm = raw_input('\nAre you sure? ')
+        if confirm == 'y' or confirm == 'yes':
+            print('Deleting image(s) from the database...')
+            dbio.remove_images(conn, images)
+        else:
+            print('Doing nothing...')
+        conn.close()
+        sys.exit(0)
+
+    # Option to manually add catalog matching results
+    if args.manually_add_match:
+        inp = raw_input('\nPlease enter the source assoc_source id, the '
+                        'name of the catalog, and, optionally, the id of the '
+                        'matched catalog source and the angular separation in '
+                        'arcseconds, in that order one per line. '
+                        'Hit "q" when you are done. You may alternatively '
+                        'provide a similarly formatted text file with one '
+                        'catalog match per line:\n')
+        cmatches = []
+        while inp != 'q':
+            try:
+                int(inp[0])
+                cmatches.append(inp)
+                inp = raw_input()
+            except IndexError:
+                inp = raw_input()
+            except ValueError:
+                with open(inp, 'r') as f:
+                    text = f.read()
+                    cmatches = [line for line in text.strip().split('\n')]
+                    break
+            if inp == 'q':
+                break
+        assoc_ids = []
+        catalogs = []
+        catsrc_ids = []
+        separations = []
+        for cmatch in cmatches:
+            cm = cmatch.split(', ')
+            assoc_ids.append(int(cm[0]))
+            catalog = cm[1].lower()
+            if catalog not in catalogio.catalog_dict.keys():
+                raise ConfigError('{} is not a valid catalog.'.format(cm[1]))
+            else:
+                catalogs.append(catalog)
+            try:
+                catsrc_ids.append(int(cm[2]))
+                separations.append(float(cm[3]))
+            except IndexError:
+                catsrc_ids.append(-1)
+                separations.append(-1)
+        cmrows = zip(catalogs, catsrc_ids, assoc_ids, separations)
+        print('\nAdding new catalog matching results for assoc_ids {}...'.
+              format(assoc_ids))
+        dbio.update_assoc_nmatches(conn, assoc_ids)
+        dbio.add_catalog_match(conn, cmrows)
+        conn.close()
+        sys.exit(0)
+    
     # Option to add a new sky survey catalog to the database "skycat" schema
     if args.add_catalog:
         skycatdb.create(conn)
@@ -1061,7 +1159,8 @@ def main():
         sys.exit(0)
     
     # Process images
-    process(conn, stages, opts, dirs, setup['catalogs'], sfparams, qaparams)
+    process(conn, stages, opts, dirs, setup['files'],
+            setup['catalogs'], sfparams, qaparams)
 
     nimages, exec_time = print_run_stats(start_time)
 

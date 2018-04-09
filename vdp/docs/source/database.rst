@@ -7,7 +7,7 @@ detected source, association between detections of the
 same source, and match to sources from other radio catalogs.
 The :ref:`tables` section below lists every table in the
 database along with a description of the columns.
-A graphical view of the database organization can be
+A spreadsheet view of the database organization can be
 seen `here. <https://docs.google.com/spreadsheets/d/e/2PACX-1vR20qGzJ7U3hFBNYZ1IUJWcFpdlOmfjQKv_8pk6aRW7BuljZ6VGNWyagHnsMVkZ6_Y9-Dl1vEwNv8Bg/pubhtml>`_
 
 .. _tables:
@@ -255,7 +255,7 @@ in the table, as well.
 - *noise*: estimate of the rms noise measured in the center of the
   image (mJy/beam); header keyword ``ACTNOISE``
 - *peak*: flux value of the brightest pixel in the image (mJy/beam);
-  header keyword ``DATAMAX``
+  header keyword ``PEAK`` or ``DATAMAX``
 - *config*: VLA configuration; header keyword ``CONFIG``
 - *nvis*: number of visibilities in the data before imaging; header
   keyword ``NVIS``
@@ -344,3 +344,68 @@ table for every image which could have or does contain the same VU source.
 
 The "skycat" Schema
 ^^^^^^^^^^^^^^^^^^^
+Cross-matching of VLITE sources with sources in other radio catalogs
+and surveys is done within the database taking advantage of the Q3C
+spatial indexing and functions. To enable this, all radio catalogs
+used for comparison must be stored in the same database as the
+VLITE sources. Since these catalogs are not part of the same
+organizational structure as the main VLITE database, they are
+stored in a separate schema with the name "skycat". Every
+survey/catalog is a separate table with the same format in
+this schema. There is also a table **skycat.catalogs** which
+provides a list of every table contained in the schema along
+with information about that catalog (telescope, frequency,
+spatial resolution, publication reference).
+
+.. _catalogs:
+
+***************
+skycat.catalogs
+***************
+This table contains information about every radio catalog
+that is available for cross-matching with VLITE sources.
+It can be used to get the name of the catalog referenced
+by the *catalog_id* column in the **catalog_match** table.
+
+- *id*: unique row id to identify the catalog
+- *name*: name of the survey/catalog and table in the "skycat" schema
+- *telescope*: name of the radio telescope used to acquire the
+  catalog data
+- *frequency*: frequency of the catalog observations (MHz)
+- *resolution*: approximate spatial resolution of the catalog observations;
+  used to ensure VLITE sources are only cross-matched with sources from
+  radio catalogs in the same resolution class
+- *reference*: reference to the publication containing the catalog
+
+.. _catalog_sources:
+
+*********************
+skycat.[catalog_name]
+*********************
+Each survey/catalog included in the "skycat" schema is stored
+in a separate table of the name **skycat.[catalog_name]**,
+where **[catalog_name]** is the name of the catalog as it
+appears in the **skycat.catalogs** table. Each one of these
+tables has the same format with the following columns:
+
+- *id*: row id number of the source referenced by the *src_id*
+  column of the **catalog_match** table
+- *name*: name given to the source
+- *ra*: source right ascension (degrees)
+- *e_ra*: error on the source right ascension (degrees)
+- *dec*: source declination (degrees)
+- *e_dec*: error on the source declination (degrees)
+- *total_flux*: total integrated flux (mJy)
+- *e_total_flux*: error on the total integrated flux (mJy)
+- *peak_flux*: peak flux density per beam (mJy/beam)
+- *e_peak_flux*: error on the peak flux density (mJy/beam)
+- *maj*: size of the source semi-major axis (arcsec)
+- *e_maj*: error on the semi-major axis size (arcsec)
+- *min*: size of the source semi-minor axis (arcsec)
+- *e_min*: error on the semi-minor axis size (arcsec)
+- *pa*: source position angle (degrees)
+- *e_pa*: error on the position angle
+- *rms*: local noise estimate, or the rms noise in the image (mJy/beam)
+- *field*: name of the field, or image, where the source was detected
+- *catalog_id*: id number of the catalog that the source is in;
+  references the *id* column of the **skycat.catalogs** table

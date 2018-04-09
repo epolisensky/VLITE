@@ -140,11 +140,11 @@ def add_table(tblname, conn):
     sql = '''INSERT INTO skycat.catalogs (
         id, name, telescope, frequency, resolution, reference) VALUES (
         %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING'''
-    cur.execute(sql, (catalogio.cat_dict[tblname]['id'], tblname,
-                      catalogio.cat_dict[tblname]['telescope'],
-                      catalogio.cat_dict[tblname]['frequency'],
-                      catalogio.cat_dict[tblname]['resolution'],
-                      catalogio.cat_dict[tblname]['reference']))
+    cur.execute(sql, (catalogio.catalog_dict[tblname]['id'], tblname,
+                      catalogio.catalog_dict[tblname]['telescope'],
+                      catalogio.catalog_dict[tblname]['frequency'],
+                      catalogio.catalog_dict[tblname]['resolution'],
+                      catalogio.catalog_dict[tblname]['reference']))
 
     # OLD WAY: this way took too long
     """
@@ -204,7 +204,7 @@ def create(conn):
         ''')
     cur.execute(sql)
 
-    tables = catalogio.catalog_list
+    tables = catalogio.catalog_dict.keys()
     atleastone = False
     for table in tables:
         cur.execute('''SELECT EXISTS(SELECT 1 FROM information_schema.tables
