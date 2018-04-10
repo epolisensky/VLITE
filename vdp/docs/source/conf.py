@@ -21,7 +21,7 @@ import sys
 import mock
 sys.path.insert(0, os.path.abspath('../..'))
 
-MOCK_MODULES = ['numpy', 'pandas', 'psycopg2', 'astropy']
+MOCK_MODULES = ['numpy', 'pandas', 'psycopg2', 'bdsf']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
