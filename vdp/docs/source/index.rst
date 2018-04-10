@@ -35,7 +35,7 @@ configuration file::
   $ python vdp.py example_config.yaml
 
 Check out the `VDPGuide IPython notebook
-<https://github.com/erichards/VLITE/blob/develop/VDPGuide.ipynb>`_
+<https://github.com/erichards/VLITE/blob/develop/vdp/notebooks/VDPGuide.ipynb>`_
 for a step-by-step walkthrough of the pipeline stages and
 analysis examples.
 
