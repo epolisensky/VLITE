@@ -1,5 +1,0 @@
-vdp
-vdp/database
-vdp/matching
-vdp/skycatalog
-vdp/sourcefinding

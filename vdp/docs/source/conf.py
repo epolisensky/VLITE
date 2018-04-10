@@ -18,7 +18,15 @@
 #
 import os
 import sys
+import mock
 sys.path.insert(0, os.path.abspath('../../'))
+
+MOCK_MODULES = ['psycopg2', 'psycopg2.extensions', 'psycopg2.extras',
+                'numpy', 'astropy.io', 'astropy.coordinates',
+                'astropy.time', 'ephem', 'pandas']
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = mock.Mock()
+
 
 #autodoc_mock_imports = ['psycopg2', 'psycopg2.extensions', 'psycopg2.extras',
 #                        'numpy', 'astropy.io', 'astropy.coordinates',
