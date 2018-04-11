@@ -1,10 +1,6 @@
-"""Creates a decorator which can be used to timeout any
-long-running function.
-
-Adapted from the "Function Timeout" in the Python Decorator
-Library([1]_).
-
-.. [1] https://wiki.python.org/moin/PythonDecoratorLibrary#Function_Timeout
+"""Adapted from "Function Timeout" in the Python
+Decorator Library 
+(https://wiki.python.org/moin/PythonDecoratorLibrary#Function_Timeout).
 
 """
 from functools import wraps
@@ -12,9 +8,29 @@ import signal
 
 
 class TimeoutError(Exception):
+    """Exception raised when function runs too long."""
     pass
 
 def timeout(seconds=300, error_message='Function call timed out.'):
+    """Creates a decorator which can be used to timeout any
+    long-running function.
+
+    Parameters
+    ----------
+    seconds : float, optional
+        Number of seconds a function is permitted to run
+        before a TimeoutError exception is raised. Default
+        is 300 seconds (5 minutes).
+    error_message : str, optional
+        Error message to be printed when the TimeoutError
+        exception is raised.
+
+    Returns
+    -------
+    decorator
+        Decorator function which can wrap around any other
+        function to terminate if it runs for too long.
+    """
     def decorator(func):
         def _handle_timeout(signum, frame):
             raise TimeoutError(error_message)

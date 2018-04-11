@@ -1,7 +1,7 @@
 Modules
 =======
-**vdp** is comprised of 12 individual modules. The most important
-ones are included here, grouped by their functionality.
+**vdp** is comprised of 13 individual modules shown here,
+grouped by their functionality.
 
 .. toctree::
    :maxdepth: 2
@@ -14,6 +14,7 @@ Database & Classes
 .. toctree::
    :maxdepth: 2
 
+   createdb
    dbclasses
    dbio
 
@@ -43,3 +44,13 @@ Radio Sky Surveys & Catalogs
 
    catalogio
    skycatdb
+
+Utility
+-------
+
+.. toctree::
+   :maxdepth: 2
+
+   maintenance
+   timeout
+   errors

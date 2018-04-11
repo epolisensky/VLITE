@@ -49,7 +49,7 @@ Getting Started with the VLITE Database Pipeline
    basic_usage
    stages
    database
-   examples
+   usage_examples
    instructions
 
    

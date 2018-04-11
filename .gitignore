@@ -1,3 +1,4 @@
 # ignore certain file types
 *.pyc
 *.sh
+*.txt

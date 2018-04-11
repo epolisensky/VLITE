@@ -3,7 +3,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 
 
-def deRuitermatch(src, match_srcs, beam, match_der=6.44, min_der=99999.9):
+def run_deruiter(src, match_srcs, beam, match_der=6.44, min_der=99999.9):
     """This matching function uses the unitless de Ruiter
     radius to determine if there is a successful cross-match
     between two sources. A successful match must have a
@@ -12,7 +12,7 @@ def deRuitermatch(src, match_srcs, beam, match_der=6.44, min_der=99999.9):
     
     Parameters
     ----------
-    src : database.dbclasses.DetectedSource instance
+    src : ``database.dbclasses.DetectedSource`` instance
         DetectedSource object to be matched.
     match_srcs : list
         List of either DetectedSource or CatalogSource
@@ -30,7 +30,7 @@ def deRuitermatch(src, match_srcs, beam, match_der=6.44, min_der=99999.9):
 
     Returns
     -------
-    match : boolean
+    match : bool
         Returns ``True`` if a match was successful for 
         the given source.
     match_src : object
@@ -71,7 +71,7 @@ def simple_match(src, match_srcs, beam):
 
     Parameters
     ----------
-    src : database.dbclasses.DetectedSource instance
+    src : ``database.dbclasses.DetectedSource`` instance
         VLITE DetectedSource object to be matched.
     match_srcs : list
         List of either DetectedSource or CatalogSource
@@ -83,7 +83,7 @@ def simple_match(src, match_srcs, beam):
 
     Returns
     -------
-    match : boolean
+    match : bool
         Returns ``True`` if a match was successful for 
         the given source.
     match_src : object
@@ -92,7 +92,7 @@ def simple_match(src, match_srcs, beam):
         Otherwise, returns ``None``.
     min_sep : float
         The angular separation between the VLITE source and
-        its nearest neighbor.
+        its nearest neighbor (arcsec).
     """
     match = False
     match_src = None
@@ -122,16 +122,16 @@ def quickcheck(dec1, dec2, deglim):
     Parameters
     ----------
     dec1 : float
-        Declination of the first source in degrees.
+        Declination of the first source (degrees).
     dec2 : float
-        Declination of the second source in degrees.
+        Declination of the second source (degrees).
     deglim : float
         Maximum allowed separation between the two
-        source's declinations, in degrees.
+        source's declinations (degrees).
 
     Returns
     -------
-    flag : boolean
+    flag : bool
         Returns ``True`` if the separation in declinations
         is less than the maximum allowed limit. Otherwise,
         returns ``False``.
@@ -144,33 +144,33 @@ def quickcheck(dec1, dec2, deglim):
 
 
 def deruiter(ra1, dec1, e_ra1, e_dec1, ra2, dec2, e_ra2, e_dec2):
-    """Calculate the unitless de Ruiter radius between two 
+    """Calculates the unitless de Ruiter radius between two 
     points using RA & Dec coordinates and their errors in degrees.
     
     Parameters
     ----------
     ra1 : float
-        Right ascension in degrees of the primary source
-        being matched.
+        Right ascension of the primary source
+        being matched (degrees).
     dec1 : float
-        Declination in degrees of the primary source being
-        matched.
+        Declination of the primary source being
+        matched (degrees).
     e_ra1 : float
         Error on the right ascension of the first source
-        in degrees.
+        (degrees).
     e_dec1 : float
-        Error on the declination of the first source in degrees.
+        Error on the declination of the first source (degrees).
     ra2 : float
-        Right ascension in degrees of the second source attempting
-        to be matched to the primary source.
+        Right ascension of the second source attempting
+        to be matched to the primary source (degrees).
     dec2 : float
-        Declination in degrees of the second source attempting
-        to be matched to the primary source.
+        Declination of the second source attempting
+        to be matched to the primary source (degrees).
     e_ra2 : float
         Error on the right ascension of the second source
-        in degrees.
+        (degrees).
     e_dec2 : float
-        Error on the declination of the second source in degrees.
+        Error on the declination of the second source (degrees).
 
     Returns
     -------
@@ -198,19 +198,19 @@ def angdist(ra1, dec1, ra2, dec2):
     Parameters
     ----------
     ra1 : float
-        Right ascension of the first source in degrees.
+        Right ascension of the first source (degrees).
     dec1 : float
-        Declination of the first source in degrees.
+        Declination of the first source (degrees).
     ra2 : float
-        Right ascension of the second source in degrees.
+        Right ascension of the second source (degrees).
     dec2 : float
-        Declination of the second source in degrees.
+        Declination of the second source (degrees).
 
     Returns
     -------
     sep : float
         The separation between the two points on the sky
-        in arcseconds.
+        (arcseconds).
     """
     p1 = SkyCoord(ra1, dec1, unit="deg")
     p2 = SkyCoord(ra2, dec2, unit="deg")

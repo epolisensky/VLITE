@@ -2,24 +2,26 @@
 for reading in the different sky survey catalogs.
 Each catalog source is initialized as a CatalogSource
 object to create a uniform set of properties for each
-sky survey's sources. When reading the catalogs for the
+radio catalog's sources. When reading the catalogs for the
 first time, sources with the uniform set of attributes
-are written to text files called "[catalog_name]_psql.txt"
+are written to text files called "[catalog_name]_psql.txt",
 which is used to insert the sources into the PostgreSQL
 database in an efficient way. 
 
 Instructions for adding a new catalog:
-1.) Add catalog name in all lowercase and a new id number
-to the catalog dictionary. DO NOT re-order the id numbers
-unless you plan on re-writing all the "*_psql.txt" files
-and the entire "skycat" schema. Otherwise, the id number
-of the catalog in the **skycat.catalogs** table will not
-match the 'catalog_id' of the sources in the catalog's table.
-2.) Write a function called 'read_[catalog name]' for
-reading in the catalog and writing to the text file
-if it doesn't exist using the same format as all the
-others.
-3.) Add a line to skycatdb.py to call the
+
+1. Add catalog name in all lowercase and a new id number to 
+the catalog dictionary. *DO NOT* re-order the id numbers 
+unless you plan on re-writing all the "\*_psql.txt" files 
+and the entire "skycat" schema. Otherwise, the id number of 
+the catalog in the **skycat.catalogs** table will not match 
+the 'catalog_id' of the sources in the catalog's table.
+
+2. Write a function called ``read_[catalog name]`` for reading 
+in the catalog and writing to the text file if it doesn't 
+exist using the same format as all the others.
+
+3. Add a line to skycatdb.py to call the 
 ``read_[catalog name]`` function.
 
 Adapted from EP's iofuncs.py.
@@ -87,10 +89,58 @@ def set_error(catalog, attrs):
 
 
 class CatalogSource(object):
-    """Class for the sky survey sources. Their
-    catalog origin is identified by the catalog_id
+    """Class for the radio catalog sources. Their
+    catalog origin is identified by the 'catalog_id'
     attribute.
-    
+
+    Attributes
+    ----------
+    id : int
+        Uniquely identifies the source in its catalog.
+    name : str
+        Name given to the source in some catalogs.
+    ra : float
+        Source right ascension (degrees).
+    e_ra : float
+        Error on the right ascension (degrees).
+    dec : float
+        Source declination (degrees).
+    e_dec : float
+        Error on the declination (degrees).
+    total_flux : float
+        Total integrated flux (mJy).
+    e_total_flux : float
+        Error on the total flux (mJy).
+    peak_flux : float
+        Peak flux density per beam (mJy/beam).
+    e_peak_flux : float
+        Error on the peak flux (mJy/beam).
+    maj : float
+        FWHM of the source major axis (arcsec).
+    e_maj : float
+        Error on the major axis size (arcsec).
+    min : float
+        FWHM of the source minor axis (arcsec).
+    e_min : float
+        Error on the minor axis size (arcsec).
+    pa : float
+        Position angle of the source major axis (degrees).
+    e_pa : float
+        Error on the position angle (degrees).
+    rms : float
+        Local or image noise (mJy/beam).
+    field : str
+        Name of the field where the source is located
+        provided by some catalogs.
+    catalog_id : int
+        Uniquely identifies the radio catalog from which this
+        source originates.
+    assoc_id : int
+        The id of the closest VLITE source in the
+        **assoc_source** table.
+    sep : float
+        Angular separation between this catalog source and the
+        closest VLITE source (arcsec).
     """
     def __init__(self):
         self.id = None
@@ -123,6 +173,7 @@ def read_tgss(return_sources=False):
     not already exist.
 
     Telescope/frequency: GMRT 150 MHz
+
     Spatial resolution: 25'' 
 
     """
@@ -191,6 +242,7 @@ def read_first(return_sources=False):
     not already exist.
 
     Telescope/frequency: VLA 1.4 GHz
+
     Spatial resolution: 5'' 
 
     """
@@ -267,6 +319,7 @@ def read_sumss(return_sources=False):
     not already exist.
 
     Telescope/frequency: MOST 843 MHz
+
     Spatial resolution: 45'' 
 
     """
@@ -330,6 +383,7 @@ def read_wenss(return_sources=False):
     not already exist.
 
     Telescope/frequency: WSRT 325 MHz
+
     Spatial resolution: 54'' 
     
     """
@@ -394,6 +448,7 @@ def read_nvss(return_sources=False):
     not already exist.
 
     Telescope/frequency: VLA 1.4 GHz
+
     Spatial resolution: 45'' 
 
     """
@@ -497,6 +552,7 @@ def read_gleam(return_sources=False):
     not already exist.
 
     Telescope/frequency: MWA 74-231 MHz
+
     Spatial resolution: ~100'' 
 
     """
@@ -569,6 +625,7 @@ def read_cosmos(return_sources=False):
     lines start with 'C'.
 
     Telescope/frequency: VLA 320 MHz
+
     Spatial resolution: ~6''
 
     """
@@ -650,6 +707,7 @@ def read_vlssr(return_sources=False):
     vlssr_psql.txt if the file does not already exist.
 
     Telescope/frequency: VLA 74 MHz
+
     Spatial resolution: ~75''
 
     """
@@ -714,6 +772,7 @@ def read_txs(return_sources=False):
     not already exist.
 
     Telescope/frequency: Texas Interferometer 365 MHz
+
     Spatial resolution: 100"? 
 
     """
@@ -773,6 +832,7 @@ def read_sevenc(return_sources=False):
     not already exist.
 
     Telescope/frequency: Cambridge Low Frequency Synthesis Telescope 151 MHz
+
     Spatial resolution: ~70''
 
     """
@@ -835,6 +895,7 @@ def read_gpsr5(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: VLA 5 GHz
+
     Spatial resolution: ~4''
 
     """
@@ -903,6 +964,7 @@ def read_gpsr1(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: VLA 1.4 GHz
+
     Spatial resolution: ~5''
 
     """
@@ -974,6 +1036,7 @@ def read_nordgc(return_sources=False):
     Nord et al. (2004) catalog.
 
     Telescope/frequency: VLA 330 MHz
+
     Spatial resolution: ~10''
 
     """
@@ -1058,6 +1121,7 @@ def read_lazio04(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: VLA 330 MHz
+
     Spatial resolution: 6?''
 
     """
@@ -1124,6 +1188,7 @@ def read_m31_glg04(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: VLA 325 MHz
+
     Spatial resolution: 6''
 
     """
@@ -1202,6 +1267,7 @@ def read_lotss(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: LOFAR 150 MHz
+
     Spatial resolution: 25''
 
     """
@@ -1269,6 +1335,7 @@ def read_lofar_lba(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: LOFAR 34, 46, & 62 MHz
+
     Spatial resolution: 30-56''
 
     """
@@ -1333,6 +1400,7 @@ def read_lofar_hba(return_sources=False):
     if the file does not already exist.
 
     Telescope/frequency: LOFAR 150 MHz
+
     Spatial resolution: 6''
 
     """
@@ -1409,6 +1477,7 @@ def read_nrl_nvss(return_sources=False):
     PyBDSF on all NVSS images.
 
     Telescope/frequency: VLA 1.4 GHz
+
     Spatial resolution: 45''
 
     """

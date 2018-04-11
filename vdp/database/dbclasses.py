@@ -24,44 +24,44 @@ class Image(object):
     Attributes
     ----------
     id : int
-        Numerical index. Incremented by `PostgreSQL` upon insertion.
+        Numerical index. Incremented by PostgreSQL upon insertion
+        into the database **image** table.
     filename : str
         Full directory path for the image file.
     imsize : str
-        Image size in pixels -- (NAXIS1, NAXIS2).
+        Image size in pixels -- (``NAXIS1``, ``NAXIS2``).
     obs_ra : float
-        Right ascension of image pointing center in degrees.
+        Right ascension of image pointing center (degrees).
     obs_dec : float
-        Declination of image pointing center in degrees.
+        Declination of image pointing center (degrees).
     pixel_scale : float
-        Spatial conversion from pixel to angular size on the sky.
-        Units are arcseconds / pixel.
+        Spatial conversion from pixel to angular size on the sky
+        (arcseconds / pixel.)
     obj : str
-        Name of observed object.
-    obs_date : str
+        Name of observed object in the header.
+    obs_date : date
         Date when observations were taken.
-    map_date : str
-        Date when data was processed.
+    map_date : date
+        Date when data was imaged.
     obs_freq : float
-        Rest frequency of the observations in MHz.
+        Rest frequency of the observations (MHz).
     pri_freq : float
         Frequency of the simultaneously acquired primary
-        band data in GHz (NOT the frequency of the image
-        on hand).
+        band data (GHz).
     bmaj : float
-        Size of the beam semi-major axis in arcseconds.
+        Size of the beam semi-major axis (arcsec).
     bmin : float
-        Size of the beam semi-minor axis in arcseconds.
+        Size of the beam semi-minor axis (arcsec).
     bpa : float
-        Beam position angle in degrees.
+        Beam position angle (degrees).
     noise : float
-        Noise estimate from the image center in mJy/beam.
+        Noise estimate from the image center (mJy/beam).
     peak : float
-        Peak brightness in the image in mJy/beam.
+        Peak brightness in the image (mJy/beam).
     config : str
         Very Large Array configuration.
     nvis : int
-        Number of visibilities in the data before imaging.
+        Number of visibilities in the data after calibration.
     mjdtime : float
         Modified Julian Date (days since 0h Nov 17, 1858).
     tau_time : float
@@ -71,8 +71,8 @@ class Image(object):
     nsrc : int
         Number of sources extracted during source finding.
     rms_box : str
-        `PyBDSF` parameter used during source finding.
-        From `PyBDSF` docs: "The first integer, boxsize, is the 
+        PyBDSF parameter used during source finding.
+        From PyBDSF docs: "The first integer, boxsize, is the 
         size of the 2-D sliding box [in pixels] for calculating 
         the rms and mean over the entire image. The second, stepsize, 
         is the number of pixels by which this box is moved for the next 
@@ -80,19 +80,19 @@ class Image(object):
     error_id : int
         Numerical code assigned when an image fails a quality
         check. Each number has a corresponding explanation in
-        the database error table.
+        the database **error** table.
     stage : int
-        Highest processing stage completed. 1 = Image object initialized,
+        Highest processing stage completed. 1 = read image,
         2 = source finding, 3 = source association, 4 = catalog matching.
     radius : float
-        Radius defining the circular field-of-view in degrees in which
-        sources were extracted.
+        Radius defining the circular field-of-view in which
+        sources were extracted (degrees).
     nearest_problem : str
         Name of the closest (in angular separation) source which is known
         to cause difficulties in imaging.
     separation : float
-        Angular separation in degrees from the nearest problem source
-        to the image pointing center.
+        Angular separation between the nearest problem source
+        and the image pointing center (degrees).
     """
     # A class variable to count the number of images
     num_images = 0
@@ -288,13 +288,12 @@ class Image(object):
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
         to flag images with the following issues:
-        1.) missing necessary header keywords (self.error_id = 1)
-        2.) integration time on source (tau_time) < min_tos
-        3.) noise < 0 or > max_rms mJy/beam
-        4.) beam semi-major/semi-minor axis > max_ellip (too elliptical)
-        5.) pointing center within prob_sep degrees of a known bright
-        radio source (Cas A, Cygnus A, Taurus A, Hercules A,
-        Virgo A (M87), the Sun, planets, Galactic Center)
+
+        1. missing necessary header keywords (self.error_id = 1)
+        2. integration time on source (tau_time) < min_tos
+        3. noise < 0 or > max_rms mJy/beam
+        4. beam semi-major/semi-minor axis > max_ellip (too elliptical)
+        5. pointing center within prob_sep degrees of a known bright radio source (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), the Sun, planets, Galactic Center)
 
         """
         print('\nPerforming preliminary image quality checks...')
@@ -456,27 +455,22 @@ class Image(object):
 
 
     def log_attrs(self, pybdsfdir):
-        """Image class method to assign values to object 
+        """Image object method to assign values to object 
         attributes which come from source finding using info 
-        in the `PyBDSF` output log file. This is useful when 
+        in the PyBDSF output log file. This is useful when 
         source finding has already been run on an image and the 
         results are being recorded after the fact using the 
-        `PyBDSF` output files.
+        PyBDSF output files.
 
         Parameters
         ----------
         pybdsfdir : str
-            Directory path to the `PyBDSF` output files.
+            Directory path to the PyBDSF output files.
 
         Returns
         -------
         rms_box : str
-            `PyBDSF` parameter used during source finding.
-            From `PyBDSF` docs: "The first integer, boxsize, is the 
-            size of the 2-D sliding box [in pixels] for calculating 
-            the rms and mean over the entire image. The second, stepsize, 
-            is the number of pixels by which this box is moved for the next 
-            measurement."
+            PyBDSF parameter used during source finding.
         gresid_std : float
             Standard deviation of the background in the residual 
             image after removing gaussian fitted sources.
@@ -499,13 +493,108 @@ class Image(object):
 
 class DetectedSource(object):
     """Class of objects to store elliptical Gaussian fit 
-    properties of sources found and measured by `PyBDSF`. 
+    properties of sources found and measured by PyBDSF. 
     Attribute values are translated from the class of objects 
-    output by `PyBDSF`.
+    output by PyBDSF.
+
+    Attributes
+    ----------
+    src_id : int
+        Uniquely identifies the source in a given image.
+    isl_id : int
+        Uniquely identifies an island in a given image from
+        which sources are formed.
+    image_id : int
+        Uniquely identifies the image the source comes from.
+    ra : float
+        Right ascension (degrees).
+    e_ra : float
+        Error on the right ascension (degrees).
+    dec : float
+        Declination (degrees).
+    e_dec : float
+        Error on the declination (degrees).
+    total_flux : float
+        Total integrated flux (mJy).
+    e_total_flux : float
+        Error on the total integrated flux (mJy).
+    peak_flux : float
+        Peak flux density per beam (mJy/beam).
+    e_peak_flux : float
+        Error on the peak flux (mJy/beam).
+    ra_max : float
+        Right ascension of the source maximum brightness (degrees).
+    e_ra_max : float
+        Error on the right ascension of the maximum (degrees).
+    dec_max : float
+        Declination of the source maximum brightness (degrees).
+    e_dec_max : float
+        Error on the declination of the maximum (degrees).
+    maj : float
+        FWHM of the source major axis (arcsec).
+    e_maj : float
+        Error on the source major axis size (arcsec).
+    min : float
+        FWHM of the source minor axis (arcsec).
+    e_min : float
+        Error on the source minor axis size (arcsec).
+    pa : float
+        Position angle of the source major axis measured east
+        of north (degrees).
+    e_pa : float
+        Error on the source position angle (degrees).
+    dc_maj : float
+        FWHM of the deconvolved major axis (arcsec).
+    e_dc_maj : float
+        Error on the deconvolved major axis (arcsec).
+    dc_min : float
+        FWHM of the deconvolved minor axis (arcsec).
+    e_dc_min : float
+        Error on the deconvolved minor axis (arcsec).
+    dc_pa : float
+        Position angle of the deconvolved major axis measured
+        east of north (degrees).
+    e_dc_pa : float
+        Error on the deconvolved position angle (degrees).
+    total_flux_isl : float
+        Total integrated flux density of the island (mJy).
+    total_flux_islE : float
+        Error on the total integrated flux density of the island (mJy).
+    rms_isl : float
+        Average background rms of the island (mJy/beam).
+    mean_isl : float
+        Average background mean of the island (mJy/beam).
+    resid_rms : float
+        Average residual background rms of the island (mJy/beam).
+    resid_mean : float
+        Average residual background mean of the island (mJy/beam).
+    code : str
+        Defines source structure: 'S' = isolated single-Gaussian source,
+        'C' = single-Gaussian source in island with other sources,
+        'M' = multi-Gaussian source.
+    assoc_id : int
+        Links to associated source in the database **assoc_source** table.
+    dist_from_center : float
+        Angular separation between the source location and image
+        pointing center (degrees).
+    id : int
+        Uniquely identifies the source in the **assoc_source** table.
+    res_class : str
+        Resolution class of the image in which the source was found.
+        'A': res <= 15", 'B': 15" < res <= 35", 'C': 35" < res <= 60",
+        'D': res > 60".
+    ndetect : int
+        Number of times this same source has been detected in other
+        VLITE images.
+    nmatches : int
+        Number of catalogs which contain this source.
+    detected : bool
+        Whether or not the source was detected in the image (used
+        for the **vlite_unique** table).
 
     References
     ----------
-    Refer to the `PyBDSF` documentation ([1]_) for definitions 
+    Refer to the PyBDSF documentation[1]_ for definitions 
     of their output columns.
 
     .. [1] http://www.astron.nl/citt/pybdsm/write_catalog.html#definition-of-output-columns
@@ -558,15 +647,15 @@ class DetectedSource(object):
 
 
     def cast(self, origsrc):
-        """Attributes of a `bdsf.gaul2srl.Source` object
-        output from `bdsf.process_image` are re-cast to define
+        """Attributes of a ``bdsf.gaul2srl.Source`` object
+        output from ``bdsf.process_image`` are re-cast to define
         attributes of a DetectedSource object.
 
         Parameters
         ----------
-        origsrc : bdsf.gaul2srl.Source instance
+        origsrc : ``bdsf.gaul2srl.Source`` instance
             Object which stores all the measured properties
-            of a source extracted from an image in `PyBDSF`.
+            of a source extracted from an image in PyBDSF.
 
         """
         self.src_id = origsrc.source_id
@@ -606,7 +695,7 @@ class DetectedSource(object):
 
     def correct_flux(self, imobj):
         """Applies a 1-D radial correction to all flux measurements
-        from `PyBDSF`. The correction factor has been empirically derived
+        from PyBDSF. The correction factor has been empirically derived
         from flux comparisons of sources as a function of angular
         distance from the image center. The scale factor increases
         farther from the pointing center as the beam power decreases.
@@ -637,15 +726,14 @@ class DetectedSource(object):
 
 
 def dict2attr(obj, dictionary):
-    """Converts dictionary key, value pairs to object attributes.
+    """Converts dictionary key-value pairs to object attributes.
     
     Parameters
     ----------
     obj : class instance
         Any object initialized from a class.
     dictionary : dict
-        Dictionary key, value pairs become attribute, 
-        value pairs.
+        Dictionary key-value pairs become attribute-value pairs.
     """
     for key in dictionary.keys():
         setattr(obj, key, dictionary[key])
@@ -654,24 +742,24 @@ def dict2attr(obj, dictionary):
 def translate_from_txtfile(img, pybdsfdir):
     """Creates a list of DetectedSource objects
     from reading in a source list text file output
-    by `PyBDSF`.
+    by PyBDSF.
     
     Parameters
     ----------
-    img : database.dbclasses.Image instance
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute
         values set from header info.
     pybdsfdir : str
-        Directory path to `PyBDSF` files.
+        Directory path to PyBDSF files.
 
     Returns
     -------
-    img : database.dbclasses.Image instance
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute
         values updated with source finding results.
     sources : list of DetectedSource objects
         DetectedSource objects with attribute values
-        set from `PyBDSF` output source list text file.
+        set from PyBDSF output source list text file.
     """
     # Set the file path
     prefix = re.findall('.*\/(.*)\.', img.filename)[0]
@@ -691,29 +779,29 @@ def translate_from_txtfile(img, pybdsfdir):
 
 
 def translate(img, out):
-    """Method to translate `PyBDSF` output within the
+    """Method to translate PyBDSF output within the
     pipeline to DetectedSource objects and update 
     the Image object.
 
     Parameters
     ----------
-    img : database.dbclasses.Image instance
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info.
-    out : bdsf.image.Image instance
-        The object output by `PyBDSF` after running its
-        source finding task `process_image()`. Contains
-        a list of bdsf.gaul2srl.Source objects which
+    out : ``bdsf.image.Image`` instance
+        The object output by PyBDSF after running its
+        source finding task ``process_image()``. Contains
+        a list of ``bdsf.gaul2srl.Source`` objects which
         are translated into DetectedSource objects.
 
     Returns
     -------
-    img : database.dbclasses.Image instance
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info & updated with source finding results.
     newsrcs : list
-        List of database.dbclasses.DetectedSource objects.
-        Attributes of each object are set from the `PyBDSF`
+        List of ``database.dbclasses.DetectedSource`` objects.
+        Attributes of each object are set from the PyBDSF
         output object.    
     """
     # Add PyBDSF defined attributes

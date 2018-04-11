@@ -60,7 +60,7 @@ def expected_nsrc(rms, max_angle=1.5, sigma=5.):
     image center (max_angle) based on the detection threshold
     (sigma) in the image from logN-logS fit of WENSS catalog 
     scaled to 341 MHz from 325 MHz with alpha= -0.7, rms at 
-    center of image [mJy], and fitted beam.
+    center of image (mJy), and fitted beam.
 
     Parameters
     ----------

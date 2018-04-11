@@ -1,10 +1,10 @@
 """This module contains all the functionality to run a FITS image
-through the LOFAR source finding software `PyBDSF` 
+through the LOFAR source finding software PyBDSF 
 (https://github.com/lofar-astron/PyBDSF). The class
-BDSFImage() creates an object whose attributes can be any number
-of `PyBDSF` parameters. Source finding is performed by calling the
-object method find_sources(), which calls the `PyBDSF` function
-process_image() and returns the output object.
+``BDSFImage()`` creates an object whose attributes can be any number
+of PyBDSF parameters. Source finding is performed by calling the
+object method ``find_sources()``, which calls the PyBDSF function
+``process_image()`` and returns the output object.
 
 """
 import warnings
@@ -16,15 +16,15 @@ from timeout import timeout
 
 
 def write_sources(out):
-    """Calls `PyBDSF` functions `write_catalog()`
-    and `export_image()` to record results from 
+    """Calls PyBDSF functions ``write_catalog()``
+    and ``export_image()`` to record results from 
     source finding on an image.
     
     Parameters
     ----------
-    out : bdsf.image.Image instance
-        The object output by `PyBDSF` after running its
-        source finding task `process_image()`.
+    out : ``bdsf.image.Image`` instance
+        The object output by PyBDSF after running its
+        source finding task ``process_image()``.
     """
     # Write the source list catalog, ascii and ds9 regions file
     out.write_catalog(format='ds9', catalog_type='srl', clobber=True)
@@ -37,7 +37,7 @@ def write_sources(out):
 
 
 class BDSFImage(Image):
-    """Object to be manipulated and read into `PyBDSF`.
+    """Object to be manipulated and read into PyBDSF.
     Inherits all methods defined for Image class, but
     overrides initialization. The number of attributes
     and their values will change based on what the user
@@ -102,13 +102,13 @@ class BDSFImage(Image):
 
 
     def set_rms_box(self):
-        """Sets the `PyBDSF` rms_box parameter to a box size
+        """Sets the PyBDSF ``rms_box`` parameter to a box size
         1/10th of the image size and a step size one third of
-        the box size. This "default" rms_box yields slightly
+        the box size. This "VLITE default" ``rms_box`` yields slightly
         better results with fewer artifacts than if left as a
-        free parameter for `PyBDSF` to calculate. A custom
-        rms_box can be defined in the config file which will
-        supersede the one defined here.
+        free parameter for PyBDSF to calculate. A custom
+        ``rms_box`` can be defined in the configuratrion file
+        which will supersede the one defined here.
 
         """
         data, hdr = Image.read(self)
@@ -122,7 +122,7 @@ class BDSFImage(Image):
 
     def get_attr(self):
         """Return all object attributes as a dictionary.
-        This is fed into `bdsf.process_image()` as parameter
+        This is fed into ``bdsf.process_image()`` as parameter
         arguments.
 
         """
@@ -131,9 +131,10 @@ class BDSFImage(Image):
     # Function will timeout after 5 min
     @timeout()
     def find_sources(self):
-        """Run `PyBDSF` `process_image()` task using object 
+        """Run PyBDSF ``process_image()`` task using object 
         attributes as parameter inputs. Returns ``None`` if 
-        `PyBDSF` fails.
+        PyBDSF fails. Wrapped in a timeout function so
+        processing is killed if taking longer than 5 minutes.
 
         """
         print('\nExtracting sources...')
@@ -157,17 +158,16 @@ class BDSFImage(Image):
                 print(' -- PyBDSF failed to process image.\n')
 
         return out
-
             
 
     def minimize_islands(self):
-        """Incrementally increase and decrease the `bdsf.process_image()`
-        argument rms_box size until a minimum number of islands are 
+        """Incrementally increases and decreases the ``bdsf.process_image()``
+        argument ``rms_box`` box size until a minimum number of islands are 
         found. This technique works best on images with significant 
         artifacts where false detections are the biggest concern.
         This also takes a really long time since it is running
-        `bdsf.process_image` numerous times, so is probably only
-        ever worth using when analyzing a single image.
+        ``bdsf.process_image`` numerous times, so is probably only
+        ever worth using when analyzing a small number of images.
 
         """
         # Initial run

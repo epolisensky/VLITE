@@ -9,6 +9,12 @@ except ImportError:
 
 
 def cluster():
+    """Executes CLUSTER and ANALYZE SQL commands on the database
+    tables **detected_source** and **assoc_source** to re-order
+    the data on the disk according to the Q3C spatial index.
+    This should help with query performance.
+
+    """
     try:
         cf = sys.argv[1]
     except IndexError:

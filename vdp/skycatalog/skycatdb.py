@@ -1,6 +1,6 @@
 """Tables corresponding to each sky survey catalog are 
-stored in a separate schema called 'skycat' within the 
-same `PostgreSQL` database as the VLITE data. This
+stored in a separate schema called "skycat" within the 
+same PostgreSQL database as the VLITE data. This
 module contains the functions to create the schema
 and tables.
 
@@ -19,8 +19,8 @@ def index(tblname, conn):
     ----------
     tblname : str
         Name of the database table.
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     """
     cur = conn.cursor()
 
@@ -41,7 +41,7 @@ def index(tblname, conn):
 
 def add_table(tblname, conn):
     """Copies sky survey sources into a new table
-    in the 'skycat' schema from a text file. If the
+    in the "skycat" schema from a text file. If the
     text file does not yet exist, the sources are
     read from the original catalog, initialized as
     CatalogSource objects, and written to the text file.
@@ -51,8 +51,8 @@ def add_table(tblname, conn):
     tblname : str
         Name of the table/catalog from which the source
         originated.
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     """
     cur = conn.cursor()
 
@@ -177,15 +177,15 @@ def add_table(tblname, conn):
     
 
 def create(conn):
-    """Creates the 'skycat' schema and catalogs 
+    """Creates the "skycat" schema and catalogs 
     table within that schema. Calls the functions
-    `add_table` and `index` for each catalog in the
-    list from `catalogio.catalog_list`.
+    ``add_table`` and ``index`` for each catalog in the
+    list from ``catalogio.catalog_dict.keys()``.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.    
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.    
     """
     cur = conn.cursor()
     sql = (

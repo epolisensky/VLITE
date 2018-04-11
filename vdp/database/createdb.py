@@ -25,15 +25,15 @@ def make_error(cur, params):
 
 
 def create(conn, params, safe=False):
-    """Creates new tables and triggers for the connected `PostgreSQL` 
+    """Creates new tables and triggers for the connected PostgreSQL 
     database by dropping tables if they exist. The current user
     must own the tables or be a superuser in order to drop them.
     USE WITH CAUTION! DELETING THE DATA CANNOT BE UNDONE.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     params : dict
         Dictionary of quality check requirements from the run
         configuration file.

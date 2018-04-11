@@ -1,6 +1,6 @@
 """This is the main script for the VLITE Database
 Pipeline (vdp). It is responsible for reading in the
-configuration file, connecting to the the `PostgreSQL` database,
+configuration file, connecting to the the PostgreSQL database,
 and calling the processing stages.
 
 """
@@ -29,19 +29,19 @@ __version__ = 1.8
 
 def print_run_stats(start_time):
     """Prints general information about the just completed run 
-    of the Post-Processing Pipeline, including the number of
-    images initialized and the total execution time.
+    of the pipeline, including the number of
+    images processed and the total execution time.
     
     Parameters
     ----------
-    start_time : datetime.datetime instance
+    start_time : ``datetime.datetime`` instance
         Time when the run was started.
 
     Returns
     -------
-    nimgs : integer
+    nimgs : int
         Number of image files initialized as Image objects.
-    runtime : datetime.timedelta instance
+    runtime : ``datetime.timedelta`` instance
         Total execution time of the just completed pipeline run.
     """
     print('--------------------------------------\n')
@@ -56,8 +56,8 @@ def print_run_stats(start_time):
 
 
 def cfgparse(cfgfile):
-    """This function reads the `YAML` configuration file provided
-    as a command line argument when `vdp.py` is called and parses
+    """This function reads the YAML configuration file provided
+    as a command line argument when vdp.py is called and parses
     each section of the file into dictionaries.
 
     Parameters
@@ -69,18 +69,18 @@ def cfgparse(cfgfile):
     -------
     stages : dict
         Keys are the processing stages (source finding, source assocation,
-        and catalog matrching) and values are boolean ``True`` or ``False``.
+        and catalog matching) and values are boolean ``True`` or ``False``.
     opts : dict
         Keys are the processing options (save to database, quality checks,
         overwrite, reprocess, redo match, and update match) and values are
         boolean ``True`` or ``False``.
     setup : dict
         Keys are the setup parameters (root directory, year, month, day,
-        database name, database user, and catalogs) and values are the
-        user-supplied inputs.
+        files, database name, database user, and catalogs) and values
+        are the user-supplied inputs.
     sfparams : dict
-        Keys are the source finding (mode and scale) and `PyBDSF` parameters
-        and values are the user inputs.
+        Keys are the required source finding parameters *mode* and *scale*
+        and other optional PyBDSF parameters and values are the user inputs.
     qaparams : dict
         Keys are the image quality parameters (min time on source (s),
         max noise (mJy/beam), max beam axis ratio, min problem source
@@ -239,39 +239,39 @@ def cfgparse(cfgfile):
 
 
 def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
-    """Creates a `psycopg2` connection object to communicate
-    with the `PostgreSQL` database. If no database with the
+    """Creates a psycopg2 connection object to communicate
+    with the PostgreSQL database. If no database with the
     provided name exists, the user is prompted to create a
-    new one. The "skycat" schema which holds all the sky survey
+    new one. The "skycat" schema which holds all the radio
     catalogs in tables is created at this stage if it does not
     already exist. The user will be prompted to verify deletion
-    of all current tables if the database exists and the *overwrite*
+    of all current tables if the database exist and the *overwrite*
     option in the configuration file is ``True``. All necessary
     tables, functions, and triggers are created through a call to 
-    `database.createdb.create()`.
+    ``database.createdb.create()``.
     
     Parameters
     ----------
     dbname : str
-        Name of the `PostgreSQL` database.
+        Name of the PostgreSQL database.
     user : str
-        Username for the `PostgreSQL` database connection.
+        Username for the PostgreSQL database connection.
     overwrite : bool
         If ``True``, tables and data will be deleted and re-created,
         assuming there is a pre-existing database of name "dbname".
         If ``False``, the existing database with "dbname" is used.
     qaparams : dict
-        The dictionary of image quality cuts specified by the user
+        The dictionary of image quality requirements specified by the user
         in the configuration file. The values are written to the
         database **error** table.
     safe_override : bool, optional
-        If ``True``, this overrides the safe boolean. Implemented
-        for testing purposes. Default value is ``False``.
+        If ``True``, this overrides the 'safe' parameter in
+        ``database.createdb.create()``. Default value is ``False``.
 
     Returns
     -------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     """
     try:
         # DB exists
@@ -326,31 +326,31 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
 
 def vlite_unique(conn, src, image_id, radius):
     """This function adds a VLITE unique (VU) source, or a source
-    with no sky catalog matches, to the **vlite_unique** table. 
+    with no other radio catalog matches, to the **vlite_unique** table. 
     After adding a new VU source, the **image** table is queried
     to find all previously processed images in which the VU source
-    could have been detected based on field-of-view (FOV) and spatial
-    resolution. The **vlite_unique** table, therefore, keeps a record
-    of every image in which a VU source was in the FOV and whether it
-    was detected.
+    could have been detected based on field-of-view size. The 
+    **vlite_unique** table, therefore, keeps a record
+    of every image in which a VU source was in the field-of-view
+    and whether it was detected.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    src : database.dbclasses.DetectedSource instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    src : ``database.dbclasses.DetectedSource`` instance
         The VU source from the **assoc_source** table.
     image_id : int
         Id number of the image in which the VU source
         was detected.
     radius : float
-        Radius (in degrees) of the image's FOV. Used in
+        Radius (in degrees) of the image's field-of-view. Used in
         querying the **image** table.
 
     Returns
     -------
-    src : database.dbclasses.DetectedSource instance
-        The same VU src with updated `detected` attribute.
+    src : ``database.dbclasses.DetectedSource`` instance
+        The same VU src with updated 'detected' attribute.
     """
     # Start by checking if the VU source is already in the VU table
     existing = dbio.check_vlite_unique(conn, src.id)
@@ -388,13 +388,13 @@ def vlite_unique(conn, src, image_id, radius):
 def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
     """This function handles ingestion of the image metadata
     into the database **image** table and represents the first
-    stage in the Post-Processing Pipeline.
+    stage in the VLITE Database Pipeline.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from the header info.
     save : bool
@@ -415,7 +415,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
 
     Returns
     -------
-    imobj : database.dbclasses.Image instance
+    imobj : ``database.dbclasses.Image`` instance
         Image object with `id` attribute updated after insertion into
         the database **image** table, or ``None`` if the image
         has already been processed and will not be reprocessed.
@@ -506,27 +506,27 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
 
 
 def srcfind(conn, imobj, sfparams, save, qa, qaparams):
-    """Runs `PyBDSF` source finding, writes out results,
-    and inserts source fit parameters into database 
-    **detected_source**, **detected_island**, and 
-    **corrected_flux** tables, if the *save to database*
-    option is set to ``True``. This function represents
-    the second stage of the Post-Processing Pipeline.
+    """Runs PyBDSF source finding and inserts source 
+    fit parameters into database  **detected_source**,
+    **detected_island**, and **corrected_flux** tables,
+    if the *save to database* option is set to ``True``. 
+    This function represents the second stage of the
+    VLITE Database Pipeline.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info.
     sfparams : dict
-        Specifies any non-default `PyBDSF` parameters to be 
+        Specifies any non-default PyBDSF parameters to be 
         used in source finding.
     save : bool
         If ``True``, the source fit parameters are written and saved
-        to the database **detected_island*, **detected_source**, and
-        **corrected_flux** tables. The `PyBDSF` files are always 
+        to the database **detected_island**, **detected_source**, and
+        **corrected_flux** tables. The PyBDSF files are always 
         written out.
     qa : bool
         If ``True``, quality checks are run on the source finding
@@ -537,12 +537,12 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
 
     Returns
     -------
-    imobj : database.dbclasses.Image instance
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with updated attributes
         from the source finding results.
     sources : list
-        List of database.dbclasses.DetectedSource objects.
-        Attributes of each object are set from the `PyBDSF`
+        List of ``database.dbclasses.DetectedSource`` objects.
+        Attributes of each object are set from the PyBDSF
         output object.
     """
     # STAGE 2 -- Source finding + 2nd quality check
@@ -566,7 +566,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     if out is not None:
         # Write PyBDSF files to daily directory
         runbdsf.write_sources(out)
-        # Translate `PyBDSF` output to DetectedSource objects
+        # Translate PyBDSF output to DetectedSource objects
         imobj, sources = dbclasses.translate(imobj, out)
         # Run quality checks, part 2
         if qa:
@@ -594,17 +594,19 @@ def srcassoc(conn, imobj, sources, save):
     """Associates through positional cross-matching sources
     extracted from the current image with previously detected
     VLITE sources stored in the **assoc_source** database table.
+    This function represents the third stage of the VLITE
+    Database Pipeline.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info & updated with source finding results.
     sources : list
-        List of database.dbclasses.DetectedSource objects.
-        Attributes of each object are from the `PyBDSF` fit results.
+        List of ``database.dbclasses.DetectedSource`` objects.
+        Attributes of each object are from the PyBDSF fit results.
     save : bool
         If ``True``, the **assoc_source** table is updated with the
         association results and the 'assoc_id' is updated in the
@@ -615,7 +617,7 @@ def srcassoc(conn, imobj, sources, save):
     -------
     detected_unmatched : list
         List of new VLITE detected sources. 
-    imobj : database.dbclasses.Image instance
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with updated `stage` attribute.
     """
     # STAGE 3 -- Source association
@@ -665,23 +667,28 @@ def srcassoc(conn, imobj, sources, save):
 def catmatch(conn, imobj, sources, catalogs, save):
     """Performs positional cross-matching of VLITE 
     detected sources to other radio sky survey catalogs.
+    This function represents the fourth and final stage
+    in the VLITE Database Pipeline.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info.
     sources : list
-        VLITE detected sources to be matched to sky catalog sources.
+        VLITE detected sources to be matched to other
+        radio catalog sources.
     catalogs : list
-        Names of the sky survey catalogs to use.
+        Names of the radio catalogs to use.
     save : bool
         If ``True``, match results are recorded in the
         **catalog_match** table and the **assoc_source** table is
         updated. VLITE unique sources with no sky catalog match are
-        inserted into the **vlite_unique** table.
+        inserted into the **vlite_unique** table. If ``False``,
+        results are printed to the terminal and no changes are
+        made to the database.
     """
     # STAGE 4 -- Sky catalog cross-matching
     print
@@ -748,17 +755,15 @@ def catmatch(conn, imobj, sources, catalogs, save):
 
 def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     """This function handles the logic and transitions between
-    processing stages. All individual processing functions
-    are called from here. Input parameters come from output
-    of `cfgparse`.
+    processing stages.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     stages : dict
         Keys are the processing stages (source finding, source assocation,
-        and catalog matrching) and values are boolean ``True`` or ``False``.
+        and catalog matching) and values are boolean ``True`` or ``False``.
     opts : dict
         Keys are the processing options (save to database, quality checks,
         overwrite, reprocess, redo match, and update match) and values are
@@ -772,11 +777,11 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
         Names of radio sky survey catalogs to use when running
         catalog matching.
     sfparams : dict
-        Specifies any non-default `PyBDSF` parameters to be used in source
+        Specifies any non-default PyBDSF parameters to be used in source
         finding.
     qaparams : dict
         User-specified quality requirements or default values defined
-        and set in `cfgparse`.
+        and set in ``cfgparse``.
     """
     # Define booleans from stages & opts dictionaries
     sf = stages['source finding']

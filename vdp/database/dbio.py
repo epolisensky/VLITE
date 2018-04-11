@@ -1,7 +1,5 @@
-"""Functions for specific I/O to the `PostgreSQL` database
-tables needed for the Post-Processing Pipeline.
+"""Functions for specific I/O to the PostgreSQL database tables."""
 
-"""
 import psycopg2
 import psycopg2.extras
 import json
@@ -16,30 +14,29 @@ def record_config(conn, cfgfile, start_time, exec_time, nimages,
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     cfgfile : str
-        Name of the `YAML` run configuration file.
-    start_time : datetime.datetime instance
+        Name of the YAML run configuration file.
+    start_time : ``datetime.datetime`` instance
         Date & time at the start of the pipeline run.
-    exec_time : datetime.timedelta instance
+    exec_time : ``datetime.timedelta`` instance
         Execution time of the pipeline run.
     nimages : int
         Number of images processed. (Technically,
         number of Image objects initialized.)
     stages : dict
-        Dictionary of the 'stages' section of the configuration file.
+        Dictionary of the *stages* section of the configuration file.
     opts : dict
-        Dictionary of the 'options' section of the configuration file.
+        Dictionary of the *options* section of the configuration file.
     setup : dict
-        Dictionary of the 'setup' section of the configuration file.
+        Dictionary of the *setup* section of the configuration file.
     sfparams : dict
-        Dictionary of the 'pybdsf_params' section of the
+        Dictionary of the *pybdsf_params* section of the
         configuration file.
     qaparams : dict
-        Dictionary of the 'image_qa_params' section of the
+        Dictionary of the *image_qa_params* section of the
         configuration file.
-
     """
     jstages = json.dumps(stages)
     jopts = json.dumps(opts)
@@ -60,7 +57,7 @@ def record_config(conn, cfgfile, start_time, exec_time, nimages,
 def init_image(impath):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
-    the `header_attrs` class method.
+    the ``header_attrs`` object method.
 
     """
     img = dbclasses.Image(impath)
@@ -72,7 +69,7 @@ def init_image(impath):
 
 def status_check(conn, impath):
     """Returns the id, highest completed stage, and radius used
-    for source finding from the database image table or ``None``
+    for source finding from the database **image** table or ``None``
     if the image filename is not in the database.
 
     """
@@ -92,19 +89,19 @@ def add_image(conn, img, status, delete=False):
     
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    img : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with attributes
         set from image header.
     status : tuple
         If ``None``, the image is new and is added to the
-        database **image** table. If not ``None``, the iamge
+        database **image** table. If not ``None``, the image
         id stored in the tuple is used to update the correct
         row in the **image** table.
     delete : bool, optional
         If ``True``, rows in the **detected_island** database table
-        with the appropriate image_id will be deleted,
+        with the appropriate 'image_id' will be deleted,
         cascading to the **detected_source** and **corrected_flux**
         tables and triggering updates on the **assoc_source**, 
         **catalog_match**, and **vlite_unique** tables. Default value
@@ -112,7 +109,7 @@ def add_image(conn, img, status, delete=False):
 
     Returns
     -------
-    img : database.dbclasses.Image instance
+    img : ``database.dbclasses.Image`` instance
         Initialized Image object with updated id attribute,
         if newly added to the database.
     """
@@ -180,9 +177,9 @@ def add_sources(conn, img, sources):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.    
-    img : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.    
+    img : ``database.dbclasses.Image`` instance
         Image object with attributes updated with source
         finding results.
     sources : list
@@ -267,13 +264,13 @@ def add_corrected(conn, src):
 
 def add_assoc(conn, sources):
     """Adds a newly detected VLITE source to the
-    **assoc_source** table and updates the assoc_id
+    **assoc_source** table and updates the 'assoc_id'
     for that source in the **detected_source** table.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         Newly detected VLITE sources stored as 
         DetectedSource objects.
@@ -306,14 +303,14 @@ def add_assoc(conn, sources):
 
 
 def update_matched_assoc(conn, sources):
-    """Updates the position of existing sources in the
+    """Updates the RA & Dec of existing sources in the
     **assoc_source** table to the weighted average of all
     detections.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         DetectedSource objects extracted from the
         **assoc_source** table which have been matched
@@ -331,15 +328,15 @@ def update_matched_assoc(conn, sources):
 
 
 def update_detected_associd(conn, sources):
-    """Updates the assoc_id for sources in the
+    """Updates the 'assoc_id' for sources in the
     **detected_source** table which have been successfully
     associated with existing VLITE sources in the 
     **assoc_source** table.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         DetectedSource objects detected in the current
         image that have been associated with previous
@@ -366,8 +363,8 @@ def update_checked_catalogs(conn, image_id, catalogs):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     image_id : int
         Id number of the image in consideration.
     catalogs : list
@@ -415,11 +412,11 @@ def check_catalog_match(conn, asrc_id, catalog):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     asrc_id : int
         Row id of the source in the **assoc_soure** table to
-        match to the assoc_id in the **catalog_match** table.
+        match to the 'assoc_id' in the **catalog_match** table.
     catalog : str
         Name of the sky catalog.
 
@@ -449,8 +446,8 @@ def update_assoc_nmatches(conn, sources):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         DetectedSource objects with updated nmatches
         attribute after running sky catalog matching,
@@ -483,8 +480,8 @@ def add_catalog_match(conn, sources):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         List of CatalogSource objects matched to VLITE
         DetectedSource objects, or list of tuples.
@@ -527,17 +524,17 @@ def check_vlite_unique(conn, asrc_id):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     asrc_id : int
         Row id of the source in the **assoc_soure** table to
-        match to the assoc_id in the **vlite_unique** table.
+        match to the 'assoc_id' in the **vlite_unique** table.
 
     Returns
     -------
     existing : list
-        Returns the id, image_id, and detected columns of
-        the entry with the given assoc_id. Otherwise, 
+        Returns the 'id', 'image_id', and 'detected' columns of
+        the entry with the given 'assoc_id'. Otherwise, 
         returns ``None``.
     """
     cur = conn.cursor()
@@ -557,16 +554,16 @@ def add_vlite_unique(conn, src, image_id, update=False):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    src : database.dbclasses.DetectedSource instance 
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    src : ``database.dbclasses.DetectedSource`` instance 
         DetectedSource object with attribute nmatches = 0.
     image_id : int
         Id number of the image from which the source came.
-    update : boolean, optional
+    update : bool, optional
         If ``True``, the 'detected' column is updated for
-        the existing row with the specified image_id and
-        assoc_id. Otherwise, a new row is added.
+        the existing row with the specified 'image_id' and
+        'assoc_id'. Otherwise, a new row is added.
         Default is ``False``.
     """
     cur = conn.cursor()
@@ -590,8 +587,8 @@ def get_image_sources(conn, image_id):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     image_id : int
         Id number of the image.
 
@@ -625,17 +622,17 @@ def get_associated(conn, sources):
     
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         DetectedSource objects pulled from the
-        **detected_source** table based on image_id.
+        **detected_source** table based on 'image_id'.
 
     Returns
     -------
     assoc_sources : list
         Sources pulled from the **assoc_source** table
-        based on matching assoc_id and translated
+        based on matching 'assoc_id' and translated
         from row dictionary objects to 
         DetectedSource objects.
     """   
@@ -669,17 +666,17 @@ def get_associated(conn, sources):
 def delete_matches(conn, sources, image_id):
     """Deletes all previous sky catalog cross-matching
     results for a given set of sources. This function
-    is called when the config. file option *redo match*
+    is called when the configuration file option *redo match*
     is ``True``.
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         DetectedSource objects belonging to a
         particular image pulled from the
-        **assoc_source** table based on matching assoc_id.
+        **assoc_source** table based on matching 'assoc_id'.
     image_id : int
         Id number of the image.
 
@@ -687,7 +684,7 @@ def delete_matches(conn, sources, image_id):
     -------
     sources : list
         DetectedSource objects with their nmatches
-        attribute re-initialized to ``None``.
+        attribute re-initialized to 0.
     """
     print('\nRemoving previous sky catalog matching results '
           'for {} sources.'.format(len(sources)))
@@ -717,9 +714,9 @@ def update_stage(conn, imobj):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    imobj : database.dbclasses.Image instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
         Image object used to set table column values.
     """
     cur = conn.cursor()
@@ -777,8 +774,8 @@ def remove_catalog(conn, catalogs):
 
 def get_new_vu(conn):
     """Returns list of sources from the **assoc_source** table
-    for which the number of sky catalog matching results dropped
-    to 0 after removing results of catalog. The **new_vu** table
+    for which the 'nmatches' dropped to 0 after removing 
+    catalog matching results. The **new_vu** table
     is created to record the row id number of sources in the
     **assoc_source** table whose 'nmatches' column is 0 after
     subtracting 1 as triggered by deletion of rows in the
@@ -786,14 +783,14 @@ def get_new_vu(conn):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
 
     Returns
     -------
     assoc_objs : list
         List of DetectedSource objects pulled from the
-        **assoc_source** table whose nmatches now equals 0.
+        **assoc_source** table whose 'nmatches' now equals 0.
     """
     cur = conn.cursor()
 
@@ -826,8 +823,8 @@ def get_vu_image(conn, assoc_id):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     assoc_id : int
         The id number of the VLITE source from the
         **assoc_source** table.
@@ -866,8 +863,8 @@ def remove_sources(conn, assoc_ids):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     assoc_ids : list
         List of id numbers corresponding to the VLITE sources
         to be removed from the **assoc_source** table.    
@@ -887,8 +884,8 @@ def remove_images(conn, images):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     images : list
         List of image filenames to be removed from
         the database **image** table.
@@ -907,4 +904,3 @@ def remove_images(conn, images):
     
     conn.commit()
     cur.close()
-

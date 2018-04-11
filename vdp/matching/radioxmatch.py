@@ -44,7 +44,7 @@ def write_regions(srclist, impath, ext='.reg'):
                 src.ra, src.dec, src.maj, src.min, src.pa + 90.0, src.name))
 
 
-def limit_res(rows, res_class):
+def filter_res(rows, res_class):
     """Filters out sources extracted from the database
     which originate from images with spatial resolutions
     outside the acceptable range.
@@ -52,7 +52,7 @@ def limit_res(rows, res_class):
     Parameters
     ----------
     rows : list
-        `psycopg2` row dictionary objects extracted
+        psycopg2 row dictionary objects extracted
         from the database.
     res : float
         Spatial resolution of the current image in arcseconds.
@@ -60,7 +60,7 @@ def limit_res(rows, res_class):
     Returns
     -------
     keep : list
-        List of `psycopg2` row dictionary objects after
+        List of psycopg2 row dictionary objects after
         applying the spatial resolution filtering.
     """
     keep = []
@@ -82,9 +82,9 @@ def check_previous(conn, src, search_radius):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
-    src : database.dbclasses.DetectedSource instance
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    src : ``database.dbclasses.DetectedSource`` instance
         Source whose position will be used to find
         all previously processed images which could
         have contained it.
@@ -114,8 +114,8 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     table : str
         Name of the database table to query.
     center_ra : float
@@ -156,11 +156,11 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     detected_sources : list
         List of the sources extracted from the current image.
-    imobj : database.dbclasses.Image instance
+    imobj : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute values
         set from header info & updated with source finding results.
     search_radius : float
@@ -176,18 +176,18 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
         Sources extracted from the image which could NOT be successfully
         associated with previously detected sources. These are added
         to the **assoc_table** as new detections and then cross-matched
-        with other sky survey catalogs.
+        with other radio catalogs.
     assoc_matched : list
         Previously detected sources from the **assoc_source** table which
         were successfully associated with sources from the new image. 
         Positions of these sources are updated in the **assoc_source**
         table to reflect the weighted average of all detections. The 
-        number of detections (ndetect) is increased by one.
+        number of detections ('ndetect') is increased by one.
     assoc_unmatched : list
         Previously detected sources from the **assoc_source** table which
         were not successfully associated with sources from the new image.
-        Any of these non-detections with no sky catalog matches
-        (nmatches = 0) are recorded in the **vlite_unique** table.
+        Any of these non-detections with no radio catalog matches
+        ('nmatches' = 0) are recorded in the **vlite_unique** table.
     """
     # Find image resolution class
     for config, res_range in res_dict.items():
@@ -201,11 +201,11 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
           format(len(assoc_rows), search_radius))
     # Limit to sources taken from images of similar resolution
     if len(assoc_rows) > 0:
-        limited_assoc_rows = limit_res(assoc_rows, res_class)
+        filtered_assoc_rows = filter_res(assoc_rows, res_class)
     else:
-        limited_assoc_rows = []
+        filtered_assoc_rows = []
 
-    if not limited_assoc_rows:
+    if not filtered_assoc_rows:
         # No previous sources found in that sky region at that resolution
         for src in detected_sources:
             src.res_class = res_class
@@ -218,7 +218,7 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
         # Translate row dictionaries to DetectedSource objects
         assoc_sources = []
         assoc_ids = []
-        for asrc in limited_assoc_rows:
+        for asrc in filtered_assoc_rows:
             assoc_ids.append(asrc['id'])
             assoc_sources.append(dbclasses.DetectedSource())
             dbclasses.dict2attr(assoc_sources[-1], asrc)
@@ -332,13 +332,15 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
 
 
 def filter_catalogs(conn, catalogs, res):
-    """Selects only sky surveys with a spatial resolution that
+    """Selects only radio catalogs with a spatial resolution that
     lies in the same range as the current image's resolution.
-    The B and C configuration equivalent resolution ranges are
-    combined into one big range to include more sky survey catalogs.
+    The A & B configuration equivalent resolution ranges are
+    combined into one big range to include more all-sky survey catalogs.
 
     Parameters
     ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     catalogs : list
         List of catalog names to check.
     res : float
@@ -382,33 +384,34 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
 
     Parameters
     ----------
-    conn : psycopg2.extensions.connect instance
-        The `PostgreSQL` database connection object.
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
     sources : list
         List of DetectedSource objects which need a
         sky survey catalog match.
     catalog : str
         Name of the sky survey catalog whose sources
         are being used for cross-matching.
-    imobj : database.dbclasses.Image instance
+    imobj : ``database.dbclasses.Image`` instance
         Image object whose attributes are used for setting
-        search center.
+        the cone search center.  Only used if match_in_db
+        is ``False``.
     search_radius : float
         Size of the circular search region in degrees. Only
         used if match_in_db is ``False``.
-    match_in_db : boolean
+    match_in_db : bool
         If ``True``, do the cross-matching inside the database
         between the **assoc_source** and catalog tables. If ``False``,
         do the cross-matching outside the database by first extracting
         the catalog sources using a cone search. This option should
         be set to ``False`` when the VLITE sources to be matched are
-        not in the **assoc_source** table as is the case when results
+        not in the **assoc_source** table, as is the case when results
         are not saved to the database.
 
     Returns
     -------
     sources : list
-        DetectedSource objects with updated nmatches attribute.
+        DetectedSource objects with updated 'nmatches' attribute.
     catalog_matched : list
         CatalogSource objects which have been successfully
         matched to the VLITE sources.
