@@ -9,6 +9,7 @@ import sys
 import glob
 import re
 import argparse
+import logging
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
@@ -16,7 +17,7 @@ from errors import ConfigError
 from database import createdb, dbclasses, dbio
 from sourcefinding import runbdsf
 from matching import radioxmatch
-from skycatalog import catalogio, skycatdb
+from radiocatalogs import catalogio, radcatdb
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -24,7 +25,67 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = 1.8
+__version__ = 1.9
+
+
+# create logger
+logger = logging.getLogger('vdp')
+logger.setLevel(logging.DEBUG)
+
+
+def loggerinit(logfile=None, verbosity=1):
+    """Initializes handlers for logging to both the 
+    console and a text file.
+
+    Parameters
+    ----------
+    logfile : str, optional
+        Name of the log file. If ``None``, messages will
+        only be printed to the console. Default is ``None``.
+    verbosity : int (0 or 1), optional
+        Set to 0 if you don't want any messages to be printed
+        to the console. Messages will still be printed to the
+        log file if one is provided. Default is 1.
+    """
+    # Create boolean lists to determine if any handlers of either type
+    is_stream = []
+    is_file = []
+    if len(logger.handlers) > 0:
+        for handler in logger.handlers:
+            is_stream.append(type(handler) is logging.StreamHandler)
+            is_file.append(type(handler) is logging.FileHandler)
+
+    if verbosity < 1:
+        pass
+    elif any(is_stream):
+        # a console handler already exists
+        pass
+    else:
+        # create console handler with a slightly higher log level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        # create formatter and add it to the handler
+        ch_formatter = logging.Formatter('%(message)s')
+        ch.setFormatter(ch_formatter)
+        # add the handler to the logger
+        logger.addHandler(ch)
+
+    if logfile is None:
+        pass
+    elif any(is_file):
+        # a file handler already exists
+        pass
+    else:
+        # create file handler which logs even debug messages
+        fh = logging.FileHandler(logfile)
+        fh.setLevel(logging.DEBUG)
+        # create formatter and add it to the handler
+        fh_formatter = logging.Formatter(
+            '%(asctime)s %(name)-28s: %(levelname)-6s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S')
+        fh.setFormatter(fh_formatter)
+        # add the handler to the logger
+        logger.addHandler(fh)
 
 
 def print_run_stats(start_time):
@@ -44,14 +105,14 @@ def print_run_stats(start_time):
     runtime : ``datetime.timedelta`` instance
         Total execution time of the just completed pipeline run.
     """
-    print('--------------------------------------\n')
-    print('Run statistics:')
+    logger.info('--------------------------------------')
+    logger.info('Run statistics:')
     # Count the number of images processed
     nimgs = dbclasses.Image.image_count()
-    print('\nProcessed {} images.'.format(nimgs))
+    logger.info('Processed {} images.'.format(nimgs))
     # Print the runtime
     runtime = datetime.now() - start_time
-    print('\nTotal runtime: {}\n'.format(runtime))
+    logger.info('Total runtime: {}'.format(runtime))
     return nimgs, runtime
 
 
@@ -147,7 +208,8 @@ def cfgparse(cfgfile):
             procdir = os.path.join(monthdir, day, 'Images/')
             # Check full image path
             if not os.path.isdir(procdir):
-                print('\nSkipping non-existent directory {}'.format(procdir))
+                print('\nSkipping non-existent directory {}'.format(
+                    procdir))
                 continue
             dirs.append(procdir)
 
@@ -171,7 +233,8 @@ def cfgparse(cfgfile):
 
     # Check list of sky catalogs
     if stages['catalog matching']:
-        catalog_opts = catalogio.catalog_dict.keys() # all available catalogs
+        # all available catalogs
+        catalog_opts = sorted(catalogio.catalog_dict.keys())
         # If catalogs = [], use all of them
         if len(setup['catalogs']) < 1:
             setup['catalogs'] = catalog_opts
@@ -183,8 +246,8 @@ def cfgparse(cfgfile):
                         cat = str(cat)
                     cat = cat.lower()
                     if cat not in catalog_opts:
-                        print('\nCurrently available catalogs: {}\n'.format(
-                            catalog_opts))
+                        print('\nCurrently available catalogs: {}\n'.
+                                    format(catalog_opts))
                         raise ConfigError('Catalog {} is not a valid option'.
                                           format(cat))
             except TypeError:
@@ -202,7 +265,7 @@ def cfgparse(cfgfile):
             except ValueError:
                 raise ConfigError('min time on source must be a number.')
         if qaparams['max noise (mJy/beam)'] is None:
-            qaparams['max noise (mJy/beam)'] = 1000.
+            qaparams['max noise (mJy/beam)'] = 500.
         else:
             try:
                 qaparams['max noise (mJy/beam)'] = float(
@@ -217,15 +280,6 @@ def cfgparse(cfgfile):
                     qaparams['max beam axis ratio'])
             except ValueError:
                 raise ConfigError('max beam axis ratio must be a number.')
-        if qaparams['min problem source separation (deg)'] is None:
-            qaparams['min problem source separation (deg)'] = 20.
-        else:
-            try:
-                qaparams['min problem source separation (deg)'] = float(
-                    qaparams['min problem source separation (deg)'])
-            except ValueError:
-                raise ConfigError('min problem source separation must be a '
-                                  'number.')
         if qaparams['max source metric'] is None:
             qaparams['max source metric'] = 10.
         else:
@@ -242,7 +296,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     """Creates a psycopg2 connection object to communicate
     with the PostgreSQL database. If no database with the
     provided name exists, the user is prompted to create a
-    new one. The "skycat" schema which holds all the radio
+    new one. The "radcat" schema which holds all the radio
     catalogs in tables is created at this stage if it does not
     already exist. The user will be prompted to verify deletion
     of all current tables if the database exist and the *overwrite*
@@ -276,11 +330,11 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     try:
         # DB exists
         conn = psycopg2.connect(host='localhost', database=dbname, user=user)
-        print('\nConnected to database {}.'.format(dbname))
+        logger.info('Connected to database {}.'.format(dbname)) 
         if not overwrite:
-            print('\nUsing existing database {}.'.format(dbname))
+            logger.info('Using existing database {}.'.format(dbname))
         else:
-            print('\nOverwriting existing database tables.')
+            logger.info('Overwriting existing database tables.')
             if safe_override:
                 createdb.create(conn, qaparams, safe=True)
             else:
@@ -289,12 +343,12 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
         # Check for sky catalogs by verifying schema exists
         cur = conn.cursor()
         cur.execute('''SELECT EXISTS(SELECT 1 FROM pg_namespace 
-            WHERE nspname = 'skycat');''')
+            WHERE nspname = 'radcat');''')
         if not cur.fetchone()[0]:
             cur.close()
-            print('\nNo sky catalogs found in database. '
-                  'Creating them now...')
-            skycatdb.create(conn)
+            logger.info('Radio catalog schema "radcat" not found. '
+                  'Creating tables now...')
+            radcatdb.create(conn)
         else:
             cur.close()
     except psycopg2.OperationalError:
@@ -313,12 +367,12 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
             conn.close()
             conn = psycopg2.connect(host='localhost', database=dbname,
                                     user=user)
-            print('\nConnected to new database {}.'.format(dbname))
+            logger.info('Connected to new database {}.'.format(dbname))
             createdb.create(conn, qaparams, safe=True)
-            print('\nCreating new sky catalog tables...')
-            skycatdb.create(conn)
+            logger.info('Adding radio catalogs to "radcat" schema...')
+            radcatdb.create(conn)
         else:
-            print('\nNo new database created.\n')
+            logger.info('No new database created.')
             raise ConfigError('Cannot access database {}'.format(dbname))
 
     return conn
@@ -421,10 +475,9 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
         has already been processed and will not be reprocessed.
     """
     # STAGE 1 -- Add image to table, 1st quality check
-    print
-    print('**********************')
-    print('STAGE 1: READING IMAGE')
-    print('**********************')
+    logger.info('**********************')
+    logger.info('STAGE 1: READING IMAGE')
+    logger.info('**********************')
 
     # Run image quality checks
     if qa:
@@ -446,7 +499,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                 imobj = dbio.add_image(conn, imobj, status) # branch 4
             else:
                 # already processed & not re-doing
-                print('\nImage already in database. Moving on...')
+                logger.info('Image already in database. Moving on...')
                 imobj = None # branch 3
     else: # Running at least one stage
         if status is None:
@@ -456,11 +509,12 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                     imobj = dbio.add_image(conn, imobj, status)
                 else:
                     # just initialize if not writing to DB
-                    print('\nInitializing image.')
+                    logger.info('Initializing image.')
             else:
                 # image not in DB, but not running source finding --> quit
-                print('\nERROR: Image {} not yet processed. Source finding '
-                      'must be run before other stages.'.format(imobj.filename))
+                logger.error('ERROR: Image {} not yet processed. '
+                             'Source finding must be run before other stages.'.
+                             format(imobj.filename))
                 imobj = None # branch 5
         else:
             if stages['source finding']:
@@ -469,7 +523,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                     if save:
                         imobj = dbio.add_image(conn, imobj, status)
                     else:
-                        print('\nInitializing image.')
+                        logger.info('Initializing image.')
                 else:
                     if reproc:
                         if save:
@@ -478,28 +532,26 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                                                    delete=True)
                         else:
                             # just initialize if not writing to DB
-                            print('\nInitializing image.')
+                            logger.info('Initializing image.')
                     else:
                         # image has SF results & not re-processing
-                        print('\nImage already processed. Moving on...')
+                        logger.info('Image already processed. Moving on...')
                         imobj = None # branch 9
             else:
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
-                    print('\nInitializing image.')
+                    logger.info('Initializing image.')
                     imobj.id = status[0]
                     imobj.stage = status[1]
                     imobj.radius = status[2]
                 else:
-                    print('\nERROR: Image {} does not have sources extracted '
-                          'yet. Source finding must be run before other '
-                          'stages.'.format(imobj.filename))
+                    logger.error('ERROR: Image {} does not have sources '
+                                 'extracted yet. Source finding must be run '
+                                 'before other stages.'.format(imobj.filename))
                     imobj = None # branch 7
 
-    # Uncomment below when ready to stop flagged images (after testing)
-    #if imobj.error_id is not None:
-    # For now, just stop if header keywords are missing
-    if imobj is not None and imobj.error_id == 1:
+    # Stop if the image failed a quality check
+    if imobj is not None and imobj.error_id is not None:
         imobj = None
     
     return imobj
@@ -546,10 +598,9 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         output object.
     """
     # STAGE 2 -- Source finding + 2nd quality check
-    print
-    print('**********************')
-    print('STAGE 2: SOURCE FINDNG')
-    print('**********************')
+    logger.info('**********************')
+    logger.info('STAGE 2: SOURCE FINDNG')
+    logger.info('**********************')
     
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
@@ -574,15 +625,19 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     else:
         # PyBDSF failed to process
         sources = None
-        imobj.error_id = 6
+        imobj.error_id = 7
+
+    # Stop if the image failed the source count QA
+    if imobj.error_id is not None:
+        sources = None
 
     if save:
         # Add source fit parameters to database tables
         dbio.add_sources(conn, imobj, sources)
         if sources is not None:
             # Compute beam corrected fluxes & write to corrected_flux table
-            print('Correcting all flux measurements for primary beam '
-                  'response.')
+            logger.info('Correcting all flux measurements for primary beam '
+                        'response.')
             for src in sources:
                 src.correct_flux(imobj)
                 dbio.add_corrected(conn, src)
@@ -621,10 +676,9 @@ def srcassoc(conn, imobj, sources, save):
         Initialized Image object with updated `stage` attribute.
     """
     # STAGE 3 -- Source association
-    print
-    print('***************************')
-    print('STAGE 3: SOURCE ASSOCIATION')
-    print('***************************')
+    logger.info('***************************')
+    logger.info('STAGE 3: SOURCE ASSOCIATION')
+    logger.info('***************************')
 
     if save:
         match_in_db = True
@@ -691,10 +745,9 @@ def catmatch(conn, imobj, sources, catalogs, save):
         made to the database.
     """
     # STAGE 4 -- Sky catalog cross-matching
-    print
-    print('*********************************')
-    print('STAGE 4: MATCHING TO SKY CATALOGS')
-    print('*********************************')
+    logger.info('*********************************')
+    logger.info('STAGE 4: MATCHING TO SKY CATALOGS')
+    logger.info('*********************************')
     
     catalogs = [catalog.lower() for catalog in catalogs]
     # Filter catalogs by resolution
@@ -706,18 +759,18 @@ def catmatch(conn, imobj, sources, catalogs, save):
     else:
         new_catalogs = catalogs
     if not new_catalogs:
-        print('\nAll specified catalogs with appropriate resolution '
-              'have already been checked for matches.')
+        logger.info('All specified catalogs with appropriate resolution '
+                    'have already been checked for matches.')
         if save:
             imobj.stage = 4
             dbio.update_stage(conn, imobj)
         return
 
-    print('\nUsing the following catalogs for cross-matching: {}'.format(
+    logger.info('Using the following catalogs for cross-matching: {}'.format(
         new_catalogs))
 
     if not sources:
-        print('\nNo new VLITE sources to match.')
+        logger.info('No new VLITE sources to match.')
         if save:
             imobj.stage = 4
             dbio.update_stage(conn, imobj)
@@ -822,8 +875,8 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
 
         # Begin loop through time-sorted images
         for imobj in imobjlist:
-            print('_' * (len(imobj.filename) + 10))
-            print('\nStarting {}.'.format(imobj.filename))
+            logger.info('_' * (len(imobj.filename) + 10))
+            logger.info('Starting {}.'.format(imobj.filename))
             # STAGE 1 -- Add image to database
             imobj = iminit(conn, imobj, save, qa, qaparams, reproc, stages)
             # Move on to next image if imobj is None
@@ -836,19 +889,23 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                     conn, imobj, sfparams, save, qa, qaparams)
                 # Remove temp fits file
                 os.system('rm '+imgdir+'*.crop.fits')
-                # Do this so PyBDSF warning messages get printed to log
-                # when re-directing out put to text file
-                os.system('grep "WARNING" '+imgdir+'*.log')
+                # Copy PyBDSF warnings from their log to ours
+                with open(imobj.filename[:-4]+'crop.fits.pybdsf.log', 'r') as f:
+                    lines = f.readlines()
+                warnings = [line.strip() for line in lines if 'WARNING' in line]
+                if warnings:
+                    logger.info('PyBDSF warnings:')
+                    for warning in warnings:
+                        logger.info(warning)
+                # Move PyBDSF output files to PyBDSF directory
+                os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
+                if glob.glob(imgdir+'*pybdsm*'):
+                    os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 if sources is None:
                     # Image failed to process
-                    with open(pybdsfdir+'failed.txt', 'a') as f:
-                        f.write(img+'\n')
+                    #with open(pybdsfdir+'failed.txt', 'a') as f:
+                    #    f.write(img+'\n')
                     continue
-                else:
-                    # Move PyBDSF output files to PyBDSF directory
-                    os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
-                    if glob.glob(imgdir+'*pybdsm*'):
-                        os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 # STAGE 3 -- Source association
                 if sa:
                     new_sources, imobj = srcassoc(conn, imobj, sources, save)
@@ -859,21 +916,21 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('Completed source finding, association, '
-                              'and sky catalog cross-matching on image')
-                        print('{}.'.format(imobj.filename))
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.info('Completed source finding, association, '
+                                    'and sky catalog cross-matching on image')
+                        logger.info('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                     else: # sf + sa - branch 11, 14
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('Completed source finding and association on '
-                              'image')
-                        print('{}.'.format(imobj.filename))
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.info('Completed source finding and association '
+                                    'on image')
+                        logger.info('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                         continue
                 else:
                     if cm: # sf + cm - branch 10, 13
@@ -881,21 +938,21 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('Completed source finding and sky catalog '
-                              'cross-matching to the extracted')
-                        print('sources from image')
-                        print('{}.'.format(imobj.filename))
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.info('Completed source finding and sky catalog '
+                                    'cross-matching to the extracted sources '
+                                    'from image')
+                        logger.info('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                     else: # sf only - branch 6, 8
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('Completed source finding on image')
-                        print('{}.'.format(imobj.filename))
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.info('Completed source finding on image')
+                        logger.info('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                         continue
             else: # no sf
                 if sa:
@@ -911,25 +968,30 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            print('\n====================================='
-                              '==========================================\n')
-                            print('Completed source association and sky '
-                                  'catalog cross-matching to the newly')
-                            print('detected sources from image')
-                            print('{}.'.format(imobj.filename))
-                            print('\n====================================='
-                              '==========================================\n')
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
+                            logger.info('Completed source association and sky '
+                                        'catalog cross-matching to the newly '
+                                        'detected sources from image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
                         else: # sa only - branch 19
-                            print('\n====================================='
-                              '==========================================\n')
-                            print('Completed source association for image')
-                            print('{}.'.format(imobj.filename))
-                            print('\n====================================='
-                              '==========================================\n')
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
+                            logger.info('Completed source association for '
+                                        'image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
                     else: # stage > 2
-                        print("\nNOTE: {}'s".format(imobj.filename))
-                        print('sources have already been associated with the '
-                              'existing VLITE catalog.')
+                        logger.info("\nNOTE: {}'s".format(imobj.filename))
+                        logger.info('sources have already been associated '
+                                    'with the existing VLITE catalog.')
                         if cm: # cm only - branch 21
                             assoc_sources = dbio.get_associated(conn, sources)
                             if rematch:
@@ -950,13 +1012,15 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            print('\n====================================='
-                              '==========================================\n')
-                            print('Completed sky catalog cross-matching for '
-                                  'image')
-                            print('{}.'.format(imobj.filename))
-                            print('\n====================================='
-                              '==========================================\n')
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
+                            logger.info('Completed sky catalog cross-matching '
+                                        'for image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('====================================='
+                                        '====================================='
+                                        '=====')
                         else: continue # branch 18
                 else:
                     if cm: # cm only - branch 17
@@ -984,23 +1048,21 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('Completed sky catalog cross-matching for image')
-                        print('{}.'.format(imobj.filename))
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.info('Completed sky catalog cross-matching for '
+                                    'image')
+                        logger.info('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                     else: # branch 16
-                        print('\n====================================='
-                              '==========================================\n')
-                        print('\nERROR: Source association must be run '
-                              'before catalog cross-matching for image')
-                        print('{}.\n'.format(imobj.filename))
-                        print('Alternatively, run source finding with catalog '
-                              'matching to cross-match detected')
-                        print('VLITE sources with other radio sky surveys.')
-                        print('\n====================================='
-                              '==========================================\n')
+                        logger.info('======================================='
+                                    '========================================')
+                        logger.error('ERROR: Source association must be run '
+                                     'before catalog cross-matching for image')
+                        logger.error('{}.'.format(imobj.filename))
+                        logger.info('======================================='
+                                    '========================================')
                         continue
 
     return
@@ -1012,6 +1074,9 @@ def main():
     parser = argparse.ArgumentParser(
         description='Run the VLITE Database Pipline (vdp)')
     parser.add_argument('config_file', help='the YAML configuration file')
+    parser.add_argument('-v', '--verbosity', type=int, choices=[0, 1],
+                        default=1, help='set to 0 to stop printing log '
+                        'messages to the conosole')
     parser.add_argument('--ignore_prompt', action='store_true',
                         help='ignore prompt to verify database '
                         'removal/creation')
@@ -1029,7 +1094,7 @@ def main():
                         'VLITE source(s) after follow-up')
     parser.add_argument('--add_catalog', action='store_true',
                         help='adds any new sky survey catalogs to a table in '
-                        'the database "skycat" schema')
+                        'the database "radcat" schema')
     args = parser.parse_args()
     
     # Start the timer
@@ -1037,6 +1102,16 @@ def main():
 
     # Parse run configuration file
     stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
+
+    # Initialize logger handlers for console & file
+    logfile = str(setup['year']) + str(setup['month']).zfill(2) + '.log'
+    logpath = os.path.join(setup['root directory'], logfile)
+    loggerinit(logpath, args.verbosity)
+    logger.info('')
+    logger.info('#' * (len(logpath) + 10))
+    logger.info('Starting the VLITE Database Pipeline.')
+    logger.info('Log file: {}'.format(logpath))
+    logger.info('#' * (len(logpath) + 10))
 
     # Find existing/create/overwrite database
     if any([args.remove_catalog_matches, args.remove_source,
@@ -1051,7 +1126,7 @@ def main():
                              'matching results? (List catalogs separated by '
                              'a comma.)\n')
         cat_list = [cat.lower() for cat in catalogs.split(', ')]
-        print('\nRemoving matching results for {}...'.format(catalogs))
+        logger.info('Removing matching results for {}...'.format(catalogs))
         dbio.remove_catalog(conn, cat_list)
         # Find all assoc_sources whose nmatches dropped to 0
         vu_assoc_sources = dbio.get_new_vu(conn)
@@ -1076,8 +1151,8 @@ def main():
             with open(inp, 'r') as f:
                 text = f.read()
             asid_list = [int(asid) for asid in text.strip().split('\n')]
-        print('\nRemoving row(s) {} from the assoc_source table...'.format(
-            asid_list))
+        logger.info('Removing row(s) {} from the assoc_source table...'.
+                    format(asid_list))
         dbio.remove_sources(conn, tuple(asid_list))
         conn.close()
         sys.exit(0)
@@ -1096,14 +1171,14 @@ def main():
                 text = f.read()
             images = [re.findall('([0-9]{4}-\S+)', img)[0] for img \
                       in text.strip().split('\n')]
-        print('\nPreparing to remove image(s) {} from the database.'.format(
-            images))
+        logger.info('Preparing to remove image(s) {} from the database.'.
+                    format(images))
         confirm = raw_input('\nAre you sure? ')
         if confirm == 'y' or confirm == 'yes':
-            print('Deleting image(s) from the database...')
+            logger.info('Deleting image(s) from the database...')
             dbio.remove_images(conn, images)
         else:
-            print('Doing nothing...')
+            logger.info('Doing nothing...')
         conn.close()
         sys.exit(0)
 
@@ -1150,16 +1225,16 @@ def main():
                 catsrc_ids.append(-1)
                 separations.append(-1)
         cmrows = zip(catalogs, catsrc_ids, assoc_ids, separations)
-        print('\nAdding new catalog matching results for assoc_ids {}...'.
-              format(assoc_ids))
+        logger.info('Adding new catalog matching results for assoc_ids {}...'.
+                    format(assoc_ids))
         dbio.update_assoc_nmatches(conn, assoc_ids)
         dbio.add_catalog_match(conn, cmrows)
         conn.close()
         sys.exit(0)
     
-    # Option to add a new sky survey catalog to the database "skycat" schema
+    # Option to add a new sky survey catalog to the database "radcat" schema
     if args.add_catalog:
-        skycatdb.create(conn)
+        radcatdb.create(conn)
         conn.close()
         sys.exit(0)
     
@@ -1170,7 +1245,7 @@ def main():
     nimages, exec_time = print_run_stats(start_time)
 
     # Record run configuration parameters
-    dbio.record_config(conn, args.config_file, start_time, exec_time,
+    dbio.record_config(conn, args.config_file, logpath, start_time, exec_time,
                        nimages, stages, opts, setup, sfparams, qaparams)
 
     conn.close()

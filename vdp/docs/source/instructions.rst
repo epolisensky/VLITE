@@ -10,16 +10,16 @@ improvements to **vdp** which may have to be done in the future.
 Adding a New Radio Catalog
 --------------------------
 Adding a new catalog of radio sources to be used for cross-matching
-against VLITE sources will require editing the ``skycatalog.catalogio``
-and ``skycatalog.skycatdb`` modules. Properties of each catalog
+against VLITE sources will require editing the ``radiocatalogs.catalogio``
+and ``radiocatalogs.radcatdb`` modules. Properties of each catalog
 source are read in and stored as attributes of objects from the
-``skycatalog.CatalogSource()`` class. These objects and their
+``radiocatalogs.catalogio.CatalogSource()`` class. These objects and their
 attributes are written to a text file which is then read and bulk
-inserted into the database as a new table in the "skycat" schema.
+inserted into the database as a new table in the "radcat" schema.
 Follow the instructions below to add or update a catalog.
 
 1. If adding a new catalog, create a new entry for it in the
-   catalog dictionary at the top of the ``skycatalog.catalogio``
+   catalog dictionary at the top of the ``radiocatalogs.catalogio``
    module. Add the name of the catalog as a new key and a
    dictionary as its value which contains the key 'id' and a
    new id number value. The catalog name must be in all lowercase,
@@ -32,18 +32,18 @@ Follow the instructions below to add or update a catalog.
 	     the correct corresponding id number. If you insert it
 	     elsewhere (i.e. to maintain alphabetical order) and
 	     re-assign the id values of the other existing catalogs,
-	     then you will need to re-create the "skycat" schema
+	     then you will need to re-create the "radcat" schema
 	     *AND* re-write the "\*_psql.txt" files so that the
 	     'catalog_id' of the sources matches the 'id' of the
-	     catalog in the **skycat.catalogs** table.
+	     catalog in the **radcat.catalogs** table.
 
 2. Write a new function, or update the existing, to read the
-   catalog in the ``skycatalog.catalogio`` module. Name the
+   catalog in the ``radiocatalogs.catalogio`` module. Name the
    function "read_[catalog name]", where "[catalog_name]" is
    whatever you specified in the catalog dictionary. Use one
    of the other catalog reading functions as a template.
 3. The final step is to add a couple of lines, or update the
-   existing ones if necessary, in the ``skycatalog.skycatdb.add_table``
+   existing ones if necessary, in the ``radiocatalogs.radcatdb.add_table``
    function to call the function to read the catalog::
 
      elif tblname == '[catalog name]':

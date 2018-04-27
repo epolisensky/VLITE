@@ -301,7 +301,8 @@ run of the pipeline like the start time, execution time, and number
 of images read are is also recorded.
 
 - *id*: unique identifier corresponding to each run of **vdp**
-- *file*: name of the configuration file used for the run
+- *config_file*: name of the configuration file used for the run
+- *log_file*: name of the log file
 - *start_time*: date and time the run was started; formatted as
   yyyy-mm-dd hh:mm:ss
 - *execution_time*: length of the time taken to execute the full
@@ -342,7 +343,7 @@ table for every image which could have or does contain the same VU source.
   
 .. _sky_catalogs:
 
-The "skycat" Schema
+The "radcat" Schema
 ^^^^^^^^^^^^^^^^^^^
 Cross-matching of VLITE sources with sources in other radio catalogs
 and surveys is done within the database taking advantage of the Q3C
@@ -350,9 +351,9 @@ spatial indexing and functions. To enable this, all radio catalogs
 used for comparison must be stored in the same database as the
 VLITE sources. Since these catalogs are not part of the same
 organizational structure as the main VLITE database, they are
-stored in a separate schema with the name "skycat". Every
+stored in a separate schema with the name "radcat". Every
 survey/catalog is a separate table with the same format in
-this schema. There is also a table **skycat.catalogs** which
+this schema. There is also a table **radcat.catalogs** which
 provides a list of every table contained in the schema along
 with information about that catalog (telescope, frequency,
 spatial resolution, publication reference).
@@ -360,7 +361,7 @@ spatial resolution, publication reference).
 .. _catalogs:
 
 ***************
-skycat.catalogs
+radcat.catalogs
 ***************
 This table contains information about every radio catalog
 that is available for cross-matching with VLITE sources.
@@ -380,12 +381,12 @@ by the *catalog_id* column in the **catalog_match** table.
 .. _catalog_sources:
 
 *********************
-skycat.[catalog_name]
+radcat.[catalog_name]
 *********************
-Each survey/catalog included in the "skycat" schema is stored
-in a separate table of the name **skycat.[catalog_name]**,
+Each survey/catalog included in the "radcat" schema is stored
+in a separate table of the name **radcat.[catalog_name]**,
 where **[catalog_name]** is the name of the catalog as it
-appears in the **skycat.catalogs** table. Each one of these
+appears in the **radcat.catalogs** table. Each one of these
 tables has the same format with the following columns:
 
 - *id*: row id number of the source referenced by the *src_id*
@@ -408,4 +409,4 @@ tables has the same format with the following columns:
 - *rms*: local noise estimate, or the rms noise in the image (mJy/beam)
 - *field*: name of the field, or image, where the source was detected
 - *catalog_id*: id number of the catalog that the source is in;
-  references the *id* column of the **skycat.catalogs** table
+  references the *id* column of the **radcat.catalogs** table

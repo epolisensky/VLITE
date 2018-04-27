@@ -13,26 +13,32 @@ Instructions for adding a new catalog:
 1. Add catalog name in all lowercase and a new id number to 
 the catalog dictionary. *DO NOT* re-order the id numbers 
 unless you plan on re-writing all the "\*_psql.txt" files 
-and the entire "skycat" schema. Otherwise, the id number of 
-the catalog in the **skycat.catalogs** table will not match 
+and the entire "radcat" schema. Otherwise, the id number of 
+the catalog in the **radcat.catalogs** table will not match 
 the 'catalog_id' of the sources in the catalog's table.
 
 2. Write a function called ``read_[catalog name]`` for reading 
 in the catalog and writing to the text file if it doesn't 
 exist using the same format as all the others.
 
-3. Add a line to skycatdb.py to call the 
+3. Add a line to radcatdb.py to call the 
 ``read_[catalog name]`` function.
 
 Adapted from EP's iofuncs.py.
 
 """
 import os
+import logging
 import pandas as pd
 
+
+# create logger
+catio_logger = logging.getLogger('vdp.radiocatalogs.catalogio')
+
+
 # Define path to the sky catalog data
-#catalogdir = '/home/vpipe/vlite-emily/data/SkyCatalogs'
-catalogdir = '/home/erichards/work/data/SkyCatalogs'
+#catalogdir = '/home/vpipe/vlite-emily/data/RadioCatalogs'
+catalogdir = '/home/erichards/work/data/RadioCatalogs'
 
 # If adding a new catalog, don't forget to add it to this dictionary!
 # Note: catalog name must be lowercase, cannot lead with a number, and
@@ -231,7 +237,8 @@ def read_tgss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} TGSS sources to tgss_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} TGSS sources to tgss_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -308,7 +315,8 @@ def read_first(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} FIRST sources to first_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} FIRST sources to first_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -372,7 +380,8 @@ def read_sumss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} SUMSS sources to sumss_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} SUMSS sources to sumss_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -437,7 +446,8 @@ def read_wenss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} WENSS sources to wenss_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} WENSS sources to wenss_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -541,7 +551,8 @@ def read_nvss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} NVSS sources to nvss_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} NVSS sources to nvss_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -613,7 +624,8 @@ def read_gleam(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} GLEAM sources to gleam_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} GLEAM sources to gleam_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -695,8 +707,8 @@ def read_cosmos(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} COSMOS Legacy P-band sources to cosmos_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} COSMOS Legacy P-band sources to '
+                      'cosmos_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -745,7 +757,7 @@ def read_vlssr(return_sources=False):
         # Read errors line
         line = fread.readline()
         if not line:
-            print 'ERROR: Cannot read error line in VLSSr catalog!'
+            catio_logger.error('ERROR: Cannot read error line in VLSSr catalog')
             break
         sources[-1].e_ra = 15. * dms2deg(0, 0, line[6:11]) # deg
         sources[-1].e_dec = dms2deg(0, 0, line[19:23]) # deg
@@ -761,7 +773,8 @@ def read_vlssr(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} VLSSr sources to vlssr_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} VLSSr sources to vlssr_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -821,7 +834,8 @@ def read_txs(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} TXS sources to txs_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} TXS sources to txs_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -884,7 +898,8 @@ def read_sevenc(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} 7C sources to sevenc_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} 7C sources to sevenc_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -952,8 +967,8 @@ def read_gpsr5(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} GPSR 5 GHz sources to gpsr5_psql.txt'.format(
-        len(sources)))
+    catio_logger.info(' -- wrote {} GPSR 5 GHz sources to gpsr5_psql.txt'.
+                      format(len(sources)))
     return sources
 
 
@@ -1021,8 +1036,8 @@ def read_gpsr1(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} GPSR 1.4 GHz sources to gpsr1_psql.txt'.format(
-        len(sources)))
+    catio_logger.info(' -- wrote {} GPSR 1.4 GHz sources to gpsr1_psql.txt'.
+                      format(len(sources)))
     return sources
 
 
@@ -1109,8 +1124,8 @@ def read_nordgc(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} Hyman-updated Nord GC 330 MHz catalog sources to '
-          'nordgc_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} Hyman-updated Nord GC 330 MHz catalog '
+                      'sources to nordgc_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -1176,8 +1191,8 @@ def read_lazio04(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} Lazio 2004 catalog sources to lazio04_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} Lazio 2004 catalog sources to '
+                      'lazio04_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -1255,8 +1270,8 @@ def read_m31_glg04(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} GLG2004 M31 catalog sources to m31_glg04_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} GLG2004 M31 catalog sources to '
+                      'm31_glg04_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -1324,7 +1339,8 @@ def read_lotss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} LoTSS sources to lotss_psql.txt'.format(len(sources)))
+    catio_logger.info(' -- wrote {} LoTSS sources to lotss_psql.txt'.format(
+        len(sources)))
     return sources
 
 
@@ -1388,8 +1404,8 @@ def read_lofar_lba(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} LOFAR_LBA/VWT2014 sources to lofar_lba_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} LOFAR_LBA/VWT2014 sources to '
+                      'lofar_lba_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -1462,8 +1478,8 @@ def read_lofar_hba(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} LOFAR_HBA/WVR2016 sources to lofar_hba_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} LOFAR_HBA/WVR2016 sources to '
+                      'lofar_hba_psql.txt'.format(len(sources)))
     return sources
 
 
@@ -1533,6 +1549,6 @@ def read_nrl_nvss(return_sources=False):
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
                              src.rms, src.field, src.catalog_id))
-    print(' -- wrote {} NRL-NVSS sources to nrl_nvss_psql.txt'.
-          format(len(sources)))
+    catio_logger.info(' -- wrote {} NRL-NVSS sources to nrl_nvss_psql.txt'.
+                      format(len(sources)))
     return sources

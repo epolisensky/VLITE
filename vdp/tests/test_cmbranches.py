@@ -233,7 +233,7 @@ class TestCMBranches(unittest.TestCase):
 
     def test_cmupdate(self):
         """Branch 17c - add new catalog to existing CM results"""
-        # Run SF + SA + CM with NVSS catalog first
+        # Run SF + SA + CM with FIRST catalog only
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : True}
         opts = {'save to database' : True, 'quality checks' : True,
@@ -250,7 +250,7 @@ class TestCMBranches(unittest.TestCase):
         self.catalogs = ['FIRST', 'TGSS']
         process(self.conn, stages, opts, self.dirs, self.files,
                 self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should have results for both NVSS & FIRST
+        # Check DB - should have results for both FIRST & TGSS
         self.cur = self.conn.cursor()
         self.cur.execute('SELECT id, stage FROM image')
         img_rows = self.cur.fetchall()
@@ -259,14 +259,14 @@ class TestCMBranches(unittest.TestCase):
         assoc_matches = self.cur.fetchone()[0] # 22
         self.cur.execute('''SELECT COUNT(1) FROM catalog_match
             WHERE catalog_id = 2''')
-        nvss_matches = self.cur.fetchone()[0] # 22
+        first_matches = self.cur.fetchone()[0] # 22
         self.cur.execute('''SELECT COUNT(1) FROM catalog_match
-            WHERE catalog_id = 10''')
-        first_matches = self.cur.fetchone()[0] # 21
+            WHERE catalog_id = 16''')
+        tgss_matches = self.cur.fetchone()[0] # 21
         self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
         unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, nvss_matches,
-                  first_matches, unique_detections]
+        result = [sorted_img_rows, assoc_matches, first_matches,
+                  tgss_matches, unique_detections]
         self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 21, 10])
         self.cur.close()
 

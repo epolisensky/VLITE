@@ -8,9 +8,8 @@ in a single execution of the pipeline, or they can be run one stage
 at a time in multiple executions of the pipeline while processing
 multiple images each time in each separate stage. The former is the
 default preferred method since the latter requires multiple executions
-of the pipeline and would be much more time consuming. Stages can be
-turned on and off through the YAML configuration file.
-They are described in more detail below.
+of the pipeline. Stages can be turned on and off through the YAML
+configuration file. They are described in more detail below.
 
 .. _read_image:
 
@@ -55,24 +54,19 @@ in the order they are listed:
    ``PEAK`` or ``DATAMAX``, ``CONFIG``, and ``DURATION``
 2. the integration time on source (``TAU_TIME``) must be
    greater than some minimum time (default is 60 s)
-3. the image noise must be greater than 0 and less than some
-   maximum value (default is 1000 mJy/beam)
+3. the image noise must be >= 0 and <= some maximum value
+   (default is 500 mJy/beam)
 4. the ratio of the image's beam semi-major to semi-minor axis
    must be less than some maximum value (default is 4)
-5. the distance between the image pointing center and a
-   known problem source or field must be more than some
-   minimum angular separation (default is 20 degrees);
-   the following sources/fields are known to be imaged poorly
-   by VLITE:
-
-   - all planets plus the Sun and Pluto
+5. the imaging target can't be a planet or the NCP
+6. a known problem source cannot be in the image's field-of-view:
+   - the Sun
    - Cassiopeia A
    - Cygnus A
    - Taurus A
    - Hercules A
    - M87 (Virgo A)
    - Galactic Center
-   - the North Celestial Pole (NCP)
 
 Each of the above requirements has a default value which is used
 unless otherwise specified through the corresponding option under
@@ -134,10 +128,10 @@ The VLITE images are cropped to a circular field-of-view before being
 ingested by PyBDSF. This is done to ensure that cone search queries
 in the database return sources which lie in the same well-defined
 field-of-view as the images. The radius of the circular field is half
-the image size, which for VLITE is 2 degrees for A & B configuration,
-3 degrees for C, and 4 degrees for D. The *scale* parameter in the
-**vdp** configuration file can be used to make the field-of-view radius
-smaller by the factor specified.
+the image size, which for VLITE is 1 degree for A cofiguration, 2
+degrees for B/B+, 3 degrees for C, and 4 degrees for D. The *scale*
+parameter in the **vdp** configuration file can be used to make the
+field-of-view radius smaller by the factor specified.
 
 Experience has shown that it is better to specify the ``rms_box``
 parameter for VLITE images rather than leave PyBDSF to calculate it
@@ -228,7 +222,8 @@ After source finding, the association stage proceeds as follows:
    there was not.
 
 If the *save to database* option is turned off, the association results
-are printed to the terminal without updating the database tables.
+are printed to the console and/or log file without updating the
+database tables.
 
 .. _catalog_matching:
 
@@ -290,5 +285,5 @@ already matching results for that VLITE associated source.
 The functionality to directly cross-match all sources detected in the
 current VLITE image with any specified radio catalogs, regardless of
 spatial resolution, is enabled by running only the source finding and
-catalog matching stages. These results are printed to the terminal, but
-are not saved to the database.
+catalog matching stages with *save to database* disabled. These results
+will then be printed to the console, but are not saved to the database.

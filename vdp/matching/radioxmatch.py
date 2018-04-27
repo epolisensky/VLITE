@@ -6,12 +6,17 @@ Adapted from EP's VSLOW.py.
 """
 import re
 import numpy as np
+import logging
 import psycopg2
 import psycopg2.extras
 from psycopg2 import sql
-from skycatalog import catalogio
+from radiocatalogs import catalogio
 from database import dbclasses, dbio
 import matchfuncs
+
+
+# create logger
+match_logger = logging.getLogger('vdp.matching.radioxmatch')
 
 
 res_dict = {'A' : (0., 15.), 'B' : (15., 35.),
@@ -64,13 +69,15 @@ def filter_res(rows, res_class):
         applying the spatial resolution filtering.
     """
     keep = []
-    print('Limiting to sources in resolution class {} ({}" < BMIN <= {}")'.
-          format(res_class, res_dict[res_class][0], res_dict[res_class][1]))
+    match_logger.info('Limiting to sources in resolution class {} '
+                      '({}" < BMIN <= {}")'.format(res_class,
+                                                   res_dict[res_class][0],
+                                                   res_dict[res_class][1]))
     for row in rows:
         if row['res_class'] == res_class:
             keep.append(row)
 
-    print(' -- {} sources remaining'.format(len(keep)))
+    match_logger.info(' -- {} sources remaining'.format(len(keep)))
 
     return keep
 
@@ -197,8 +204,9 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
     # Extract all previously detected sources in the same FOV
     assoc_rows = cone_search(conn, 'assoc_source', imobj.obs_ra,
                              imobj.obs_dec, search_radius)
-    print('\nExtracted {} sources from assoc_source table within {} degrees.'.
-          format(len(assoc_rows), search_radius))
+    match_logger.info('Extracted {} sources from assoc_source table '
+                      'within {} degrees.'.format(
+                          len(assoc_rows), search_radius))
     # Limit to sources taken from images of similar resolution
     if len(assoc_rows) > 0:
         filtered_assoc_rows = filter_res(assoc_rows, res_class)
@@ -222,9 +230,9 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
             assoc_ids.append(asrc['id'])
             assoc_sources.append(dbclasses.DetectedSource())
             dbclasses.dict2attr(assoc_sources[-1], asrc)
-        print('Attempting to match {} sources from this image to {} sources '
-              'previously detected in VLITE images...'.format(
-                  len(detected_sources), len(assoc_sources)))
+        match_logger.info('Attempting to match {} sources from this image to '
+                          '{} sources previously detected in VLITE images...'.
+                          format(len(detected_sources), len(assoc_sources)))
 
         detected_matched = []
         detected_unmatched = []
@@ -232,12 +240,14 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
         assoc_unmatched = []
 
         if not match_in_db:
-            print('-----------------------------------------------------------'
-                  '--------------------------------------------------------')
-            print('src_id match assoc_id\tra\t\te_ra\t\t\tdec\t\te_dec\t\t'
-                  'separation (arcsec)')
-            print('-----------------------------------------------------------'
-                  '--------------------------------------------------------')
+            match_logger.info('-----------------------------------------------'
+                              '-----------------------------------------------'
+                              '---------------------')
+            match_logger.info('src_id match assoc_id\tra\t\te_ra\t\t\tdec\t\t'
+                              'e_dec\t\tseparation (arcsec)')
+            match_logger.info('-----------------------------------------------'
+                              '-----------------------------------------------'
+                              '---------------------')
             for src in detected_sources:
                 match, asrc, min_sep = matchfuncs.simple_match(
                     src, assoc_sources, imobj.bmin)
@@ -264,19 +274,16 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
                     src.res_class = res_class
                     detected_unmatched.append(src)
                 try:
-                    print('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
+                    match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
                         src.src_id, match, asrc.id, asrc.ra, asrc.e_ra,
                         asrc.dec, asrc.e_dec, min_sep))
                 except AttributeError:
-                    print('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
+                    match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
                         src.src_id, match, None, src.ra, src.e_ra,
                         src.dec, src.e_dec, min_sep))
         else:
             # Match sources if they are separatred by less than half a beam
             cur = conn.cursor()
-            #sql = '''SELECT a.src_id, b.id FROM detected_source AS a, 
-            #    assoc_source AS b WHERE a.image_id = %s AND b.id IN %s AND
-            #    q3c_join(a.ra, a.dec, b.ra, b.dec, %s)'''
             sql = '''SELECT a.src_id, bb.id FROM detected_source AS a,
                 LATERAL ( SELECT b.* FROM assoc_source AS b
                 WHERE a.image_id = %s AND b.id IN %s AND
@@ -324,8 +331,8 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
                     src.ndetect = 1
                     detected_unmatched.append(src)
 
-    print(' -- number of matches: {}'.format(len(detected_matched)))
-    print(' -- number of new sources to add: {}'.format(
+    match_logger.info(' -- number of matches: {}'.format(len(detected_matched)))
+    match_logger.info(' -- number of new sources to add: {}'.format(
         len(detected_unmatched)))
 
     return detected_matched, detected_unmatched, assoc_matched, assoc_unmatched
@@ -367,7 +374,7 @@ def filter_catalogs(conn, catalogs, res):
         try:
             catalog_res = catalogio.catalog_dict[catalog]['resolution']
         except KeyError:
-            cur.execute('''SELECT resolution FROM skycat.catalogs
+            cur.execute('''SELECT resolution FROM radcat.catalogs
                 WHERE name = %s''', (catalog, ))
             catalog_res = cur.fetchone()[0]
         if use_range[0] < catalog_res <= use_range[1]:
@@ -422,9 +429,9 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
     if not match_in_db:
         # Extract catalog sources
         catalog_rows = cone_search(conn, catalog, imobj.obs_ra, imobj.obs_dec,
-                                   search_radius, 'skycat')
-        print('\nExtracted {} sources from {} within {} degrees.'.
-              format(len(catalog_rows), catalog, search_radius))
+                                   search_radius, 'radcat')
+        match_logger.info('Extracted {} sources from {} within {} degrees.'.
+                          format(len(catalog_rows), catalog, search_radius))
         # Sky survey does not cover this sky region, move on
         if not catalog_rows:
             return
@@ -434,13 +441,16 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
         for csrc in catalog_rows:
             catalog_sources.append(catalogio.CatalogSource())
             dbclasses.dict2attr(catalog_sources[-1], csrc)
-        print('Attempting to match {} sources from this image to {} '
-              'sources from the {} sky catalog...'.format(
-                  len(sources), len(catalog_sources), catalog))
+        match_logger.info('Attempting to match {} sources from this image to '
+                          '{} sources from the {} sky catalog...'.format(
+                              len(sources), len(catalog_sources), catalog))
         
-        print('-----------------------------------------------------')
-        print('VLITE_src_id match catalog_src_id separation (arcsec)')
-        print('-----------------------------------------------------')
+        match_logger.info('-------------------------------------------------'
+                          '----')
+        match_logger.info('VLITE_src_id match catalog_src_id separation '
+                          '(arcsec)')
+        match_logger.info('-------------------------------------------------'
+                          '----')
         
         for src in sources:
             match, csrc, min_sep = matchfuncs.simple_match(
@@ -456,13 +466,14 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
             else:
                 if src.nmatches is None:
                     src.nmatches = 0
-            print('{}\t{}\t{}\t{}'.format(src.src_id, match, csrc.id, csrc.sep))
+            match_logger.info('{}\t{}\t{}\t{}'.format(
+                src.src_id, match, csrc.id, min_sep))
 
 
     # Cross-match inside the DB
     else:
-        print('\nAttempting to match {} sources from this image to '
-              'the {} sky catalog...'.format(len(sources), catalog))
+        match_logger.info('Attempting to match {} sources from this image to '
+                          'the {} sky catalog...'.format(len(sources), catalog))
         # Skip the sources which already have results for this catalog
         # (from a different image)
         assoc_ids = []
@@ -472,15 +483,15 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
                 continue
             else:
                 assoc_ids.append(src.id)
-        print(' -- found previous matching results for {} sources'.format(
-            len(sources) - len(assoc_ids)))
+        match_logger.info(' -- found previous matching results for {} sources'.
+                          format(len(sources) - len(assoc_ids)))
 
         # Find nearest neighbor within half a beam
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         sql = '''SELECT a.id AS assoc_id, bb.*,
             3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep
             FROM assoc_source AS a, LATERAL (
-            SELECT b.* FROM skycat.{} AS b
+            SELECT b.* FROM radcat.{} AS b
             WHERE a.id IN %s AND q3c_join(a.ra, a.dec, b.ra, b.dec, %s)
             ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1)
             AS bb'''
@@ -508,6 +519,6 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
                 if src.nmatches is None:
                     src.nmatches = 0
 
-    print(' -- number of matches: {}'.format(len(catalog_matched)))
+    match_logger.info (' -- number of matches: {}'.format(len(catalog_matched)))
 
     return sources, catalog_matched

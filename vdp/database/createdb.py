@@ -1,5 +1,10 @@
 """Creates database tables, functions, and triggers."""
 import sys
+import logging
+
+
+# create logger
+createdb_logger = logging.getLogger('vdp.database.createdb')
 
 
 def make_error(cur, params):
@@ -11,17 +16,16 @@ def make_error(cur, params):
                    format(params['max noise (mJy/beam)']): 3,
                    'beam axis ratio > {}'.
                    format(params['max beam axis ratio']) : 4,
-                   'image center within {} deg of problem source'.
-                   format(params['min problem source separation (deg)']): 5,
-                   'PyBDSF failed to process' : 6,
-                   'zero sources extracted' : 7,
-                   'source metric > {}'.
-                   format(params['max source metric']) : 8}
+                   'bad imaging target (NCP or planet)' : 5,
+                   'problem source in image field-of-view' : 6,
+                   'PyBDSF failed to process' : 7,
+                   'zero sources extracted' : 8,
+                   'source count metric > {}'.
+                   format(params['max source metric']) : 9}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
         cur.execute(sql, (value, key))
-
 
 
 def create(conn, params, safe=False):
@@ -49,7 +53,7 @@ def create(conn, params, safe=False):
     else:
         cont = 'yes'
     if cont == 'y' or cont == 'yes':
-        print('\nDropping tables if they exist...')
+        createdb_logger.info('Dropping tables if they exist...')
         cur = conn.cursor()
         sql = (
             '''
@@ -69,14 +73,15 @@ def create(conn, params, safe=False):
             ''')
         cur.execute(sql)
 
-        print('\nCreating new tables...')
+        createdb_logger.info('Creating new tables...')
         sql = (
             '''
             CREATE EXTENSION IF NOT EXISTS q3c;
 
             CREATE TABLE run_config (
                 id SERIAL NOT NULL,
-                file TEXT,
+                config_file TEXT,
+                log_file TEXT,
                 start_time TIMESTAMP (0),
                 execution_time TIME (1),
                 nimages INTEGER,
@@ -124,7 +129,7 @@ def create(conn, params, safe=False):
                 bpa REAL,
                 noise REAL,
                 peak REAL,
-                config VARCHAR(1),
+                config VARCHAR(3),
                 nvis INTEGER,
                 mjdtime DOUBLE PRECISION,
                 tau_time REAL,
@@ -359,6 +364,6 @@ def create(conn, params, safe=False):
         cur.close()
 
     else:
-        print('\nAborting... database left unchanged.')
+        createdb_logger.info('Aborting... database left unchanged.')
         sys.exit(0)
 

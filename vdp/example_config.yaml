@@ -18,8 +18,8 @@ options:
 setup:
   root directory: /path/to/data/
   year: 2018
-  month: 4
-  day: [9]                    # list of days to process; [] = all
+  month: 04
+  day: [27]                   # list of days to process; [] = all
   # list files to process - put different days in separate lists; [[]] = all
   files: [[]]
   database name: vlite
@@ -38,8 +38,7 @@ pybdsf_params:
 
 image_qa_params:
   # used when quality checks: yes/True; leave blank for defaults
-  min time on source (s):
-  max noise (mJy/beam):
-  max beam axis ratio:
-  min problem source separation (deg):
-  max source metric:
+  min time on source (s):     # (default 60 s)
+  max noise (mJy/beam):       # (default 500 mJy/beam)
+  max beam axis ratio:        # (default 4)
+  max source metric:          # (default 10)

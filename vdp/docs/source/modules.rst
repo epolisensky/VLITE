@@ -43,7 +43,7 @@ Radio Sky Surveys & Catalogs
    :maxdepth: 2
 
    catalogio
-   skycatdb
+   radcatdb
 
 Utility
 -------

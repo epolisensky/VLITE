@@ -3,10 +3,15 @@
 import psycopg2
 import psycopg2.extras
 import json
+import logging
 import dbclasses
 
 
-def record_config(conn, cfgfile, start_time, exec_time, nimages,
+# create logger
+dbio_logger = logging.getLogger('vdp.database.dbio')
+
+
+def record_config(conn, cfgfile, logfile, start_time, exec_time, nimages,
                   stages, opts, setup, sfparams, qaparams):
     """Inputs information about the current run of the pipeline
     into the database **run_config** table. All contents of the
@@ -18,6 +23,8 @@ def record_config(conn, cfgfile, start_time, exec_time, nimages,
         The PostgreSQL database connection object.
     cfgfile : str
         Name of the YAML run configuration file.
+    logfile : str
+        Name of the log file.
     start_time : ``datetime.datetime`` instance
         Date & time at the start of the pipeline run.
     exec_time : ``datetime.timedelta`` instance
@@ -45,10 +52,10 @@ def record_config(conn, cfgfile, start_time, exec_time, nimages,
     jqaparams = json.dumps(qaparams)
     cur = conn.cursor()
     cur.execute('''INSERT INTO run_config (
-        file, start_time, execution_time, nimages, stages, options, setup,
-        pybdsf_params, image_qa_params) VALUES (
-        %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                (cfgfile, start_time, exec_time, nimages,
+        config_file, log_file, start_time, execution_time, nimages, 
+        stages, options, setup, pybdsf_params, image_qa_params) VALUES (
+        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                (cfgfile, logfile, start_time, exec_time, nimages,
                  jstages, jopts, jsetup, jsfparams, jqaparams))
     conn.commit()
     cur.close()
@@ -117,7 +124,7 @@ def add_image(conn, img, status, delete=False):
     
     # Add new image to DB
     if status is None:
-        print('\nAdding new entry to image table.')
+        dbio_logger.info('Adding new entry to image table.')
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
@@ -136,7 +143,7 @@ def add_image(conn, img, status, delete=False):
         img.id = cur.fetchone()[0]
     # Update existing image entry
     else:
-        print('\nUpdating existing entries in image table.')
+        dbio_logger.info('Updating existing entries in image table.')
         img.id = status[0]
         sql = '''UPDATE image SET filename = %s, imsize = %s, obs_ra = %s,
             obs_dec = %s, pixel_scale = %s, object = %s, obs_date = %s, 
@@ -156,7 +163,7 @@ def add_image(conn, img, status, delete=False):
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
-            print('\nRemoving previous sources...')
+            dbio_logger.info('Removing previous sources...')
             cur.execute('DELETE FROM detected_island WHERE image_id = %s', (
                 img.id, ))
             cur.execute('DELETE FROM vlite_unique WHERE image_id = %s', (
@@ -202,7 +209,7 @@ def add_sources(conn, img, sources):
         return
     
     # Add sources to  detected_source and detected_island tables
-    print('\nAdding detected sources to database.')
+    dbio_logger.info('Adding detected sources to database.')
     for src in sources:
         src.image_id = img.id
         # Insert values into detected_island table
@@ -394,7 +401,7 @@ def update_checked_catalogs(conn, image_id, catalogs):
                     if catalog not in existing_catalogs]
 
     # Update catalogs_checked with new catalogs
-    all_catalogs = json.dumps(existing_catalogs + new_catalogs)
+    all_catalogs = json.dumps(sorted(existing_catalogs + new_catalogs))
     
     cur.execute('UPDATE image SET catalogs_checked = %s WHERE id = %s',
                 (all_catalogs, image_id))
@@ -430,7 +437,7 @@ def check_catalog_match(conn, asrc_id, catalog):
 
     cur.execute('''SELECT id FROM catalog_match
         WHERE assoc_id = %s AND catalog_id = (
-          SELECT id FROM skycat.catalogs WHERE name = %s)''',
+          SELECT id FROM radcat.catalogs WHERE name = %s)''',
                 (asrc_id, catalog))
     rowid = cur.fetchone()
 
@@ -497,7 +504,7 @@ def add_catalog_match(conn, sources):
             sep = src.sep
         except AttributeError:
             # sources = list of tuples
-            cur.execute('SELECT id FROM skycat.catalogs WHERE name = %s',
+            cur.execute('SELECT id FROM radcat.catalogs WHERE name = %s',
                         (src[0], ))
             catalog_id = cur.fetchone()[0]
             src_id = src[1]
@@ -686,8 +693,8 @@ def delete_matches(conn, sources, image_id):
         DetectedSource objects with their nmatches
         attribute re-initialized to 0.
     """
-    print('\nRemoving previous sky catalog matching results '
-          'for {} sources.'.format(len(sources)))
+    dbio_logger.info('Removing previous sky catalog matching results '
+                     'for {} sources.'.format(len(sources)))
 
     cur = conn.cursor()
 
@@ -736,12 +743,13 @@ def remove_catalog(conn, catalogs):
     cur = conn.cursor()
 
     for catalog in catalogs:
-        # Get the catalog_id from the skycat.catalogs table
-        cur.execute('SELECT id FROM skycat.catalogs WHERE name = %s',
+        # Get the catalog_id from the radcat.catalogs table
+        cur.execute('SELECT id FROM radcat.catalogs WHERE name = %s',
                     (catalog, ))
         catid = cur.fetchone()
         if catid is None:
-            print('\nERROR: the catalog {} does not exist.'.format(catalog))
+            dbio_logger.error('ERROR: the catalog {} does not exist.'.
+                              format(catalog))
             return
         else: pass
 
@@ -898,7 +906,8 @@ def remove_images(conn, images):
         try:
             image_id = cur.fetchone()[0]
         except TypeError:
-            print('WARNING: Image {} is not in the database.'.format(image))
+            dbio_logger.info('WARNING: Image {} is not in the database.'.
+                             format(image))
         cur.execute('DELETE FROM image WHERE id = %s',
                     (image_id, ))
     

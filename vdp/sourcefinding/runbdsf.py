@@ -8,11 +8,16 @@ object method ``find_sources()``, which calls the PyBDSF function
 
 """
 import warnings
+import logging
 from datetime import datetime
 import numpy as np
 import bdsf
 from database.dbclasses import Image
 from timeout import timeout
+
+
+# create logger
+sf_logger = logging.getLogger('vdp.sourcefinding.runbdsf')
 
 
 def write_sources(out):
@@ -137,7 +142,7 @@ class BDSFImage(Image):
         processing is killed if taking longer than 5 minutes.
 
         """
-        print('\nExtracting sources...')
+        sf_logger.info('Extracting sources...')
         start = datetime.now()
         opts = self.get_attr()
         with warnings.catch_warnings():
@@ -148,14 +153,14 @@ class BDSFImage(Image):
                 out = None
 
         try:
-            print(' -- found {} sources in {:.2f} seconds\n'.format(
+            sf_logger.info(' -- found {} sources in {:.2f} seconds'.format(
                 out.nsrc, (datetime.now() - start).total_seconds()))
         except AttributeError:
             try:
-                print(' -- found {} islands in {:.2f} seconds\n'.format(
+                sf_logger.info(' -- found {} islands in {:.2f} seconds'.format(
                     out.nisl, (datetime.now() - start).total_seconds()))
             except AttributeError:
-                print(' -- PyBDSF failed to process image.\n')
+                sf_logger.info(' -- PyBDSF failed to process image.')
 
         return out
             
@@ -171,20 +176,19 @@ class BDSFImage(Image):
 
         """
         # Initial run
-        print('\nStarting minimize_islands with box {}...'.format(
+        sf_logger.info('Starting minimize_islands with box {}...'.format(
             self.rms_box))
         self.stop_at = 'isl' # stop fitting at islands
         out = self.find_sources()
         if out is not None:
             box0 = out.rms_box # record initial box
             min_isl = out.nisl # initialize island number minimum
-            #print ('Initial box {} found {} islands.\n'.format(box0, min_isl))
         else:
             # Only fails when user's box is too small
             box0 = self.rms_box            
             min_isl = 99999
-            print ('\nPyBDSF has failed with box {}.'.format(box0))
-            print('Increasing rms_box...\n')
+            sf_logger.info('PyBDSF has failed with box {}.'.format(box0))
+            sf_logger.info('Increasing rms_box...')
 
         opt_box = box0 # initialize optimal box
         box_size = box0[0]
@@ -195,7 +199,7 @@ class BDSFImage(Image):
             box_size += self.box_incr
             box_step = int(box_size / 3.)
             self.rms_box = (box_size, box_step)
-            print ('Trying box {}...'.format(self.rms_box))
+            sf_logger.info('Trying box {}...'.format(self.rms_box))
             out = self.find_sources()
             if out is not None:
                 if out.nisl < min_isl: # new winner, keep going
@@ -208,8 +212,9 @@ class BDSFImage(Image):
             else:
                 # usually happens when box size is too small and "an
                 # unphysical rms value was encountered", so keep going
-                print ('\nPyBDSF has failed with box {}.'.format(self.rms_box))
-                print('Increasing rms_box...\n')
+                sf_logger.info('PyBDSF has failed with box {}.'.format(
+                    self.rms_box))
+                sf_logger.info('Increasing rms_box...')
             i += 1
 
         # Begin decreasing box size loop
@@ -220,7 +225,7 @@ class BDSFImage(Image):
             box_step = int(box_size / 3.)
             self.rms_box = (box_size, box_step)
             if box_size > 0: # stop if box size goes to 0 or below
-                print ('Trying box {}...'.format(self.rms_box))
+                sf_logger.info('Trying box {}...'.format(self.rms_box))
                 out = self.find_sources()
             else:
                 break
@@ -235,15 +240,16 @@ class BDSFImage(Image):
             else:
                 # usually happens when box size is too small and "an
                 # unphysical rms value was encountered", so stop here
-                print ('\nPyBDSF has failed with box {}.'.format(self.rms_box))
-                print ('Stopping here.\n')
+                sf_logger.info('PyBDSF has failed with box {}.'.format(
+                    self.rms_box))
+                sf_logger.info('Stopping here.')
                 break
             i += 1
 
-        print('Found minimum of {} islands using box {}.'.format(min_isl,
-                                                                    opt_box))
+        sf_logger.info('Found minimum of {} islands using box {}.'.format(
+            min_isl, opt_box))
         # Final complete run with best parameters
-        print('\nFinal run...')
+        sf_logger.info('Final run...')
         self.rms_box = opt_box
         self.stop_at = None
         opt_out = self.find_sources()

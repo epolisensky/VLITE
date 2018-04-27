@@ -1,6 +1,6 @@
 Reading Other Radio Catalogs
 ============================
 
-.. automodule:: skycatalog.catalogio
+.. automodule:: radiocatalogs.catalogio
    :members:
    :show-inheritance:

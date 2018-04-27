@@ -25,9 +25,7 @@ The database can be created at runtime, so it does not need
 to exist before starting the pipeline. If connecting to an
 existing database, the user must either be the owner of that
 database or a superuser due to the permissions needed while
-running **vdp**. Unless you have a specific reason not to,
-it is best to connect as user 'vpipe', which has already
-been created on the PostgreSQL server running on virgo.
+running **vdp**. 
 
 Running the Code
 ^^^^^^^^^^^^^^^^
@@ -41,7 +39,7 @@ you named your configuration file. The pipeline's progress
 will be displayed through messages printed to the terminal.
 
 *******************************
-Optional Command Line Arguments
+Command Line Arguments
 *******************************
 There are some optional command line arguments that enable
 some non-standard functionality for **vdp**.
@@ -59,6 +57,8 @@ optional command line arguments::
     config_file           the YAML configuration file
 
   optional arguments:
+    -v {0,1}, --verbosity {0,1}
+                          set to 0 to stop printing log messages to the conosole
     -h, --help            show this help message and exit
     --ignore_prompt       ignore prompt to verify database removal/creation
     --remove_catalog_matches
@@ -73,10 +73,16 @@ optional command line arguments::
     --add_catalog         adds any new sky survey catalogs to a table in the
                           database "skycat" schema
 
+``-v, --verbosity`` turns on or off printing of log messages to
+the console. If specified, the argument needs to be followed by
+either 0 to turn off printing or 1 to turn it on. The default is
+1, so messages will be printed to the console without having to
+explicitly include ``-v 1`` as an argument.
+
 ``--ignore_prompt`` overrides the prompt to confirm overwriting
-or creating a new database. This is needed when redirecting all
-terminal output to a log file, as is recommended when batch
-processing (see :ref:`batch_proc`).
+or creating a new database. This may be desired when batch
+processing (see :ref:`batch_proc`) and suppressing console
+print statements with ``-v 0``.
 
 ``--remove_catalog_matches`` will prompt the user to input the
 name(s) of all radio catalogs whose matching results are to be
@@ -111,15 +117,15 @@ Alternatively, a text file containing the necessary information
 may be given.
 
 ``--add_catalog`` cross-checks the list of available radio
-catalogs defined in ``skycatalog.catalogio.catalog_list``
-with the table names that exist in the database "skycat"
+catalogs defined in ``radiocatalogs.catalogio.catalog_list``
+with the table names that exist in the database "radcat"
 schema. If a catalog is found in the list that does not
-yet exist in the "skycat" schema, a new table is created
-for it and the **skycat.catalogs** table is updated accordingly.
+yet exist in the "radcat" schema, a new table is created
+for it and the **radcat.catalogs** table is updated accordingly.
 It will only be necessary to run this option after you have
-added code to ``skycatalog.catalogio`` and
-``skycatalog.skycatdb`` to read a new radio catalog and need
-to add it to an existing database's "skycat" schema.
+added code to ``radiocatalogs.catalogio`` and
+``radiocatalogs.radcatdb`` to read a new radio catalog and need
+to add it to an existing database's "radcat" schema.
 See :ref:`add_new_catalog` for more information.
 
 .. _batch_proc:
@@ -131,19 +137,20 @@ The configuration file enables processing of one ``year-mo``
 directory at a time.
 Processing more than one month of VLITE images can be accomplished
 through successive runs of **vdp** called from a bash script.
-It is recommended that all output that normally gets printed
-to the terminal window be redirected to a text file to retain
-a record of the pipeline's execution. Don't forget to use the
-optional command line argument ``--ignore_prompt`` for the
-first call to **vdp** if creating a new database or overwriting
-an existing one.
+You can suppress output to the console by using ``-v 0`` or
+``--verbosity 0``. All output will be written to a log file
+in the root directory with name "yearmo.log" (i.e. "201801.log").
+You may additionally use the optional command line argument
+``--ignore_prompt`` for the first call to **vdp** if creating
+a new database or overwriting an existing one and don't want to
+stick around to verify.
 
 Example file ``batch_vdp.bash``:
 ::
    
-  python vdp.py 201801config.yaml --ignore_prompt > 201801.log
-  python vdp.py 201802config.yaml > 201802.log
-  python vdp.py 201803config.yaml > 201803.log
+  python vdp.py 201801config.yaml -v 0 --ignore_prompt
+  python vdp.py 201802config.yaml -v 0
+  python vdp.py 201803config.yaml -v 0
 
 ************************
 Expected Execution Times
@@ -159,7 +166,9 @@ Data Products
 *************
 A ``PyBDSF/`` directory is created in the ``Images/`` parent directory
 which stores the PyBDSF generated log files and ds9 regions
-files for each image. The database contains all results from
+files for each image. A log file is also generated in the root
+directory, or appended to if it already exists, with every run of
+the pipeline The database contains all results from
 each stage of the pipeline. See :ref:`database` for more
 information.
 
@@ -282,14 +291,10 @@ The contents are described in more detail below.
     keyword ``TAU_TIME``. Default is 60 seconds.
   *max noise (mJy/beam)*
     Maximum allowed image noise. Image header keyword ``ACTNOISE``.
-    Default is 1000 mJy/beam.
+    Default is 500 mJy/beam.
   *max beam axis ratio*
     Maximum allowed ratio between the beam semi-major and
     semi-minor axes. Default is 4.
-  *min problem source separation (deg)*
-    Minimum allowed angular separation between the image
-    pointing center and a known problem source/area.
-    Default is 20 degrees.
   *max source metric*
     Maximum allowed metric for source counts. Defined as:
     (actual_num_sources - expected_num_sources) / expected_num_sources.

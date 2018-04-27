@@ -4,6 +4,7 @@ Image and DetectedSource objects.
 """
 import os
 import re
+import logging
 import numpy as np
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
@@ -11,6 +12,10 @@ from astropy.time import Time
 import ephem
 import pybdsfcat
 from sourcefinding import beam_tools
+
+
+# create logger
+dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 
 
 class Image(object):
@@ -151,7 +156,7 @@ class Image(object):
             data, header = fits.getdata(self.filename, header=True)
             return data, header
         except:
-            print('\nERROR: Problem reading image.')
+            dbclasses_logger.error('\nERROR: Problem reading image.')
 
 
     def write(self, data, header, owrite=False):
@@ -293,61 +298,69 @@ class Image(object):
         2. integration time on source (tau_time) < min_tos
         3. noise < 0 or > max_rms mJy/beam
         4. beam semi-major/semi-minor axis > max_ellip (too elliptical)
-        5. pointing center within prob_sep degrees of a known bright radio source (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), the Sun, planets, Galactic Center)
+        5. target is NCP or a planet
+        6. a known bright radio source is in the field-of-view (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), the Sun, Galactic Center)
 
         """
-        print('\nPerforming preliminary image quality checks...')
+        dbclasses_logger.info('Performing preliminary image quality checks...')
         
         # Check if image was missing any necessary header keywords
         if self.error_id == 1:
-            print('IMAGE FAILED QA: missing necessary header keyword(s)')
+            dbclasses_logger.info('IMAGE FAILED QA: missing necessary header '
+                                  'keyword(s)')
             return
         
-        # QA requirements
+        # Check integration time
         min_tos = params['min time on source (s)']
-        max_rms = params['max noise (mJy/beam)']
-        max_ellip = params['max beam axis ratio']
-        prob_sep = params['min problem source separation (deg)']
+        if self.tau_time < min_tos:
+            dbclasses_logger.info('IMAGE FAILED QA: integration time on '
+                                  'source < {} s'.format(min_tos))
+            self.error_id = 2
+            return
+        else: pass
         
-        # VLITE can't track planets, so flag all of them
+        # Check image noise
+        max_rms = params['max noise (mJy/beam)']
+        if self.noise < 0. or self.noise > max_rms:
+            dbclasses_logger.info('IMAGE FAILED QA: image noise is {}. '
+                                  'Max allowed is {}'.format(
+                                      self.noise, max_rms)) 
+            self.error_id = 3
+            return
+        else: pass
+
+        # Check beam ellipticity
+        max_ellip = params['max beam axis ratio']
+        axis_ratio = self.bmaj / self.bmin
+        if axis_ratio > max_ellip:
+            dbclasses_logger.info('IMAGE FAILED QA: beam axis ratio is {}. '
+                                  'Max allowed is {}'.format(
+                                      axis_ratio, max_ellip))
+            self.error_id = 4
+            return
+        else: pass
+
+        # VLITE can't do planets or the NCP
+        if self.obj == 'NCP' or self.obj == 'ncp':
+            dbclasses_logger.info('IMAGE FAILED QA: pointing is at NCP')
+            self.error_id = 5
+            return
+        else: pass
+        # Planet observations have obs_ra, obs_dec = 0, 0
+        if self.obs_ra == 0. and self.obs_dec == 0.:
+            dbclasses_logger.info('IMAGE FAILED QA: planet observation with '
+                                  'RA, Dec = 0, 0')
+            self.error_id = 5
+            return
+        else: pass
+
+        # Check angular separation from problem sources
         sun = ephem.Sun()
-        mer = ephem.Mercury()
-        ven = ephem.Venus()
-        mars = ephem.Mars()
-        jup = ephem.Jupiter()
-        sat = ephem.Saturn()
-        ur = ephem.Uranus()
-        nep = ephem.Neptune()
-        plu = ephem.Pluto()
         # convert from MJD to UTC ISO format
         jdt = Time(self.mjdtime, format='mjd', scale='utc')
         sun.compute(jdt.iso)
-        mer.compute(jdt.iso)
-        ven.compute(jdt.iso)
-        mars.compute(jdt.iso)
-        jup.compute(jdt.iso)
-        sat.compute(jdt.iso)
-        ur.compute(jdt.iso)
-        nep.compute(jdt.iso)
-        plu.compute(jdt.iso)
         bad_sources = {'Sun' : SkyCoord(str(sun.a_ra), str(sun.a_dec),
                                         unit=('hourangle', 'deg')),
-                       'Mercury' : SkyCoord(str(mer.a_ra), str(mer.a_dec),
-                                            unit=('hourangle', 'deg')),
-                       'Venus' : SkyCoord(str(ven.a_ra), str(ven.a_dec),
-                                          unit=('hourangle', 'deg')),
-                       'Mars' : SkyCoord(str(mars.a_ra), str(mars.a_dec),
-                                         unit=('hourangle', 'deg')),
-                       'Jupiter' : SkyCoord(str(jup.a_ra), str(jup.a_dec),
-                                            unit=('hourangle', 'deg')),
-                       'Saturn' : SkyCoord(str(sat.a_ra), str(sat.a_dec),
-                                           unit=('hourangle', 'deg')),
-                       'Uranus' : SkyCoord(str(ur.a_ra), str(ur.a_dec),
-                                           unit=('hourangle', 'deg')),
-                       'Neptune' : SkyCoord(str(nep.a_ra), str(nep.a_dec),
-                                            unit=('hourangle', 'deg')),
-                       'Pluto' : SkyCoord(str(plu.a_ra), str(plu.a_dec),
-                                          unit=('hourangle', 'deg')),
                        'Cas A' : SkyCoord(350.866250, 58.811667, unit='deg'),
                        'Cyg A' : SkyCoord(299.867917, 40.733889, unit='deg'),
                        'Tau A' : SkyCoord(83.633333, 22.014444, unit='deg'),
@@ -356,61 +369,24 @@ class Image(object):
                        'GC' : SkyCoord(266.416833, -29.007806, unit='deg')}
 
         image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
+        pixsize = float(self.imsize.strip(')').split(',')[1])
+        fov = round(0.5 * ((pixsize * self.pixel_scale) / 3600.), 2)
 
-        # Check integration time
-        if self.tau_time < min_tos:
-            print('IMAGE FAILED QA: integration time on source < {} s'.
-                  format(min_tos))
-            self.error_id = 2
-            return
-        else: pass
-        
-        # Check image noise
-        if self.noise < 0. or self.noise > max_rms:
-            print('IMAGE FAILED QA: image noise is {}. Max allowed is {}'.
-                  format(self.noise, max_rms)) 
-            self.error_id = 3
-            return
-        else: pass
-
-        # Check beam ellipticity
-        axis_ratio = self.bmaj / self.bmin
-        if axis_ratio > max_ellip:
-            print('IMAGE FAILED QA: beam axis ratio is {}. Max allowed is {}'.
-                  format(axis_ratio, max_ellip))
-            self.error_id = 4
-            return
-        else: pass
-
-        # Check angular separation from problem sources
         min_sep = 999999.99
         for src, loc in bad_sources.items():
             ang_sep = image_center.separation(loc).degree
-            if ang_sep < min_sep:
+            while ang_sep < min_sep:
                 min_sep = ang_sep
-                self.separation = ang_sep
                 self.nearest_problem = src
-            else: pass
-            if ang_sep < prob_sep:
-                print('IMAGE FAILED QA: {} is within {} degrees'.format(
-                    src, prob_sep))
-                self.error_id = 5
-                return
-            else: pass
-        # Check to see if image header says it's looking at the NCP
-        if self.obj == 'NCP':
-            print('IMAGE FAILED QA: pointing is at NCP')
-            self.error_id = 5
-            return
-        else: pass
-        # Some planet observations have obs_ra, obs_dec = 0, 0
-        if self.obs_ra == 0. and self.obs_dec == 0.:
-            print('IMAGE FAILED QA: pointing center is at RA, Dec = 0, 0')
-            self.error_id = 5
+                self.separation = ang_sep
+        if min_sep <= fov:
+            dbclasses_logger.info('IMAGE FAILED QA: {} is in the '
+                                  'field-of-view'.format(self.nearest_problem))
+            self.error_id = 6
             return
         else: pass
 
-        print('...image passed.')
+        dbclasses_logger.info('...image passed.')
 
 
     def source_qa(self, sources, params):
@@ -420,12 +396,12 @@ class Image(object):
 
         """
         max_src_metric = params['max source metric']
-        
-        print('\nPerforming source count quality checks...')
+
+        dbclasses_logger.info('Performing source count quality checks...')
         # First, check if there are any sources
         if len(sources) < 1:
-            print('IMAGE FAILED QA: 0 sources were detected')
-            self.error_id = 7
+            dbclasses_logger.info('IMAGE FAILED QA: 0 sources were detected')
+            self.error_id = 8
             return
         else: pass
 
@@ -444,14 +420,14 @@ class Image(object):
         nsrc_metric = (float(nsrc_cut) - nsrc_exp) / nsrc_exp
         
         if nsrc_metric > max_src_metric:
-            print('IMAGE FAILED QA: too many sources detected, ')
-            print('nsrc_metric = {}; limit = {}'.format(
-                nsrc_metric, max_src_metric))
-            self.error_id = 8
+            dbclasses_logger.info('IMAGE FAILED QA: too many sources '
+                                  'detected - nsrc_metric = {}; limit = {}'.
+                                  format(nsrc_metric, max_src_metric))
+            self.error_id = 9
             return
         else: pass
 
-        print('...image passed.')
+        dbclasses_logger.info('...image passed.')
 
 
     def log_attrs(self, pybdsfdir):
@@ -766,7 +742,7 @@ def translate_from_txtfile(img, pybdsfdir):
     srl = prefix + '.pybdsm.srl'
     catalog = os.path.join(pybdsfdir, srl)
     # Read the catalog
-    print('\nExtracting sources from {}.'.format(srl))
+    dbclasses_logger.info('Extracting sources from {}.'.format(srl))
     sources = pybdsfcat.read_catalog(catalog)
 
     # Count the number of sources

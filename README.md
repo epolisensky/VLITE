@@ -1,7 +1,7 @@
 # VLITE Database Pipeline (VDP)
 ### Scripts for automating source extraction and database storage.
 
-#### Version 1.8
+#### Version 1.9
 
 A post-processing pipeline to adaptively extract and catalog point sources is
 being developed to enhance the scientific value and accessibility of data
@@ -17,7 +17,7 @@ set of data. A catalog of radio sources detected in every VLITE image
 is created from source fit parameters measured using the Python Blob Detector
 and Source Finder software (`PyBDSF`; Mohan & Rafferty 2015). Detected VLITE
 sources are positionally associated with each other in a resolution-dependent
-manner, and are cross-matched to other radio sky surveys to aid in the
+manner, and are cross-matched to other radio sky surveys and catalogs to aid in the
 detection of transient sources and enable creation of radio flux spectra for
 sources across the entire northern sky.
 
@@ -36,10 +36,10 @@ by `PyBDSF`
 cross-matching
 - **matching/radioxmatch.py**: Python driver script for performing association
 and catalog cross-matching
-- **skycatalog/catalogio.py**: Python module for reading other radio sky
+- **radiocatalogs/catalogio.py**: Python module for reading other radio sky
 survey source lists and catalogs
-- **skycatalog/skycatdb.py**: Python module for creation of separate database
-schema and insertion of other radio sky survey catalogs
+- **radiocatalogs/radcatdb.py**: Python module for creation of separate database
+schema and insertion of other radio catalogs
 - **sourcefinding/beam_tools.py**: Python functions to primary beam correct
 VLITE flux measurements
 - **sourcefinding/runbdsf.py**: Python script which runs `PyBDSF` source finding

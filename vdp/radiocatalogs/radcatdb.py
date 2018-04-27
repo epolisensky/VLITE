@@ -1,5 +1,5 @@
 """Tables corresponding to each sky survey catalog are 
-stored in a separate schema called "skycat" within the 
+stored in a separate schema called "radcat" within the 
 same PostgreSQL database as the VLITE data. This
 module contains the functions to create the schema
 and tables.
@@ -7,9 +7,13 @@ and tables.
 """
 import os
 import sys
+import logging
 import psycopg2
 from psycopg2 import sql
 import catalogio
+
+# create logger
+radcatdb_logger = logging.getLogger('vdp.radiocatalogs.radcatdb')
 
 
 def index(tblname, conn):
@@ -27,12 +31,12 @@ def index(tblname, conn):
     # Just in case...
     tblname = tblname.lower()
         
-    cur.execute(psycopg2.sql.SQL('''CREATE INDEX ON skycat.{} 
+    cur.execute(psycopg2.sql.SQL('''CREATE INDEX ON radcat.{} 
         (q3c_ang2ipix(ra, dec))''').format(psycopg2.sql.Identifier(tblname)))
-    cur.execute(psycopg2.sql.SQL('CLUSTER {} ON skycat.{}').format(
+    cur.execute(psycopg2.sql.SQL('CLUSTER {} ON radcat.{}').format(
         psycopg2.sql.Identifier(tblname + '_q3c_ang2ipix_idx'),
         psycopg2.sql.Identifier(tblname)))
-    cur.execute(psycopg2.sql.SQL('ANALYZE skycat.{}').format(
+    cur.execute(psycopg2.sql.SQL('ANALYZE radcat.{}').format(
         psycopg2.sql.Identifier(tblname)))
 
     conn.commit()
@@ -41,7 +45,7 @@ def index(tblname, conn):
 
 def add_table(tblname, conn):
     """Copies sky survey sources into a new table
-    in the "skycat" schema from a text file. If the
+    in the "radcat" schema from a text file. If the
     text file does not yet exist, the sources are
     read from the original catalog, initialized as
     CatalogSource objects, and written to the text file.
@@ -62,7 +66,7 @@ def add_table(tblname, conn):
     # Create the table
     cur.execute(psycopg2.sql.SQL(
         '''
-        CREATE TABLE IF NOT EXISTS skycat.{} (
+        CREATE TABLE IF NOT EXISTS radcat.{} (
             id INTEGER NOT NULL,
             name TEXT,
             ra REAL,
@@ -84,7 +88,7 @@ def add_table(tblname, conn):
             catalog_id INTEGER,
             PRIMARY KEY (id),
             FOREIGN KEY (catalog_id)
-              REFERENCES skycat.catalogs (id)
+              REFERENCES radcat.catalogs (id)
               ON UPDATE CASCADE
               ON DELETE CASCADE
         );
@@ -130,14 +134,15 @@ def add_table(tblname, conn):
     elif tblname == 'nrl_nvss':
         sources = catalogio.read_nrl_nvss()
     else:
-        print('ERROR: No function to read catalog {}.'.format(tblname))
+        radcatdb_logger.error('ERROR: No function to read catalog {}.'.
+                              format(tblname))
         sys.exit(0)
 
-    print(' -- reading/inserting {} sources into database table'.format(
-        tblname))
+    radcatdb_logger.info(' -- reading/inserting {} sources into database'.
+                         format(tblname))
         
     # Add catalog to catalogs table
-    sql = '''INSERT INTO skycat.catalogs (
+    sql = '''INSERT INTO radcat.catalogs (
         id, name, telescope, frequency, resolution, reference) VALUES (
         %s, %s, %s, %s, %s, %s) ON CONFLICT (id) DO NOTHING'''
     cur.execute(sql, (catalogio.catalog_dict[tblname]['id'], tblname,
@@ -151,7 +156,7 @@ def add_table(tblname, conn):
     # Add sources to table
     for src in sources:
         src.catalog_id = catid
-        sql = '''INSERT INTO skycat.{} (
+        sql = '''INSERT INTO radcat.{} (
             name, ra, e_ra, dec, e_dec, total_flux, e_total_flux,
             peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa,
             rms, field, catalog_id) 
@@ -168,7 +173,7 @@ def add_table(tblname, conn):
     # This is waaaaaaay faster (~10x)
     fname = tblname + '_psql.txt'
     psqlf = os.path.join(catalogio.catalogdir, fname)
-    fullname = 'skycat.' + tblname
+    fullname = 'radcat.' + tblname
     with open(psqlf, 'r') as f:
         cur.copy_from(f, fullname, sep=' ', null='None')
 
@@ -177,7 +182,7 @@ def add_table(tblname, conn):
     
 
 def create(conn):
-    """Creates the "skycat" schema and catalogs 
+    """Creates the "radcat" schema and catalogs 
     table within that schema. Calls the functions
     ``add_table`` and ``index`` for each catalog in the
     list from ``catalogio.catalog_dict.keys()``.
@@ -190,9 +195,9 @@ def create(conn):
     cur = conn.cursor()
     sql = (
         '''
-        CREATE SCHEMA IF NOT EXISTS skycat;
+        CREATE SCHEMA IF NOT EXISTS radcat;
         
-        CREATE TABLE IF NOT EXISTS skycat.catalogs (
+        CREATE TABLE IF NOT EXISTS radcat.catalogs (
             id INTEGER NOT NULL,
             name TEXT,
             telescope TEXT,
@@ -208,17 +213,18 @@ def create(conn):
     atleastone = False
     for table in tables:
         cur.execute('''SELECT EXISTS(SELECT 1 FROM information_schema.tables
-            WHERE table_schema = 'skycat' AND table_name = %s)''',
+            WHERE table_schema = 'radcat' AND table_name = %s)''',
                     (table, ))
         if not cur.fetchone()[0]:
             atleastone = True
-            print('Adding sources from {}'.format(table))
+            radcatdb_logger.info('Adding sources from {}'.format(table))
             add_table(table, conn)
             index(table, conn)
         else:
             continue
 
     if not atleastone:
-        print('\nNo new sky catalogs to add.')
+        print
+        radcatdb_logger.info('No new sky catalogs to add.')
 
     cur.close 
