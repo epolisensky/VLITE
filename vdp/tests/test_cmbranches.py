@@ -5,14 +5,14 @@ sky catalog cross-matching stage
 
 A single test can be run by calling unittest.main()
 and by typing the following at the command prompt:
-$ python test_cmbranches.py TestCMBranches.test_sfcm_reprocess
+$ python test_cmbranches.py TestCMBranches.test_sfcm_new_image
 
 """
 import unittest
 import os
 import sys
 sys.path.append('../')
-from vdp import dbinit, process
+import vdp
 
 
 class TestCMBranches(unittest.TestCase):
@@ -24,14 +24,14 @@ class TestCMBranches(unittest.TestCase):
         every time."""
         self.dirs = ['/home/erichards/work/data/test/2540-06/04/Images/']
         self.files = [[]]
-        self.catalogs = ['FIRST']
-        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.qaparams = {'min time on source (s)' : 60.,
-                         'max noise (mJy/beam)' : 1000.,
+        self.catalogs = ['NVSS']
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 1.0}
+        self.qaparams = {'min nvis' : 1000.,
+                         'max sensitivity metric' : 3000.,
                          'max beam axis ratio' : 4.,
-                         'min problem source separation (deg)' : 20.,
-                         'max source metric' : 10.}
-        self.conn = dbinit('branchtest', 'erichards', True, self.qaparams, True)
+                         'max source count metric' : 10.}
+        self.conn = vdp.dbinit('branchtest', 'erichards', True,
+                               self.qaparams, True)
 
 
     def tearDown(self):
@@ -46,18 +46,9 @@ class TestCMBranches(unittest.TestCase):
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # No results past SF should be saved to the DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        matches = self.cur.fetchone()[0]
-        result = [sorted_img_rows, matches]
-        self.assertEqual(result, [[(1, 2), (2, 2)], 0])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 10)
 
 
     def test_all_new_image(self):
@@ -67,208 +58,126 @@ class TestCMBranches(unittest.TestCase):
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
-
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 12)
+        
 
     def test_sfcm_reprocess(self):
         """Branch 13 - SF + CM with reprocessing"""
-        # Add image to DB first
-        stages = {'source finding' : False, 'source association' : False,
+        # Add images & sources to DB first
+        stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Now do SF + CM
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        # Re-do SF & add in CM
         stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : True}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # No results past SF should be saved to the DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        matches = self.cur.fetchone()[0]
-        result = [sorted_img_rows, matches]
-        self.assertEqual(result, [[(1, 2), (2, 2)], 0])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 13)
 
 
     def test_all_reprocess(self):
         """Branch 15 - SF + SA + CM with reprocessing"""
-        # Add image to DB first
-        stages = {'source finding' : False, 'source association' : False,
+        # Add image & sources to DB first
+        stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Now run all stages
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        # Re-do SF & add SA + CM
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : True}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 15)
 
 
     def test_cmonly_fail(self):
         """Branch 16 - CM only, but stage < 2"""
-        # Populate DB with sources first
+        # Add images & sources to database
         stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now try to run CM only
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
+        opts['save to database'] = False
         # Should fail due to stage < 2
-        self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.files,self.catalogs, self.sfparams,
-                                  self.qaparams))
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 16)
 
 
     def test_cmonly(self):
-        """Branch 17a - new CM only"""        
+        """Branch 17.1 - new CM only"""        
         # Run SF + SA first
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}        
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now run CM only
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should be same as branch 12/15 (SF + SA + CM)
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 17.1)
 
 
     def test_cmredo(self):
-        """Branch 17b - redo existing CM only"""
+        """Branch 17.2 - redo existing CM only"""
         # Run SF + SA + CM first
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : True}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now redo CM
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : True, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should be same as branch 12/15 (SF + SA + CM)
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 17.2)
 
 
     def test_cmupdate(self):
-        """Branch 17c - add new catalog to existing CM results"""
-        # Run SF + SA + CM with FIRST catalog only
+        """Branch 17.3 - add new catalog to existing CM results"""
+        # Run SF + SA + CM with NVSS catalog only
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : True}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Now run CM again adding the TGSS catalog
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        # Now run CM again adding the WENSS catalog
         stages = {'source finding' : False, 'source association' : False,
                   'catalog matching' : True}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : True}
-        self.catalogs = ['FIRST', 'TGSS']
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should have results for both FIRST & TGSS
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches > 0')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('''SELECT COUNT(1) FROM catalog_match
-            WHERE catalog_id = 2''')
-        first_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('''SELECT COUNT(1) FROM catalog_match
-            WHERE catalog_id = 16''')
-        tgss_matches = self.cur.fetchone()[0] # 21
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, first_matches,
-                  tgss_matches, unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 21, 10])
-        self.cur.close()
+        self.catalogs = ['WENSS']
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 17.3)
 
 
     def test_sacm(self):
@@ -279,28 +188,14 @@ class TestCMBranches(unittest.TestCase):
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now run SA + CM
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : True}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should be same as branch 12/15 (SF + SA + CM)
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 20)
 
 
     def test_sapass_cmonly(self):
@@ -311,28 +206,14 @@ class TestCMBranches(unittest.TestCase):
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now try to run SA + CM
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : True}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should be same results as branch 17
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('SELECT COUNT(1) FROM assoc_source WHERE nmatches = 1')
-        assoc_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM catalog_match')
-        catalog_matches = self.cur.fetchone()[0] # 22
-        self.cur.execute('SELECT COUNT(1) FROM vlite_unique WHERE detected')
-        unique_detections = self.cur.fetchone()[0] # 10
-        result = [sorted_img_rows, assoc_matches, catalog_matches,
-                  unique_detections]
-        self.assertEqual(result, [[(1, 4), (2, 4)], 22, 22, 10])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 21)
 
 
 if __name__ == '__main__':

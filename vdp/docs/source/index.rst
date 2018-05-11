@@ -2,7 +2,7 @@ Welcome to the VLITE Database Pipeline Documentation
 ====================================================
 The VLITE Database Pipeline, or **vdp**, is a collection of
 Python scripts to automate the measurement and database
-archiving of radio astronomical point sources detected in
+archiving of radio-emitting astronomical point sources detected in
 VLITE images.
 
 **vdp** uses the Python Blob Detector and Source Finder
@@ -35,7 +35,7 @@ configuration file::
   $ python vdp.py example_config.yaml
 
 Check out the `VDPGuide IPython notebook
-<https://github.com/erichards/VLITE/blob/develop/vdp/notebooks/VDPGuide.ipynb>`_
+<https://github.com/erichards/VLITE/blob/master/vdp/notebooks/VDPGuide.ipynb>`_
 for a step-by-step walkthrough of the pipeline stages and
 analysis examples.
 
@@ -50,6 +50,7 @@ Getting Started with the VLITE Database Pipeline
    stages
    database
    usage_examples
+   sql
    instructions
 
    

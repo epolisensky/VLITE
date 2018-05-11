@@ -14,10 +14,13 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
 from errors import ConfigError
-from database import createdb, dbclasses, dbio
+from database import createdb
+from database import dbclasses
+from database import dbio
 from sourcefinding import runbdsf
 from matching import radioxmatch
-from radiocatalogs import catalogio, radcatdb
+from radiocatalogs import catalogio
+from radiocatalogs import radcatdb
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -25,15 +28,15 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = 1.9
+__version__ = '2.0.0'
 
 
-# create logger
+# Create logger
 logger = logging.getLogger('vdp')
 logger.setLevel(logging.DEBUG)
 
 
-def loggerinit(logfile=None, verbosity=1):
+def loggerinit(logfile=None, quiet=False):
     """Initializes handlers for logging to both the 
     console and a text file.
 
@@ -42,10 +45,9 @@ def loggerinit(logfile=None, verbosity=1):
     logfile : str, optional
         Name of the log file. If ``None``, messages will
         only be printed to the console. Default is ``None``.
-    verbosity : int (0 or 1), optional
-        Set to 0 if you don't want any messages to be printed
-        to the console. Messages will still be printed to the
-        log file if one is provided. Default is 1.
+    quiet : bool, optional
+        If ``True``, no messages will be printed to the
+        console. Default is ``False``.
     """
     # Create boolean lists to determine if any handlers of either type
     is_stream = []
@@ -55,7 +57,7 @@ def loggerinit(logfile=None, verbosity=1):
             is_stream.append(type(handler) is logging.StreamHandler)
             is_file.append(type(handler) is logging.FileHandler)
 
-    if verbosity < 1:
+    if quiet:
         pass
     elif any(is_stream):
         # a console handler already exists
@@ -254,24 +256,32 @@ def cfgparse(cfgfile):
                 raise ConfigError('Please provide a list of valid sky '
                                   'catalogs.')
 
+    # Check required source finding parameters
+    if sfparams['mode'] != 'default' and sfparams['mode'] != 'minimize_islands':
+        raise ConfigError('Source finding mode must be default or '
+                          'minimize_islands.')
+    if sfparams['scale'] < 0 or sfparams['scale'] > 1:
+        raise ConfigError('The image radius scale factor must be a number '
+                          'between 0 and 1.')
+
     # Set default QA requirements if not specified
     if opts['quality checks']:
-        if qaparams['min time on source (s)'] is None:
-            qaparams['min time on source (s)'] = 60.
+        if qaparams['min nvis'] is None:
+            qaparams['min nvis'] = 1000.
         else:
             try:
-                qaparams['min time on source (s)'] = float(
-                    qaparams['min time on source (s)'])
+                qaparams['min nvis'] = float(
+                    qaparams['min nvis'])
             except ValueError:
-                raise ConfigError('min time on source must be a number.')
-        if qaparams['max noise (mJy/beam)'] is None:
-            qaparams['max noise (mJy/beam)'] = 500.
+                raise ConfigError('min nvis must be a number.')
+        if qaparams['max sensitivity metric'] is None:
+            qaparams['max sensitivity metric'] = 3000.
         else:
             try:
-                qaparams['max noise (mJy/beam)'] = float(
-                    qaparams['max noise (mJy/beam)'])
+                qaparams['max sensitivity metric'] = float(
+                    qaparams['max sensitivity metric'])
             except ValueError:
-                raise ConfigError('max noise must be a number.')
+                raise ConfigError('max sensitivity metric must be a number.')
         if qaparams['max beam axis ratio'] is None:
             qaparams['max beam axis ratio'] = 4.
         else:
@@ -280,14 +290,14 @@ def cfgparse(cfgfile):
                     qaparams['max beam axis ratio'])
             except ValueError:
                 raise ConfigError('max beam axis ratio must be a number.')
-        if qaparams['max source metric'] is None:
-            qaparams['max source metric'] = 10.
+        if qaparams['max source count metric'] is None:
+            qaparams['max source count metric'] = 10.
         else:
             try:
-                qaparams['max source metric'] = float(
-                    qaparams['max source metric'])
+                qaparams['max source count metric'] = float(
+                    qaparams['max source count metric'])
             except ValueError:
-                raise ConfigError('max source metric must be a number.')
+                raise ConfigError('max source count metric must be a number.')
             
     return stages, opts, setup, sfparams, qaparams, dirs
 
@@ -439,7 +449,7 @@ def vlite_unique(conn, src, image_id, radius):
     return src
 
 
-def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
+def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
     """This function handles ingestion of the image metadata
     into the database **image** table and represents the first
     stage in the VLITE Database Pipeline.
@@ -466,6 +476,10 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
         done and the code moves on to the next image in the list.
     stages : dict
         Dictionary specifying which processing stages are to be run.
+    scale : float
+        Fraction between 0 and 1 of the image radius to use.
+        The full size of the image field-of-view is multiplied
+        by this number.
 
     Returns
     -------
@@ -478,6 +492,9 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
     logger.info('**********************')
     logger.info('STAGE 1: READING IMAGE')
     logger.info('**********************')
+
+    # Set the radius size
+    imobj.set_radius(scale)
 
     # Run image quality checks
     if qa:
@@ -493,14 +510,22 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
         if status is None:
             # image not in DB, so add it
             imobj = dbio.add_image(conn, imobj, status) # branch 2
+            global branch
+            branch = 2
         else:
             if reproc:
-                # already processed, but re-doing -- sources NOT deleted
-                imobj = dbio.add_image(conn, imobj, status) # branch 4
+                if save:
+                    # already processed, but re-doing -- sources NOT deleted
+                    imobj = dbio.add_image(conn, imobj, status) # branch 4
+                else:
+                    # just initialize if not writing to DB
+                    logger.info('Initializing image.')
+                branch = 4
             else:
                 # already processed & not re-doing
                 logger.info('Image already in database. Moving on...')
                 imobj = None # branch 3
+                branch = 3
     else: # Running at least one stage
         if status is None:
             if stages['source finding']:
@@ -510,12 +535,14 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                 else:
                     # just initialize if not writing to DB
                     logger.info('Initializing image.')
+                branch = 6
             else:
                 # image not in DB, but not running source finding --> quit
                 logger.error('ERROR: Image {} not yet processed. '
                              'Source finding must be run before other stages.'.
                              format(imobj.filename))
                 imobj = None # branch 5
+                branch = 5
         else:
             if stages['source finding']:
                 if status[1] == 1:
@@ -524,6 +551,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                         imobj = dbio.add_image(conn, imobj, status)
                     else:
                         logger.info('Initializing image.')
+                    branch = 8
                 else:
                     if reproc:
                         if save:
@@ -533,10 +561,12 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                         else:
                             # just initialize if not writing to DB
                             logger.info('Initializing image.')
+                        branch = 8
                     else:
                         # image has SF results & not re-processing
                         logger.info('Image already processed. Moving on...')
                         imobj = None # branch 9
+                        branch = 9
             else:
                 # not running SF -- stage must be > 1
                 if status[1] > 1:
@@ -549,10 +579,12 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages):
                                  'extracted yet. Source finding must be run '
                                  'before other stages.'.format(imobj.filename))
                     imobj = None # branch 7
+                    branch = 7
 
-    # Stop if the image failed a quality check
+    # Stop if the image failed a quality check except 6
     if imobj is not None and imobj.error_id is not None:
-        imobj = None
+        if imobj.error_id != 6:
+            imobj = None
     
     return imobj
 
@@ -610,15 +642,23 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     else:
         out = bdsfim.find_sources()
 
-    # Set new radius attribute for Image object & update stage
-    imobj.radius = bdsfim.radius
+    # Update stage
     imobj.stage = 2
    
     if out is not None:
         # Write PyBDSF files to daily directory
         runbdsf.write_sources(out)
         # Translate PyBDSF output to DetectedSource objects
-        imobj, sources = dbclasses.translate(imobj, out)
+        sources = dbclasses.translate(imobj, out)
+        # Drop sources outside the (scaled) image FOV (radius)
+        sources = [src for src in sources if \
+                   src.dist_from_center <= imobj.radius]
+        logger.info(' -- {}/{} sources are inside the circular FOV '
+                    'with radius {} degree(s)'.format(
+                        len(sources), out.nsrc, imobj.radius))
+        # Add PyBDSF defined attributes to Image object
+        imobj.rms_box = str(out.rms_box)
+        imobj.nsrc = len(sources)
         # Run quality checks, part 2
         if qa:
             imobj.source_qa(sources, qaparams)
@@ -639,7 +679,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
             logger.info('Correcting all flux measurements for primary beam '
                         'response.')
             for src in sources:
-                src.correct_flux(imobj)
+                src.correct_flux(imobj.pri_freq)
                 dbio.add_corrected(conn, src)
 
     return imobj, sources
@@ -836,6 +876,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
         User-specified quality requirements or default values defined
         and set in ``cfgparse``.
     """
+    global branch
     # Define booleans from stages & opts dictionaries
     sf = stages['source finding']
     sa = stages['source association']
@@ -868,7 +909,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
         for img in imglist:
             impath = os.path.join(imgdir, img)
             # Initialize Image object & set attributes from header
-            imobjlist.append(dbio.init_image(impath))
+            imobjlist.append(dbclasses.init_image(impath))
 
         # Sort imobjlist by mjdtime
         imobjlist.sort(key=lambda x: x.mjdtime)
@@ -878,19 +919,18 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             logger.info('_' * (len(imobj.filename) + 10))
             logger.info('Starting {}.'.format(imobj.filename))
             # STAGE 1 -- Add image to database
-            imobj = iminit(conn, imobj, save, qa, qaparams, reproc, stages)
+            imobj = iminit(conn, imobj, save, qa, qaparams, reproc, stages,
+                           sfparams['scale'])
             # Move on to next image if imobj is None
             if imobj is None:
                 continue
             
             # STAGE 2 -- Source finding
             if sf:
-                imobj, sources = srcfind(
-                    conn, imobj, sfparams, save, qa, qaparams)
-                # Remove temp fits file
-                os.system('rm '+imgdir+'*.crop.fits')
+                imobj, sources = srcfind(conn, imobj, sfparams, save,
+                                         qa, qaparams)
                 # Copy PyBDSF warnings from their log to ours
-                with open(imobj.filename[:-4]+'crop.fits.pybdsf.log', 'r') as f:
+                with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()
                 warnings = [line.strip() for line in lines if 'WARNING' in line]
                 if warnings:
@@ -903,8 +943,6 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                     os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 if sources is None:
                     # Image failed to process
-                    #with open(pybdsfdir+'failed.txt', 'a') as f:
-                    #    f.write(img+'\n')
                     continue
                 # STAGE 3 -- Source association
                 if sa:
@@ -923,7 +961,15 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('{}.'.format(imobj.filename))
                         logger.info('======================================='
                                     '========================================')
+                        if branch == 6:
+                            branch = 12
+                        if branch == 8:
+                            branch = 15
                     else: # sf + sa - branch 11, 14
+                        if branch == 6:
+                            branch = 11
+                        if branch == 8:
+                            branch = 14
                         logger.info('======================================='
                                     '========================================')
                         logger.info('Completed source finding and association '
@@ -946,6 +992,10 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('{}.'.format(imobj.filename))
                         logger.info('======================================='
                                     '========================================')
+                        if branch == 6:
+                            branch = 10
+                        if branch == 8:
+                            branch = 13
                     else: # sf only - branch 6, 8
                         logger.info('======================================='
                                     '========================================')
@@ -978,6 +1028,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             logger.info('====================================='
                                         '====================================='
                                         '=====')
+                            branch = 20
                         else: # sa only - branch 19
                             logger.info('====================================='
                                         '====================================='
@@ -988,6 +1039,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             logger.info('====================================='
                                         '====================================='
                                         '=====')
+                            branch = 19
                     else: # stage > 2
                         logger.info("\nNOTE: {}'s".format(imobj.filename))
                         logger.info('sources have already been associated '
@@ -1021,7 +1073,11 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             logger.info('====================================='
                                         '====================================='
                                         '=====')
-                        else: continue # branch 18
+                            branch = 21
+                        else:
+                            # branch 18
+                            branch = 18
+                            continue
                 else:
                     if cm: # cm only - branch 17
                         pass
@@ -1035,14 +1091,17 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                             # Delete & redo matching
                             assoc_sources = dbio.delete_matches(
                                 conn, assoc_sources, imobj.id)
+                            branch = 17.2
                         else:
                             if not updatematch:
                                 # Cross-match new/un-matched sources only
                                 assoc_sources = [src for src in assoc_sources \
                                                  if src.nmatches is None or \
                                                  src.nmatches == 0]
+                                branch = 17.1
                             else:
                                 # Use all sources if updating
+                                branch = 17.3
                                 pass
                         catmatch(conn, imobj, assoc_sources, catalogs, save)
                         if glob.glob(imgdir+'*matches.reg'):
@@ -1063,6 +1122,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.error('{}.'.format(imobj.filename))
                         logger.info('======================================='
                                     '========================================')
+                        branch = 16
                         continue
 
     return
@@ -1074,9 +1134,8 @@ def main():
     parser = argparse.ArgumentParser(
         description='Run the VLITE Database Pipline (vdp)')
     parser.add_argument('config_file', help='the YAML configuration file')
-    parser.add_argument('-v', '--verbosity', type=int, choices=[0, 1],
-                        default=1, help='set to 0 to stop printing log '
-                        'messages to the conosole')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                        help='stops printing of messages to the console')
     parser.add_argument('--ignore_prompt', action='store_true',
                         help='ignore prompt to verify database '
                         'removal/creation')
@@ -1106,7 +1165,7 @@ def main():
     # Initialize logger handlers for console & file
     logfile = str(setup['year']) + str(setup['month']).zfill(2) + '.log'
     logpath = os.path.join(setup['root directory'], logfile)
-    loggerinit(logpath, args.verbosity)
+    loggerinit(logpath, args.quiet)
     logger.info('')
     logger.info('#' * (len(logpath) + 10))
     logger.info('Starting the VLITE Database Pipeline.')

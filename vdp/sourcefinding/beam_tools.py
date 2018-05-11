@@ -2,13 +2,19 @@
 and expected source counts.
 
 """
+import os
 import numpy as np
 
 
-def read_fitted_beam():
+def read_fitted_beam(pri_freq):
     """Reads the fitted beam file which contains
     the correction factor as a function of distance
     from the image center at every 10 arcseconds.
+
+    Parameters
+    ----------
+    pri_freq : float
+        Primary frequency of the observations in GHz.
     
     Returns
     -------
@@ -18,22 +24,33 @@ def read_fitted_beam():
         of the distance from the image center
         in degrees ('angle').
     """
-    beamfile = '/home/erichards/work/data/FITBEAM_FINAL_DOMEGA.txt'
-    #beamfile = '/home/vpipe/vlite-emily/data/FITBEAM_FINAL_DOMEGA.txt'
+    # In the future, there will be a separate file for each
+    # primary observing frequency.
+    beamdir = '/home/erichards/work/data/'
+    priband_beam_dict = {0.3 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         1.5 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         3 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         6 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         10 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         15 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         22 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         33 : 'FITBEAM_FINAL_DOMEGA.txt',
+                         45 : 'FITBEAM_FINAL_DOMEGA.txt'}
+    beamfile = os.path.join(beamdir, priband_beam_dict[pri_freq])
     with open(beamfile, 'r') as f:
         lines = f.readlines()
 
-    pbdir = {'angle' : [], 'power' : [], 'domega' : []}
+    pbdict = {'angle' : [], 'power' : [], 'domega' : []}
     for line in lines:
         data = line.split()
-        pbdir['angle'].append(float(data[0]))
-        pbdir['power'].append(float(data[1]))
-        pbdir['domega'].append(float(data[2]))
+        pbdict['angle'].append(float(data[0]))
+        pbdict['power'].append(float(data[1]))
+        pbdict['domega'].append(float(data[2]))
 
-    return pbdir
+    return pbdict
 
 
-def find_nearest_pbcorr(angle):
+def find_nearest_pbcorr(angle, pri_freq):
     """Finds the primary beam correction factor
     corresponding to the angle value closest to 
     the given distance from the image center.
@@ -42,19 +59,21 @@ def find_nearest_pbcorr(angle):
     ----------
     angle : float
         Distance from the image center in degrees.
+    pri_freq : float
+        Primary frequency of the observations in GHz.
 
     Returns
     -------
     pbdata['power'][idx] : float
         Primary beam correction factor.
     """
-    pbdata = read_fitted_beam()
+    pbdata = read_fitted_beam(pri_freq)
     idx = (np.abs(np.array(pbdata['angle']) - angle)).argmin()
     
     return pbdata['power'][idx]
 
 
-def expected_nsrc(rms, max_angle=1.5, sigma=5.):
+def expected_nsrc(pri_freq, rms, max_angle=1.5, sigma=5.):
     """Calculates expected number of sources that would
     have been detected within a maximum distance from the
     image center (max_angle) based on the detection threshold
@@ -89,7 +108,7 @@ def expected_nsrc(rms, max_angle=1.5, sigma=5.):
     wenss_n = 0.497
     wenss_n2 = -1.0 / wenss_n
     # Read fitted beam file
-    pbdata = read_fitted_beam()
+    pbdata = read_fitted_beam(pri_freq)
     nexp = 0
     for i in range(len(pbdata['angle'])):
         if pbdata['angle'][i] > max_angle:

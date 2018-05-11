@@ -18,8 +18,8 @@ options:
 setup:
   root directory: /extraid/vpipe/processed/
   year: 2018
-  month: 04
-  day: [27]                   # list of days to process; [] = all
+  month: 05
+  day: [04]                   # list of days to process; [] = all
   # list files to process - put different days in separate lists; [[]] = all
   files: [[]]
   database name: vlite
@@ -38,7 +38,7 @@ pybdsf_params:
 
 image_qa_params:
   # used when quality checks: yes/True; leave blank for defaults
-  min time on source (s):     # (default 60 s)
-  max noise (mJy/beam):       # (default 500 mJy/beam)
-  max beam axis ratio:        # (default 4)
-  max source metric:          # (default 10)
+  min nvis:                        # (default 1000)
+  max sensitivity metric:          # (default 3000 mJy/bm s^1/2)
+  max beam axis ratio:             # (default 4)
+  max source count metric:         # (default 10)

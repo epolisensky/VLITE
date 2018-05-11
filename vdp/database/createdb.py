@@ -10,10 +10,10 @@ createdb_logger = logging.getLogger('vdp.database.createdb')
 def make_error(cur, params):
     """Inserts values into the database error table."""
     reason_dict = {'image missing necessary header keyword(s)' : 1,
-                   'integration time on source < {} s'.
-                   format(params['min time on source (s)']) : 2,
-                   'image noise < 0 or > {} mJy/beam'.
-                   format(params['max noise (mJy/beam)']): 3,
+                   'number of visibilities < {}'.
+                   format(params['min nvis']) : 2,
+                   'sensitivity metric (noise x sqrt(int. time)) <= 0 or > {}'.
+                   format(params['max sensitivity metric']): 3,
                    'beam axis ratio > {}'.
                    format(params['max beam axis ratio']) : 4,
                    'bad imaging target (NCP or planet)' : 5,
@@ -21,7 +21,7 @@ def make_error(cur, params):
                    'PyBDSF failed to process' : 7,
                    'zero sources extracted' : 8,
                    'source count metric > {}'.
-                   format(params['max source metric']) : 9}
+                   format(params['max source count metric']) : 9}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):

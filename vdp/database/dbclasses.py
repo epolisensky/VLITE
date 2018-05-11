@@ -10,7 +10,7 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 import ephem
-import pybdsfcat
+from database import pybdsfcat
 from sourcefinding import beam_tools
 
 
@@ -109,6 +109,9 @@ class Image(object):
                 pri_freq = float(pri[0][:-1]) / 1000. # GHz
             else:
                 pri_freq = float(pri[0][:-1]) # GHz
+            # project code 13B-266 is at 1.5 GHz
+            if pri_freq == 13:
+                pri_freq = 1.5
         except IndexError:
             pri_freq = None
         self.id = None
@@ -288,6 +291,30 @@ class Image(object):
             self.duration = hdr['DURATION'] # sec
         except KeyError:
             self.duration = None
+            self.error_id = 1
+
+
+    def set_radius(self, scale):
+        """Sets the radius attribute of the Image object.
+
+        Parameters
+        ----------
+        scale : float
+            Fraction between 0 and 1 of the image radius to use.
+            The full size of the image field-of-view is multiplied
+            by this number.
+        """        
+        try:
+            naxis = float(self.imsize.strip(')').split(',')[1])
+            r = (naxis / 2.) * scale
+            self.radius = round((r * self.pixel_scale) / 3600., 2) # in deg
+        except AttributeError:
+            try:
+                data, hdr = self.read()
+                r = (hdr['NAXIS2'] / 2.) * scale
+                self.radius = round(r * hdr['CDELT2'], 2) # in deg
+            except KeyError:
+                self.radius = None
 
 
     def image_qa(self, params):
@@ -295,11 +322,15 @@ class Image(object):
         to flag images with the following issues:
 
         1. missing necessary header keywords (self.error_id = 1)
-        2. integration time on source (tau_time) < min_tos
-        3. noise < 0 or > max_rms mJy/beam
+        2. number of visibilities (nvis) < min_nvis
+        3. noise*sqrt(int. time) <= 0 or > max_sensitivity
         4. beam semi-major/semi-minor axis > max_ellip (too elliptical)
         5. target is NCP or a planet
-        6. a known bright radio source is in the field-of-view (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), the Sun, Galactic Center)
+        6. a known bright radio source is in the field-of-view (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), Perseus A (3C84), the Sun, the Moon, Jupiter, Galactic Center)
+
+        Images that fail checks 1-5 are aborted and do not proceed
+        to source finding. Images are flagged if they fail check 6,
+        but do continue on.
 
         """
         dbclasses_logger.info('Performing preliminary image quality checks...')
@@ -307,24 +338,33 @@ class Image(object):
         # Check if image was missing any necessary header keywords
         if self.error_id == 1:
             dbclasses_logger.info('IMAGE FAILED QA: missing necessary header '
-                                  'keyword(s)')
+                                  'keyword(s).')
             return
         
-        # Check integration time
-        min_tos = params['min time on source (s)']
-        if self.tau_time < min_tos:
-            dbclasses_logger.info('IMAGE FAILED QA: integration time on '
-                                  'source < {} s'.format(min_tos))
+        # Check number of visibilities (NVIS)
+        min_nvis = params['min nvis']
+        if self.nvis < min_nvis:
+            dbclasses_logger.info('IMAGE FAILED QA: number of visibilities '
+                                  '(NVIS) {} < allowed minimum of {}.'.
+                                  format(self.nvis, min_nvis))
             self.error_id = 2
             return
         else: pass
         
-        # Check image noise
-        max_rms = params['max noise (mJy/beam)']
-        if self.noise < 0. or self.noise > max_rms:
-            dbclasses_logger.info('IMAGE FAILED QA: image noise is {}. '
-                                  'Max allowed is {}'.format(
-                                      self.noise, max_rms)) 
+        # Check image sensitivity metric (noise * sqrt(int. time))
+        max_sensitivity = params['max sensitivity metric']
+        sensitivity_metric = self.noise * np.sqrt(self.tau_time)
+        if sensitivity_metric <= 0:
+            dbclasses_logger.info('IMAGE FAILED QA: sensitivity metric '
+                                  '(noise x sqrt(int. time)) {} <= 0.'.
+                                  format(sensitivity_metric))
+            self.error_id = 3
+            return
+        if sensitivity_metric > max_sensitivity:
+            dbclasses_logger.info('IMAGE FAILED QA: sensitivity metric '
+                                  '(noise x sqrt(int. time)) {} > allowed '
+                                  'maximum of {}.'.format(
+                                      sensitivity_metric, max_sensitivity))
             self.error_id = 3
             return
         else: pass
@@ -333,8 +373,8 @@ class Image(object):
         max_ellip = params['max beam axis ratio']
         axis_ratio = self.bmaj / self.bmin
         if axis_ratio > max_ellip:
-            dbclasses_logger.info('IMAGE FAILED QA: beam axis ratio is {}. '
-                                  'Max allowed is {}'.format(
+            dbclasses_logger.info('IMAGE FAILED QA: beam axis ratio {} > '
+                                  'allowed maximum of {}.'.format(
                                       axis_ratio, max_ellip))
             self.error_id = 4
             return
@@ -342,11 +382,11 @@ class Image(object):
 
         # VLITE can't do planets or the NCP
         if self.obj == 'NCP' or self.obj == 'ncp':
-            dbclasses_logger.info('IMAGE FAILED QA: pointing is at NCP')
+            dbclasses_logger.info('IMAGE FAILED QA: pointing is at NCP.')
             self.error_id = 5
             return
         else: pass
-        # Planet observations have obs_ra, obs_dec = 0, 0
+        # Some planet observations have obs_ra, obs_dec = 0, 0
         if self.obs_ra == 0. and self.obs_dec == 0.:
             dbclasses_logger.info('IMAGE FAILED QA: planet observation with '
                                   'RA, Dec = 0, 0')
@@ -356,21 +396,30 @@ class Image(object):
 
         # Check angular separation from problem sources
         sun = ephem.Sun()
+        moon = ephem.Moon()
+        jup = ephem.Jupiter()
         # convert from MJD to UTC ISO format
         jdt = Time(self.mjdtime, format='mjd', scale='utc')
         sun.compute(jdt.iso)
+        moon.compute(jdt.iso)
+        jup.compute(jdt.iso)
         bad_sources = {'Sun' : SkyCoord(str(sun.a_ra), str(sun.a_dec),
                                         unit=('hourangle', 'deg')),
+                       'Moon' : SkyCoord(str(moon.a_ra), str(moon.a_dec),
+                                         unit=('hourangle', 'deg')),
+                       'Jupiter' : SkyCoord(str(jup.a_ra), str(jup.a_dec),
+                                            unit=('hourangle', 'deg')),
                        'Cas A' : SkyCoord(350.866250, 58.811667, unit='deg'),
+                       'Cen A' : SkyCoord(201.365000, -43.019167, unit='deg'),
                        'Cyg A' : SkyCoord(299.867917, 40.733889, unit='deg'),
-                       'Tau A' : SkyCoord(83.633333, 22.014444, unit='deg'),
                        'Her A' : SkyCoord(252.783750, 4.992500, unit='deg'),
-                       'M87' : SkyCoord(187.705833, 12.391111, unit='deg'),
+                       'Orion A' : SkyCoord(83.818750, -5.389722, unit='deg'),
+                       'Per A' : SkyCoord(49.950417, 41.511667, unit='deg'),
+                       'Tau A' : SkyCoord(83.633333, 22.014444, unit='deg'),
+                       'Virgo A' : SkyCoord(187.705833, 12.391111, unit='deg'),
                        'GC' : SkyCoord(266.416833, -29.007806, unit='deg')}
 
         image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
-        pixsize = float(self.imsize.strip(')').split(',')[1])
-        fov = round(0.5 * ((pixsize * self.pixel_scale) / 3600.), 2)
 
         min_sep = 999999.99
         for src, loc in bad_sources.items():
@@ -379,8 +428,8 @@ class Image(object):
                 min_sep = ang_sep
                 self.nearest_problem = src
                 self.separation = ang_sep
-        if min_sep <= fov:
-            dbclasses_logger.info('IMAGE FAILED QA: {} is in the '
+        if min_sep <= self.radius:
+            dbclasses_logger.info('IMAGE QA WARNING: {} is in the '
                                   'field-of-view'.format(self.nearest_problem))
             self.error_id = 6
             return
@@ -395,34 +444,31 @@ class Image(object):
         noise and fitted beam. See EP's PythonTools.
 
         """
-        max_src_metric = params['max source metric']
+        max_src_metric = params['max source count metric']
 
         dbclasses_logger.info('Performing source count quality checks...')
         # First, check if there are any sources
         if len(sources) < 1:
-            dbclasses_logger.info('IMAGE FAILED QA: 0 sources were detected')
+            dbclasses_logger.info('IMAGE FAILED QA: no sources were detected.')
             self.error_id = 8
             return
         else: pass
 
         # Get number of actual sources within central 1.5 degrees
-        image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
         nsrc_cut = 0
         for src in sources:
-            src_loc = SkyCoord(src.ra, src.dec, unit='deg')
-            deg_from_center = image_center.separation(src_loc).degree
-            if deg_from_center <= 1.5:
+            if src.dist_from_center <= 1.5:
                 nsrc_cut += 1
 
         # Estimate number of expected sources within central 1.5 degrees
-        nsrc_exp = beam_tools.expected_nsrc(self.noise)
+        nsrc_exp = beam_tools.expected_nsrc(self.pri_freq, self.noise)
         # Compute metric for determining if source count is way off
         nsrc_metric = (float(nsrc_cut) - nsrc_exp) / nsrc_exp
-        
+
         if nsrc_metric > max_src_metric:
-            dbclasses_logger.info('IMAGE FAILED QA: too many sources '
-                                  'detected - nsrc_metric = {}; limit = {}'.
-                                  format(nsrc_metric, max_src_metric))
+            dbclasses_logger.info('IMAGE FAILED QA: source count metric '
+                                  '{} > allowed max {}.'.format(
+                                      nsrc_metric, max_src_metric))
             self.error_id = 9
             return
         else: pass
@@ -611,7 +657,6 @@ class DetectedSource(object):
         self.resid_mean = None
         self.code = None
         self.assoc_id = None
-        # corrected_flux attribute
         self.dist_from_center = None
         # assoc_source attributes
         self.id = None
@@ -669,20 +714,37 @@ class DetectedSource(object):
         self.code = origsrc.code
 
 
-    def correct_flux(self, imobj):
+    def calc_center_dist(self, imobj):
+        """Calculates a detected source's angular distance
+        from the image pointing center in degrees and sets
+        the ``dist_from_center`` attribute.
+
+        Parameters
+        ----------
+        imobj : ``database.dbclasses.Image`` instance
+            Initialized Image object with attribute values
+            set from header info.
+        """
+        img_center = SkyCoord(imobj.obs_ra, imobj.obs_dec, unit='deg')
+        src_loc = SkyCoord(self.ra, self.dec, unit='deg')
+        self.dist_from_center = img_center.separation(src_loc).degree
+
+
+    def correct_flux(self, pri_freq):
         """Applies a 1-D radial correction to all flux measurements
         from PyBDSF. The correction factor has been empirically derived
         from flux comparisons of sources as a function of angular
         distance from the image center. The scale factor increases
         farther from the pointing center as the beam power decreases.
 
+        Parameters
+        ----------
+        pri_freq : float
+            Primary frequency of the observations in GHz.
         """
-        # Compute source's angular distance from image center
-        img_center = SkyCoord(imobj.obs_ra, imobj.obs_dec, unit='deg')
-        src_loc = SkyCoord(self.ra, self.dec, unit='deg')
-        self.dist_from_center = img_center.separation(src_loc).degree
         # Correct for beam response - only 1D (sym. beam) for now
-        pb_power = beam_tools.find_nearest_pbcorr(self.dist_from_center)
+        pb_power = beam_tools.find_nearest_pbcorr(self.dist_from_center,
+                                                  pri_freq)
         # List of attributes to correct
         attrs = ['total_flux', 'e_total_flux', 'peak_flux', 'e_peak_flux',
                  'total_flux_isl', 'total_flux_islE', 'rms_isl', 'mean_isl',
@@ -772,23 +834,45 @@ def translate(img, out):
 
     Returns
     -------
-    img : ``database.dbclasses.Image`` instance
-        Initialized Image object with attribute values
-        set from header info & updated with source finding results.
     newsrcs : list
         List of ``database.dbclasses.DetectedSource`` objects.
         Attributes of each object are set from the PyBDSF
         output object.    
     """
-    # Add PyBDSF defined attributes
-    img.nsrc = out.nsrc
-    img.rms_box = str(out.rms_box)
-
     # Translate PyBDSF output source objects to DetectedSource objects
     newsrcs = []
     for oldsrc in out.sources:
         newsrcs.append(DetectedSource())
         newsrcs[-1].cast(oldsrc)
         newsrcs[-1].image_id = img.id
+        newsrcs[-1].calc_center_dist(img)
 
-    return img, newsrcs
+    return newsrcs
+
+
+def init_image(impath):
+    """Initializes an object of the Image class and sets values 
+    for its attributes from the fits file header using
+    the ``header_attrs`` object method.
+
+    """
+    imobj = Image(impath)
+    data, hdr = imobj.read()
+    # Use header info to set attributes
+    imobj.header_attrs(hdr)
+    # Fix header keywords for PyBDSF, if necessary
+    header_changed = False
+    if hdr['CTYPE3'] == 'SPECLNMF':
+        hdr['CTYPE3'] = 'FREQ'
+        header_changed = True
+    try:
+        hdr['BMAJ']
+    except KeyError:
+        hdr['BMAJ'] = imobj.bmaj / 3600. # deg
+        hdr['BMIN'] = imobj.bmin / 3600.
+        hdr['BPA'] = imobj.bpa
+        header_changed = True
+    if header_changed:
+        imobj.write(data, hdr, owrite=True)
+
+    return imobj

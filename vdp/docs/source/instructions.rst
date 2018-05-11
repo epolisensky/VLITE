@@ -44,10 +44,22 @@ Follow the instructions below to add or update a catalog.
    of the other catalog reading functions as a template.
 3. The final step is to add a couple of lines, or update the
    existing ones if necessary, in the ``radiocatalogs.radcatdb.add_table``
-   function to call the function to read the catalog::
+   function to call the function to read the catalog. For example::
 
-     elif tblname == '[catalog name]':
-         sources = catalogio.read_[catalog name]()
+     elif tblname == 'nvss':
+         sources = catalogio.read_nvss()
+
+
+.. _update_beam:
+
+Updating the Primary Beam Correction Files
+------------------------------------------
+In the future, the primary beam correction will be dependent
+on the primary observing frequency. The ``priband_beam_dict``
+in the function ``sourcefinding.beam_tools.read_fitted_beam()``
+anticipates having a separate file for each primary observing
+band. Simply update the file name associated with each
+primary frequency once they are ready.
 
 .. _update_qa:
 
@@ -62,7 +74,38 @@ module under the ``Image`` class methods ``image_qa`` and
 be updated to add the new requirement to the database
 **error** table. Additional parameters may also be added to
 the configuration file along with code to parse them and set
-default values in ``vdp.cfgparse``.
+default values in ``vdp.cfgparse``. The source count metric
+is computed in the ``sourcefinding.beam_tools.expected_nsrc()``
+function.
+
+.. _update_beam_corr:
+
+Updating the Beam Correction
+----------------------------
+The ``sourcefinding.beam_tools`` module contains the functions
+to read the fitted beam file and find the nearest correction
+factor when given an angular distance from the image center.
+``sourcefinding.beam_tools.read_fitted_beam()`` is already
+set up to accept a separate file for each primary frequency.
+Simply add the correct text file name as the value to the
+corresponding primary frequency key in the dictionary
+``priband_beam_dict``.
+
+.. _change_res:
+
+Changing the Resolution Class Ranges
+------------------------------------
+The ranges in spatial resolution that define each resolution
+class are specified in the dictionary ``res_dict`` at the
+top of the ``matching.radioxmatch`` module::
+
+  res_dict = {'A' : (0., 15.), 'B' : (15., 35.),
+              'C' : (35., 60.), 'D' : (60., 9999.)}
+
+The tuples represent the lower and upper bounds of the
+resolution ranges. When used in the code, the lower
+bound is not included but the upper is
+(i.e. 15 < resolution <= 35).
 
 .. _maintenance:
 

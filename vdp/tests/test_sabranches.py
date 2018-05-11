@@ -11,7 +11,7 @@ import unittest
 import os
 import sys
 sys.path.append('../')
-from vdp import dbinit, process
+import vdp
 
 
 class TestSABranches(unittest.TestCase):
@@ -21,16 +21,16 @@ class TestSABranches(unittest.TestCase):
         """Define variables to be used by all tests and
         connect the database, overwriting existing tables
         every time."""
-        self.dirs = ['/home/erichards/work/data/test/2540-06/04/Images/']
+        self.dirs = ['/home/erichards/work/data/test/2540-06/03/Images/']
         self.files = [[]]
         self.catalogs = ['NVSS']
-        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.5}
-        self.qaparams = {'min time on source (s)' : 60.,
-                         'max noise (mJy/beam)' : 1000.,
+        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 1.0}
+        self.qaparams = {'min nvis' : 1000.,
+                         'max sensitivity metric' : 3000.,
                          'max beam axis ratio' : 4.,
-                         'min problem source separation (deg)' : 20.,
-                         'max source metric' : 10.}
-        self.conn = dbinit('branchtest', 'erichards', True, self.qaparams, True)
+                         'max source count metric' : 10.}
+        self.conn = vdp.dbinit('branchtest', 'erichards', True,
+                               self.qaparams, True)
 
 
     def tearDown(self):
@@ -42,58 +42,31 @@ class TestSABranches(unittest.TestCase):
         """Branch 11 - SF + SA on new image"""
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : False}
-        opts = {'save to database' : True, 'quality checks' : True,
+        opts = {'save to database' : False, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
         # Pipeline should stop after source association
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 1''') # 20
-        single_detections = self.cur.fetchone()[0]
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 2''') # 12
-        associations = self.cur.fetchone()[0]
-        result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 20, 12])
-        self.cur.close()
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 11)
 
 
     def test_sfsa_reprocess(self):
         """Branch 14 - SF + SA reprocess"""
+        # Add sources to database
         stages = {'source finding' : True, 'source association' : True,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
-        # Process once
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Use different scale so results are different
-        self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 0.3}
-        # Process twice
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 1''')
-        single_detections = self.cur.fetchone()[0]
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 2''')
-        associations = self.cur.fetchone()[0]
-        result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 12, 6])
-        self.cur.close()
-
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        # Reprocess with SA
+        opts['save to database'] = False
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 14)
+        
 
     def test_saonly_already_done(self):
         """Branch 18 - SA already done, so do nothing"""
@@ -103,46 +76,35 @@ class TestSABranches(unittest.TestCase):
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : True,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now try SA only
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : False}
+        opts['save to database'] = False
         # Code should exit
-        self.assertIsNone(process(self.conn, stages, opts, self.dirs,
-                                  self.files, self.catalogs, self.sfparams,
-                                  self.qaparams))
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 18)
 
 
     def test_saonly(self):
         """Branch 19 - SA only"""
-        # Process through SF first
+        # Add sources to database
         stages = {'source finding' : True, 'source association' : False,
                   'catalog matching' : False}
         opts = {'save to database' : True, 'quality checks' : True,
                 'overwrite' : False, 'reprocess' : False,
                 'redo match' : False, 'update match' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
         # Now do SA only
         stages = {'source finding' : False, 'source association' : True,
                   'catalog matching' : False}
-        process(self.conn, stages, opts, self.dirs, self.files,
-                self.catalogs, self.sfparams, self.qaparams)
-        # Check DB - should be same as SF + SA (branch 11)
-        self.cur = self.conn.cursor()
-        self.cur.execute('SELECT id, stage FROM image')
-        img_rows = self.cur.fetchall()
-        sorted_img_rows = sorted(img_rows, key=lambda tup: tup[0])
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 1''')
-        single_detections = self.cur.fetchone()[0]
-        self.cur.execute('''SELECT COUNT(1) FROM assoc_source
-            WHERE ndetect = 2''')
-        associations = self.cur.fetchone()[0]
-        result = [sorted_img_rows, single_detections, associations]
-        self.assertEqual(result, [[(1, 3), (2, 3)], 20, 12])
-        self.cur.close()
+        opts['save to database'] = False
+        vdp.process(self.conn, stages, opts, self.dirs, self.files,
+                    self.catalogs, self.sfparams, self.qaparams)
+        self.assertEqual(vdp.branch, 19)
 
 
 if __name__ == '__main__':

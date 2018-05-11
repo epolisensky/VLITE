@@ -3,42 +3,40 @@
 stages:
                               # processing steps; yes | no  or  True | False
   source finding: yes         # extract sources from image?
-  source association: yes     # associate sources with previous detections?
+  source association: yes     # match extracted sources to existing catalog?
   catalog matching: yes       # cross-match with sky survey catalogs?
 
 options:
                               # processing options; yes | no or True | False
   save to database: yes       # save results to database?
   quality checks: yes         # run image & source count quality checks?
-  overwrite: yes              # overwrite database if exists?
+  overwrite: no               # overwrite database if exists?
   reprocess: no               # redo selected stages even if done previously?
   redo match: no              # redo cross-matching with all sky catalogs?
   update match: no            # update cross-matching with new sky catalogs?
 
 setup:
-  root directory: /path/to/data/
-  year: 2018
-  month: 05
-  day: [11]                   # list of days to process; [] = all
+  root directory: /home/erichards/work/data/test/
+  year: 2017
+  month: 08
+  day: [30]                   # list of days to process; [] = all
   # list files to process - put different days in separate lists; [[]] = all
-  files: [[]]
-  database name: vlite16
-  database user: vpipe
+  files: [[1.5GHz.0137+331.IPln1.fits, 6GHz.0137+331.IPln1.fits]]
+  database name: functest
+  database user: erichards
   catalogs: []                # [] = all
 
 pybdsf_params:
   mode: default               # default | minimize_islands
-  scale: 1.0                  # fraction (0-1) of image size (radius) to use
+  scale: 0.5                  # fraction (0-1) of image size (radius) to use
   # Specify all PyBDSF parameters here
   thresh: hard
-  #rms_box: !!python/tuple [100, 30]
   adaptive_rms_box: True
-  #rms_box_bright: !!python/tuple [20, 10]
   adaptive_thresh: 10.
 
 image_qa_params:
   # used when quality checks: yes/True; leave blank for defaults
   min nvis:                        # (default 1000)
-  max sensitivity metric:          # (default 3000 mJy/bm s^1/2)
+  max sensitivity metric:          # (default 3000 mJy/bm*sqrt(s))
   max beam axis ratio:             # (default 4)
   max source count metric:         # (default 10)

@@ -46,29 +46,48 @@ Image Quality Assurance
 VLITE data is vastly inhomogeneous, so quality assurance is
 important to filter out unusable images. The first round
 of quality checks attempts to flag bad images based on their
-header metadata. Images are checked for the following requirements
+header keywords. Images are checked for the following requirements
 in the order they are listed:
 
 1. the image needs to contain all header keywords used in the
-   pipeline, with the exception of ``OBJECT``, ``DATE-MAP``,
-   ``PEAK`` or ``DATAMAX``, ``CONFIG``, and ``DURATION``
-2. the integration time on source (``TAU_TIME``) must be
-   greater than some minimum time (default is 60 s)
-3. the image noise must be >= 0 and <= some maximum value
-   (default is 500 mJy/beam)
+   pipeline:
+
+   - ``NAXIS1/2``
+   - ``OBSRA, OBSDEC``
+   - ``CDELT1/2``
+   - ``DATE-OBS``
+   - frequency info (``RESTFREQ`` or ``CRVAL3`` or ``CRVAL4``)
+   - beam info (i.e. ``BMAJ``, ``BMIN``, ``BPA``)
+   - ``ACTNOISE``
+   - ``NVIS``
+   - ``MJDTIME``
+   - ``STARTIME``
+   - ``TAU_TIME``
+   - ``DURATION``
+
+2. the number of visibilities (``NVIS``) must be >= some
+   minimum value (default is 1000)
+3. the image sensitivity metric, defined as noise x
+   sqrt(int. time), must be > 0 and <= some maximum value
+   (default is 3000 mJy/beam s^1/2)
 4. the ratio of the image's beam semi-major to semi-minor axis
    must be less than some maximum value (default is 4)
-5. the imaging target can't be a planet or the NCP
-6. a known problem source cannot be in the image's field-of-view:
+5. the imaging target can't be a planet (with RA, Dec = 0, 0) or the NCP
+6. images are flagged **but not failed** if a known problem
+   source is in the field-of-view:
+   
    - the Sun
+   - the Moon
+   - Jupiter
    - Cassiopeia A
    - Cygnus A
-   - Taurus A
    - Hercules A
-   - M87 (Virgo A)
+   - Perseus A (3C84)
+   - Taurus A
+   - Virgo A (M87)
    - Galactic Center
 
-Each of the above requirements has a default value which is used
+Requirements 2-4 have a default value which is used
 unless otherwise specified through the corresponding option under
 **image_qa_params** in the configuration file. The above requirements
 and their values are recorded in the database **error** table.
@@ -87,8 +106,11 @@ looked up in the **error** table. Once an image fails a check,
 its information is added to the **image** table and the pipeline
 moves on to the next image. It does not push the failed image
 through the remaining quality checks, if any, or allow it to pass
-through to any other stages. Quality checks can be turned off
-in the configuration file.
+through to any other stages. The exception is requirement 6, which
+simply flags images with a known problem source in their field-of-view.
+The nearest problem source and its angular distance in degrees from
+the pointing center is recorded for every image.
+Quality checks can be turned off in the configuration file.
 
 .. _source_finding:
 
@@ -108,31 +130,6 @@ and the step size inbetween are controlled by the ``rms_box`` parameter.
 Refer to the PyBDSF `documentation
 <http://www.astron.nl/citt/pybdsm/index.html>`_ for more information.
 
-Properties of the sources and islands are written to the database
-**detected_source** and **detected_island** tables, respectively.
-A ds9 region file is also created for every image. A 1-D primary
-beam correction factor is applied to all flux measurements from
-PyBDSF and recorded in the **corrected_flux** table. A 20%
-systematic uncertainty is also added in quadrature to the PyBDSF
-reported 1-sigma statistical uncertainties on all flux error
-measurements in the **corrected_flux** table only. The applied
-primary beam correction factor was determined empirically and
-depends only on the source's distance from the image center,
-which is also recorded in the **corrected_flux** table in degrees.
-Corrected fluxes are only computed if the *save to database*
-option is turned on in the configuration file.
-
-**Pre-Processing**
-
-The VLITE images are cropped to a circular field-of-view before being
-ingested by PyBDSF. This is done to ensure that cone search queries
-in the database return sources which lie in the same well-defined
-field-of-view as the images. The radius of the circular field is half
-the image size, which for VLITE is 1 degree for A cofiguration, 2
-degrees for B/B+, 3 degrees for C, and 4 degrees for D. The *scale*
-parameter in the **vdp** configuration file can be used to make the
-field-of-view radius smaller by the factor specified.
-
 Experience has shown that it is better to specify the ``rms_box``
 parameter for VLITE images rather than leave PyBDSF to calculate it
 internally (the default option). Images with bright stripe artifacts
@@ -151,6 +148,33 @@ imaging artifacts. See the :ref:`config_desc` for additional PyBDSF
 parameters to specify explicitly for VLITE under **pybdsf_params**
 in the configuration file.
 
+PyBDSF operates on the full VLITE image, but sources outside a defined
+circular field-of-view are removed afterwards. This is done to
+ensure that cone search queries in the database return sources which
+lie in the same well-defined field-of-view as the images. Keep
+in mind this means that the ds9 region files could have more sources
+than what is recorded in the database. The radius of the circular
+field is half the image size, which for VLITE is 1 degree for A
+cofiguration, 2 degrees for B/B+, 3 degrees for C,
+and 4 degrees for D. The *scale* parameter in the **vdp** configuration
+file can be used to make the field-of-view radius smaller.
+
+Properties of the sources and islands are written to the database
+**detected_source** and **detected_island** tables, respectively.
+A ds9 region file is also created for every image. A 1-D primary
+beam correction factor is applied to all flux measurements from
+PyBDSF and recorded in the **corrected_flux** table. A 20%
+systematic uncertainty is also added in quadrature to the PyBDSF
+reported 1-sigma statistical uncertainties on all flux error
+measurements in the **corrected_flux** table only. The applied
+primary beam correction factor was determined empirically and
+depends only on the source's distance from the image center,
+which is also recorded in the **corrected_flux** table in degrees.
+In the future, this will likely become more sophisticated
+using a 2-D, primary frequency-dependent approach.
+Corrected fluxes are only computed if the *save to database*
+option is turned on in the configuration file.
+
 .. _source_count_qa:
 
 Source Count Quality Assurance
@@ -165,7 +189,7 @@ getting stuck trying to fit Gaussians to large imaging artifacts.
 We also define a metric developed by E. Polisensky to flag images
 where the number of detected sources is much larger than what is
 expected based on source counts from the WENSS survey and the image's
-noise. The absolute difference between the actual number of sources and the
+noise. The difference between the actual number of sources and the
 expected number of sources normalized by the expected number is
 required to be less than some value (default is 10).
 
@@ -235,7 +259,8 @@ the radio spectrum. As for the association stage, cross-matching is
 restricted between sources with similar spatial resolutions -- the
 resolution of the catalog has to be in the same resolution class as the
 image. The resolution classes are the same as for association except the
-first two classes (A & B) are combined.
+first two classes (A & B) are combined so that there is at least one
+all-sky survey included (TGSS).
 
 The cross-matching steps proceed as follows:
 

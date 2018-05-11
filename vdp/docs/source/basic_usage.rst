@@ -25,7 +25,8 @@ The database can be created at runtime, so it does not need
 to exist before starting the pipeline. If connecting to an
 existing database, the user must either be the owner of that
 database or a superuser due to the permissions needed while
-running **vdp**. 
+running **vdp**. The database user vpipe can be used for
+running **vdp** on roadrunner.
 
 Running the Code
 ^^^^^^^^^^^^^^^^
@@ -36,15 +37,16 @@ be started from the command line::
 
 where ``config_file.yaml`` is replaced with whatever
 you named your configuration file. The pipeline's progress
-will be displayed through messages printed to the terminal.
+will be displayed through messages printed to the console
+and a log file.
 
-*******************************
+**********************
 Command Line Arguments
-*******************************
+**********************
 There are some optional command line arguments that enable
 some non-standard functionality for **vdp**.
 Use the ``--help`` or ``-h`` command line option to see all
-optional command line arguments::
+required and optional command line arguments::
   
   $ python vdp.py -h
   usage: vdp.py [-h] [--ignore_prompt] [--remove_catalog_matches]
@@ -57,9 +59,8 @@ optional command line arguments::
     config_file           the YAML configuration file
 
   optional arguments:
-    -v {0,1}, --verbosity {0,1}
-                          set to 0 to stop printing log messages to the conosole
     -h, --help            show this help message and exit
+    -q, --quiet           stops printing of messages to the console
     --ignore_prompt       ignore prompt to verify database removal/creation
     --remove_catalog_matches
                           remove matching results for the specified sky survey
@@ -73,16 +74,13 @@ optional command line arguments::
     --add_catalog         adds any new sky survey catalogs to a table in the
                           database "skycat" schema
 
-``-v, --verbosity`` turns on or off printing of log messages to
-the console. If specified, the argument needs to be followed by
-either 0 to turn off printing or 1 to turn it on. The default is
-1, so messages will be printed to the console without having to
-explicitly include ``-v 1`` as an argument.
+``-q, --quiet`` turns off printing of log messages to
+the console. They will still be recorded in the log file.
 
 ``--ignore_prompt`` overrides the prompt to confirm overwriting
 or creating a new database. This may be desired when batch
 processing (see :ref:`batch_proc`) and suppressing console
-print statements with ``-v 0``.
+print statements with ``-q``.
 
 ``--remove_catalog_matches`` will prompt the user to input the
 name(s) of all radio catalogs whose matching results are to be
@@ -137,8 +135,8 @@ The configuration file enables processing of one ``year-mo``
 directory at a time.
 Processing more than one month of VLITE images can be accomplished
 through successive runs of **vdp** called from a bash script.
-You can suppress output to the console by using ``-v 0`` or
-``--verbosity 0``. All output will be written to a log file
+You can suppress output to the console by using ``-q`` or
+``--quiet``. All output will be written to a log file
 in the root directory with name "yearmo.log" (i.e. "201801.log").
 You may additionally use the optional command line argument
 ``--ignore_prompt`` for the first call to **vdp** if creating
@@ -148,15 +146,15 @@ stick around to verify.
 Example file ``batch_vdp.bash``:
 ::
    
-  python vdp.py 201801config.yaml -v 0 --ignore_prompt
-  python vdp.py 201802config.yaml -v 0
-  python vdp.py 201803config.yaml -v 0
+  python vdp.py 201801config.yaml -q --ignore_prompt
+  python vdp.py 201802config.yaml -q
+  python vdp.py 201803config.yaml -q
 
 ************************
 Expected Execution Times
 ************************
 Execution time mostly depends on the number and size of the
-images being processed. Expect ~30-60 seconds per image for
+images being processed. Expect ~45-90 seconds per image for
 VLA A configuration, 15-45 s/image for B, and 5-15 s/image
 for C & D configurations, on average. The bottleneck is source
 finding/measurement with PyBDSF.
@@ -180,7 +178,7 @@ Description of Configuration File Parameters
 
 An example of the required YAML configuration file can be
 found in the VLITE GitHub repository `here.
-<https://github.com/erichards/VLITE/blob/develop/vdp/example_config.yaml>`_
+<https://github.com/erichards/VLITE/blob/master/vdp/example_config.yaml>`_
 The contents are described in more detail below.
 
 **stages**
@@ -286,16 +284,16 @@ The contents are described in more detail below.
   Sets quality requirements for images. Applies only if quality checks
   are turned on. Leave any parameter blank to use the default value.
 
-  *min time on source (s)*
-    Minimum allowed integration time on source. Image header
-    keyword ``TAU_TIME``. Default is 60 seconds.
-  *max noise (mJy/beam)*
-    Maximum allowed image noise. Image header keyword ``ACTNOISE``.
-    Default is 500 mJy/beam.
+  *min nvis*
+    Minimum allowed number of visibilities. Image header
+    keyword ``NVIS``. Default is 1000 seconds.
+  *max sensitivity metric*
+    Maximum allowed combination of noise & integration time on source.
+    Defined as noise x sqrt(int. time). Default is 3000 mJy/beam s^1/2.
   *max beam axis ratio*
     Maximum allowed ratio between the beam semi-major and
     semi-minor axes. Default is 4.
-  *max source metric*
+  *max source count metric*
     Maximum allowed metric for source counts. Defined as:
     (actual_num_sources - expected_num_sources) / expected_num_sources.
     Default is 10.

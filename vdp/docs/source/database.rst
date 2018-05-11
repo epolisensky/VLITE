@@ -43,10 +43,10 @@ was successfully cross-matched with a VLITE source in the
 **assoc_source** table.
 
 - *id*: unique row id number
-- *catalog_id*: references the *id* column of the **skycat.catalogs**
+- *catalog_id*: references the *id* column of the **radcat.catalogs**
   table
 - *src_id*: references the *id* column of the radio catalog
-  table (i.e. **skycat.nvss**) which corresponds to the
+  table (i.e. **radcat.nvss**) which corresponds to the
   *catalog_id*
 - *assoc_id*: references the *id* column of the **assoc_source**
   table; deletion of row in **assoc_source** table cascades to
@@ -222,7 +222,7 @@ This is a look-up table containing explanations for each possible
 image
 *****
 This table provides a record of every image processed by **vdp**.
-The more useful metadata from the image header is summarized
+The more useful keywords from the image header are summarized
 in the table, as well.
 
 - *id*: unique identifier for each new image; deletions cascade to
@@ -285,10 +285,10 @@ in the table, as well.
 - *error_id*: value assigned if the image fails one of the quality
   checks; references the *id* column of the **error** table & is
   updated if that table is updated
-- *nearest_problem*: name of the nearest source/area which is known
+- *nearest_problem*: name of the nearest source which is known
   to cause imaging problems for VLITE
 - *separation*: angular separation between the VLITE image pointing
-  center and the nearest known problem source/area (degrees)
+  center and the nearest known problem source (degrees)
 
 .. _run_config:
 
@@ -369,7 +369,7 @@ It can be used to get the name of the catalog referenced
 by the *catalog_id* column in the **catalog_match** table.
 
 - *id*: unique row id to identify the catalog
-- *name*: name of the survey/catalog and table in the "skycat" schema
+- *name*: name of the survey/catalog and table in the "radcat" schema
 - *telescope*: name of the radio telescope used to acquire the
   catalog data
 - *frequency*: frequency of the catalog observations (MHz)

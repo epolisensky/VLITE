@@ -4,7 +4,7 @@ import psycopg2
 import psycopg2.extras
 import json
 import logging
-import dbclasses
+from database import dbclasses
 
 
 # create logger
@@ -61,19 +61,6 @@ def record_config(conn, cfgfile, logfile, start_time, exec_time, nimages,
     cur.close()
 
        
-def init_image(impath):
-    """Initializes an object of the Image class and sets values 
-    for its attributes from the fits file header using
-    the ``header_attrs`` object method.
-
-    """
-    img = dbclasses.Image(impath)
-    data, header = img.read()
-    img.header_attrs(header) # Use header info to set attributes
-
-    return img
-
-
 def status_check(conn, impath):
     """Returns the id, highest completed stage, and radius used
     for source finding from the database **image** table or ``None``

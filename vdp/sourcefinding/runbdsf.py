@@ -57,7 +57,6 @@ class BDSFImage(Image):
         self.quiet = True
         self.box_incr = 20
         self.max_iter = 5
-        self.scale = 1.0
         # Set our own default rms_box parameter
         self.set_rms_box()
         # Set attributes from config file
@@ -72,38 +71,6 @@ class BDSFImage(Image):
                 if value == '' or value == 'None':
                     value = None
             setattr(self, key, value)
-        # Pre-process the image for PyBDSF
-        self.crop()
-
-
-    def crop(self):
-        """Crops the FITS image into a circle so that sources
-        are extracted from a region the same size and shape
-        as when running a cone search query on the database.
-        This ensures that the exact same areas on the sky are
-        being considered when selecting sources for matching.
-
-        """
-        data, hdr = Image.read(self)
-        Image.header_attrs(self, hdr)
-        # Fix header keywords for PyBDSF
-        if hdr['CTYPE3'] == 'SPECLNMF':
-            hdr['CTYPE3'] = 'FREQ'
-        try:
-            hdr['BMAJ']
-        except KeyError:
-            hdr['BMAJ'] = self.bmaj / 3600. # deg
-            hdr['BMIN'] = self.bmin / 3600.
-            hdr['BPA'] = self.bpa
-        n = len(data[0,0,:,:])
-        a, b = hdr['CRPIX1'], hdr['CRPIX2']
-        y, x = np.ogrid[-a:n-a, -b:n-b]
-        r = (hdr['NAXIS2'] / 2.) * self.scale
-        mask = x*x + y*y >= r*r
-        self.radius = round(r * hdr['CDELT2'], 2) # in deg
-        data[0,0,mask] = np.nan
-        self.filename = self.filename[:-4]+'crop.fits'
-        Image.write(self, data, hdr, owrite=True)
 
 
     def set_rms_box(self):
