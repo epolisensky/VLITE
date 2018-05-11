@@ -21,7 +21,7 @@ manner, and are cross-matched to other radio sky surveys and catalogs to aid
 in the detection of transient sources and enable creation of radio flux
 spectra for sources across the entire northern sky.
 
-![VLITE 3 years](https://github.com/erichards/VLITE/blob/master/VLITE_3YEARS_map.png "VLITE 3 years")
+![VLITE 3.5 years](https://github.com/erichards/VLITE/blob/master/VLITE_3.5YEARS.png "VLITE 3.5 years")
 
 ## Files
 This repository contains the following files under the vdp/ directory:
