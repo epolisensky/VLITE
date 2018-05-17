@@ -1,7 +1,7 @@
 # VLITE Database Pipeline (VDP)
 ### Scripts for automating source extraction and database storage.
 
-#### Version 2.0.0
+#### Version 2.0
 
 A pipeline to adaptively extract and catalog point sources is
 being developed to enhance the scientific value and accessibility of data
@@ -26,6 +26,7 @@ spectra for sources across the entire northern sky.
 ## Files
 This repository contains the following files under the vdp/ directory:
 
+- *break_handler.py*: class to trap keyboard interrupts
 - *database/createdb.py*: functions to create the database tables
 - *database/dbclasses.py*: module defining classes used in **vdp**
 and their functions

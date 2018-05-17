@@ -13,14 +13,12 @@ import logging
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
+from break_handler import BreakHandler
+from database import createdb, dbclasses, dbio
 from errors import ConfigError
-from database import createdb
-from database import dbclasses
-from database import dbio
 from sourcefinding import runbdsf
 from matching import radioxmatch
-from radiocatalogs import catalogio
-from radiocatalogs import radcatdb
+from radiocatalogs import catalogio, radcatdb
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -28,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 
 # Create logger
@@ -165,6 +163,7 @@ def cfgparse(cfgfile):
     yr = setup['year']
     mo = setup['month']
     days = sorted(setup['day'])
+    imgdir = setup['image directory']
 
     # Raise error if the configuration says to do nothing
     if not any(stages.values()) and not opts['save to database']:
@@ -200,6 +199,13 @@ def cfgparse(cfgfile):
             raise ConfigError('setup: day: must be a list (i.e. [{}])'.format(
                 days))
 
+        # Set image directory to Images/ if left blank
+        if not imgdir:
+            imgdir = 'Images/'
+        else:
+            if not imgdir.endswith('/'):
+                imgdir = imgdir + '/'
+
         # Define path to processing directories
         dirs = []
         for day in days:
@@ -207,13 +213,17 @@ def cfgparse(cfgfile):
                 day = format(int(day), '02')
             except ValueError:
                 continue
-            procdir = os.path.join(monthdir, day, 'Images/')
+            procdir = os.path.join(monthdir, day, imgdir)
             # Check full image path
             if not os.path.isdir(procdir):
-                print('\nSkipping non-existent directory {}'.format(
-                    procdir))
+                print('\nSkipping non-existent directory {}'.format(procdir))
                 continue
-            dirs.append(procdir)
+            else:
+                dirs.append(procdir)
+
+    # Make sure there is at least one directory to process
+    if len(dirs) < 1:
+        raise ConfigError('No valid directories found.')
 
     # Make sure stage & option inputs are boolean
     for stage in stages.values():
@@ -500,6 +510,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
     if qa:
         imobj.image_qa(qaparams)
     else:
+        imobj.error_id = None
         pass
 
     # Is the image in the database?
@@ -582,9 +593,10 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
                     branch = 7
 
     # Stop if the image failed a quality check except 6
-    if imobj is not None and imobj.error_id is not None:
-        if imobj.error_id != 6:
-            imobj = None
+    if qa:
+        if imobj is not None and imobj.error_id is not None:
+            if imobj.error_id != 6:
+                imobj = None
     
     return imobj
 
@@ -633,7 +645,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     logger.info('**********************')
     logger.info('STAGE 2: SOURCE FINDNG')
     logger.info('**********************')
-    
+
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
@@ -651,11 +663,12 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         # Translate PyBDSF output to DetectedSource objects
         sources = dbclasses.translate(imobj, out)
         # Drop sources outside the (scaled) image FOV (radius)
-        sources = [src for src in sources if \
-                   src.dist_from_center <= imobj.radius]
-        logger.info(' -- {}/{} sources are inside the circular FOV '
-                    'with radius {} degree(s)'.format(
-                        len(sources), out.nsrc, imobj.radius))
+        if imobj.filename.endswith('IPln1.fits'):
+            sources = [src for src in sources if \
+                       src.dist_from_center <= imobj.radius]
+            logger.info(' -- {}/{} sources are inside the circular FOV '
+                        'with radius {} degree(s)'.format(
+                            len(sources), out.nsrc, imobj.radius))
         # Add PyBDSF defined attributes to Image object
         imobj.rms_box = str(out.rms_box)
         imobj.nsrc = len(sources)
@@ -668,8 +681,11 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         imobj.error_id = 7
 
     # Stop if the image failed the source count QA
-    if imobj.error_id is not None:
-        sources = None
+    if qa:
+        if imobj.error_id is not None:
+            sources = None
+    else:
+        imobj.error_id = None
 
     if save:
         # Add source fit parameters to database tables
@@ -720,14 +736,15 @@ def srcassoc(conn, imobj, sources, save):
     logger.info('STAGE 3: SOURCE ASSOCIATION')
     logger.info('***************************')
 
-    if save:
-        match_in_db = True
+    # Limit cone search radius to image FOV for VLITE, bigger for VCSS
+    if imobj.filename.endswith('IPln1.fits'):
+        radius = imobj.radius # deg
     else:
-        match_in_db = False
+        radius = 3. # deg
 
     # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
-        = radioxmatch.associate(conn, sources, imobj, imobj.radius, match_in_db)
+        = radioxmatch.associate(conn, sources, imobj, radius, save)
     if save:
         # Update assoc_id col for matched detected sources
         if detected_matched:
@@ -816,15 +833,17 @@ def catmatch(conn, imobj, sources, catalogs, save):
             dbio.update_stage(conn, imobj)
         return
 
-    # Cross-match VLITE sources with each catalog
-    if not save:
-        match_in_db = False
+    # Limit cone search radius to image FOV for VLITE, bigger for VCSS
+    if imobj.filename.endswith('IPln1.fits'):
+        radius = imobj.radius # deg
     else:
-        match_in_db = True
+        radius = 3. # deg
+
+    # Cross-match VLITE sources with each catalog
     for catalog in new_catalogs:
         try:
             sources, catalog_matched = radioxmatch.catalogmatch(
-                conn, sources, catalog, imobj, imobj.radius, match_in_db)
+                conn, sources, catalog, imobj, radius, save)
         except TypeError:
             # No sky catalog sources extracted, move on to next catalog
             continue
@@ -886,10 +905,17 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     reproc = opts['reprocess']
     rematch = opts['redo match']
     updatematch = opts['update match']
-    
+
+    # Create and enable break handler
+    bh = BreakHandler()
+    bh.enable()
     # Begin loop through daily directories
     i = 0
     for imgdir in dirs:
+        # Check if there was a break in image loop
+        if bh.trapped:
+            logger.info('Pipeline terminated (keyboard interrupt).')
+            break
         # Define/make directory for PyBDSF output
         daydir = os.path.abspath(os.path.join(imgdir, '..'))
         pybdsfdir = os.path.join(daydir, 'PyBDSF/')
@@ -897,9 +923,13 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             os.system('mkdir '+pybdsfdir)
 
         if not files[0]:
-            # Select all images that end with 'IPln1.fits'
+            # Select all images that end with 'IPln1.fits'...
             imglist = [f for f in os.listdir(imgdir) if \
                        f.endswith('IPln1.fits')]
+            # ...or 'IMSC.fits' for the VCSS mosaics
+            if len(imglist) < 1:
+                imglist = [f for f in os.listdir(imgdir) if \
+                           f.endswith('IMSC.fits')]
         else:
             imglist = [f for f in files[i]]
         i += 1
@@ -1125,6 +1155,13 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         branch = 16
                         continue
 
+            # Check whether there was a break
+            if bh.trapped:
+                break
+
+    # Disable the break handler
+    bh.disable()
+
     return
 
 
@@ -1301,8 +1338,8 @@ def main():
     process(conn, stages, opts, dirs, setup['files'],
             setup['catalogs'], sfparams, qaparams)
 
+    # Update run_config table & close database connection
     nimages, exec_time = print_run_stats(start_time)
-
     # Record run configuration parameters
     dbio.record_config(conn, args.config_file, logpath, start_time, exec_time,
                        nimages, stages, opts, setup, sfparams, qaparams)

@@ -155,7 +155,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
     return rows
 
 
-def associate(conn, detected_sources, imobj, search_radius, match_in_db):
+def associate(conn, detected_sources, imobj, search_radius, save):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
     distance less than half the size of semi-minor axis of
@@ -172,6 +172,9 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
         set from header info & updated with source finding results.
     search_radius : float
         Size of the circular search region in degrees.
+    save : bool
+        If ``False``, print the results to the console and/or
+        log file.
 
     Returns
     -------
@@ -239,97 +242,102 @@ def associate(conn, detected_sources, imobj, search_radius, match_in_db):
         assoc_matched = []
         assoc_unmatched = []
 
-        if not match_in_db:
-            match_logger.info('-----------------------------------------------'
-                              '-----------------------------------------------'
-                              '---------------------')
-            match_logger.info('src_id match assoc_id\tra\t\te_ra\t\t\tdec\t\t'
-                              'e_dec\t\tseparation (arcsec)')
-            match_logger.info('-----------------------------------------------'
-                              '-----------------------------------------------'
-                              '---------------------')
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # Print results without saving to database
+        if not save:
+            # Dump detected_sources into temporary table
+            sql = (
+                '''
+                CREATE TEMP TABLE temp_source (
+                    src_id INTEGER,
+                    ra DOUBLE PRECISION,
+                    dec DOUBLE PRECISION
+                );
+                ''')
+            cur.execute(sql)
+            conn.commit()
             for src in detected_sources:
-                match, asrc, min_sep = matchfuncs.simple_match(
-                    src, assoc_sources, imobj.bmin)
-                if match:
-                    src.assoc_id = asrc.id
-                    detected_matched.append(src)
-                    # Compute weighted averages
-                    cur_sigra_sq = asrc.e_ra * asrc.e_ra
-                    cur_sigdec_sq = asrc.e_dec * asrc.e_dec
-                    asrc.e_ra = np.sqrt(1. / (
-                        (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
-                    asrc.ra = (asrc.e_ra * asrc.e_ra) * (
-                        (asrc.ra / cur_sigra_sq) + (src.ra / (
-                            src.e_ra * src.e_ra)))
-                    asrc.e_dec = np.sqrt(1. / (
-                        (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
-                    asrc.dec = (asrc.e_dec * asrc.e_dec) * (
-                        (asrc.dec / cur_sigdec_sq) + (src.dec / (
-                            src.e_dec * src.e_dec)))
-                    asrc.ndetect += 1
-                    assoc_matched.append(asrc)
-                else:
-                    src.ndetect = 1
-                    src.res_class = res_class
-                    detected_unmatched.append(src)
-                try:
-                    match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
-                        src.src_id, match, asrc.id, asrc.ra, asrc.e_ra,
-                        asrc.dec, asrc.e_dec, min_sep))
-                except AttributeError:
-                    match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
-                        src.src_id, match, None, src.ra, src.e_ra,
-                        src.dec, src.e_dec, min_sep))
-        else:
-            # Match sources if they are separatred by less than half a beam
-            cur = conn.cursor()
-            sql = '''SELECT a.src_id, bb.id FROM detected_source AS a,
-                LATERAL ( SELECT b.* FROM assoc_source AS b
-                WHERE a.image_id = %s AND b.id IN %s AND
-                q3c_join(a.ra, a.dec, b.ra, b.dec, %s) ORDER BY
-                q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
-            values = (imobj.id, tuple(assoc_ids), (0.5*(imobj.bmin/3600.)))
+                cur.execute('''INSERT INTO temp_source (
+                    src_id, ra, dec) VALUES (%s, %s, %s)''', (
+                        src.src_id, src.ra, src.dec))
+            conn.commit()
+            # Find nearest neighbor & "match" if within half a beam
+            sql = '''SELECT a.src_id, bb.id AS assoc_id,
+                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep,
+                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) < %s AS match
+                FROM temp_source AS a, LATERAL (
+                SELECT b.* FROM assoc_source AS b WHERE b.id IN %s
+                ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1)
+                AS bb'''
+            values = (0.5*imobj.bmin, tuple(assoc_ids))
             cur.execute(sql, values)
             rows = cur.fetchall()
-            cur.close()
+            cur.execute('DROP TABLE temp_source')
+            conn.commit()
+            match_logger.info('-----------------------------------------------'
+                              '-----------------------------------------------'
+                              '---------------------------------')
+            match_logger.info('src_id match assoc_id\tra\t\te_ra\t\t\tdec\t\t'
+                              'e_dec\t\tseparation (arcsec)\tndetect')
+            match_logger.info('-----------------------------------------------'
+                              '-----------------------------------------------'
+                              '---------------------------------')
+        # Save association results for database
+        else:
+            # Find nearest neighbor & "match" if within half a beam
+            sql = '''SELECT a.src_id, bb.id AS assoc_id,
+                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep,
+                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) < %s AS match
+                FROM detected_source AS a, LATERAL (
+                SELECT b.* FROM assoc_source AS b
+                WHERE a.image_id = %s AND b.id IN %s ORDER BY
+                q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
+            values = (0.5*imobj.bmin, imobj.id, tuple(assoc_ids))
+            cur.execute(sql, values)
+            rows = cur.fetchall()
 
-            # Create dictionary of src_id keys and assoc_id values of matches
-            rowdict = {}
-            for row in rows:
-                rowdict[row[0]] = row[1]
+        cur.close()
 
-            assoc_unmatched = [asrc for asrc in assoc_sources if \
-                               asrc.id not in rowdict.values()]
+        # Create dictionary of src_id keys & associated values
+        rowdict = {}
+        for row in rows:
+            rowdict[row['src_id']] = [row['assoc_id'], row['sep'], row['match']]
 
-            for src in detected_sources:
-                if src.src_id in rowdict.keys():
-                    # It's a match!
-                    src.assoc_id = rowdict[src.src_id]
-                    detected_matched.append(src)
-                    # Update the associated source
-                    asrc = [msrc for msrc in assoc_sources if \
-                            msrc.id == src.assoc_id][0]
-                    # Compute weighted averages
-                    cur_sigra_sq = asrc.e_ra * asrc.e_ra
-                    cur_sigdec_sq = asrc.e_dec * asrc.e_dec
-                    asrc.e_ra = np.sqrt(1. / (
-                        (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
-                    asrc.ra = (asrc.e_ra * asrc.e_ra) * (
-                        (asrc.ra / cur_sigra_sq) + (src.ra / (
-                            src.e_ra * src.e_ra)))
-                    asrc.e_dec = np.sqrt(1. / (
-                        (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
-                    asrc.dec = (asrc.e_dec * asrc.e_dec) * (
-                        (asrc.dec / cur_sigdec_sq) + (src.dec / (
-                            src.e_dec * src.e_dec)))
-                    asrc.ndetect += 1
-                    assoc_matched.append(asrc)
-                else:
-                    # No match -- new source
-                    src.res_class = res_class
-                    src.ndetect = 1
-                    detected_unmatched.append(src)
+        for src in detected_sources:
+            # Get the associated source object
+            asrc = [msrc for msrc in assoc_sources if \
+                    msrc.id == rowdict[src.src_id][0]][0]
+            if rowdict[src.src_id][2]:
+                # It's a match!
+                src.assoc_id = asrc.id
+                detected_matched.append(src)
+                # Compute weighted averages
+                cur_sigra_sq = asrc.e_ra * asrc.e_ra
+                cur_sigdec_sq = asrc.e_dec * asrc.e_dec
+                asrc.e_ra = np.sqrt(1. / (
+                    (1. / cur_sigra_sq) + (1. / (src.e_ra * src.e_ra))))
+                asrc.ra = (asrc.e_ra * asrc.e_ra) * (
+                    (asrc.ra / cur_sigra_sq) + (src.ra / (
+                        src.e_ra * src.e_ra)))
+                asrc.e_dec = np.sqrt(1. / (
+                    (1. / cur_sigdec_sq) + (1. / (src.e_dec * src.e_dec))))
+                asrc.dec = (asrc.e_dec * asrc.e_dec) * (
+                    (asrc.dec / cur_sigdec_sq) + (src.dec / (
+                        src.e_dec * src.e_dec)))
+                asrc.ndetect += 1
+                assoc_matched.append(asrc)
+            else:
+                # No match -- new source
+                src.res_class = res_class
+                src.ndetect = 1
+                detected_unmatched.append(src)
+                assoc_unmatched.append(asrc)
+            if not save:
+                match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
+                    src.src_id, rowdict[src.src_id][2], asrc.id, asrc.ra,
+                    asrc.e_ra, asrc.dec, asrc.e_dec, rowdict[src.src_id][1],
+                    asrc.ndetect))
 
     match_logger.info(' -- number of matches: {}'.format(len(detected_matched)))
     match_logger.info(' -- number of new sources to add: {}'.format(
@@ -385,7 +393,7 @@ def filter_catalogs(conn, catalogs, res):
     return filtered_catalogs
 
 
-def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
+def catalogmatch(conn, sources, catalog, imobj, search_radius, save):
     """Matches VLITE sources to sources from other radio
     sky survey catalogs.
 
@@ -406,14 +414,13 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
     search_radius : float
         Size of the circular search region in degrees. Only
         used if match_in_db is ``False``.
-    match_in_db : bool
-        If ``True``, do the cross-matching inside the database
-        between the **assoc_source** and catalog tables. If ``False``,
-        do the cross-matching outside the database by first extracting
-        the catalog sources using a cone search. This option should
-        be set to ``False`` when the VLITE sources to be matched are
-        not in the **assoc_source** table, as is the case when results
-        are not saved to the database.
+    save : bool
+        If ``True``, store the catalog cross-matching results
+        for future insertion into the database. If ``False``,
+        print the results to the console and/or log file.
+        This parameter is automatically set to ``False``
+        if only the source finding and catalog matching
+        stages are turned on.
 
     Returns
     -------
@@ -424,56 +431,59 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
         matched to the VLITE sources.
     """
     catalog_matched = []
+
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # Cross-match outside the DB
-    if not match_in_db:
-        # Extract catalog sources
-        catalog_rows = cone_search(conn, catalog, imobj.obs_ra, imobj.obs_dec,
-                                   search_radius, 'radcat')
-        match_logger.info('Extracted {} sources from {} within {} degrees.'.
-                          format(len(catalog_rows), catalog, search_radius))
-        # Sky survey does not cover this sky region, move on
-        if not catalog_rows:
-            return
-        
-        # Translate row dictionaries to CatalogSource objects
-        catalog_sources = []
-        for csrc in catalog_rows:
-            catalog_sources.append(catalogio.CatalogSource())
-            dbclasses.dict2attr(catalog_sources[-1], csrc)
-        match_logger.info('Attempting to match {} sources from this image to '
-                          '{} sources from the {} sky catalog...'.format(
-                              len(sources), len(catalog_sources), catalog))
-        
-        match_logger.info('-------------------------------------------------'
-                          '----')
-        match_logger.info('VLITE_src_id match catalog_src_id separation '
-                          '(arcsec)')
-        match_logger.info('-------------------------------------------------'
-                          '----')
-        
+    match_logger.info('Attempting to match {} sources from this image to '
+                      'the {} sky catalog...'.format(len(sources), catalog))
+
+    # Print results without saving to database
+    if not save:
+        # Dump sources into a temporary table
+        sql = (
+            '''
+            CREATE TEMP TABLE temp_source (
+                src_id INTEGER,
+                ra DOUBLE PRECISION,
+                dec DOUBLE PRECISION
+            );
+            ''')
+        cur.execute(sql)
+        conn.commit()
         for src in sources:
-            match, csrc, min_sep = matchfuncs.simple_match(
-                src, catalog_sources, imobj.bmin)
-            if match: # Found a match!
-                try:
-                    src.nmatches += 1
-                except TypeError:
-                    src.nmatches = 1
-                csrc.assoc_id = src.id
-                csrc.sep = min_sep
-                catalog_matched.append(csrc)
-            else:
-                if src.nmatches is None:
-                    src.nmatches = 0
-            match_logger.info('{}\t{}\t{}\t{}'.format(
-                src.src_id, match, csrc.id, min_sep))
+            cur.execute('''INSERT INTO temp_source (
+                src_id, ra, dec) VALUES (%s, %s, %s)''', (
+                    src.src_id, src.ra, src.dec))
+        conn.commit()
+        # Find nearest neighbor within FOV & "match" if within half a beam
+        sql = '''SELECT a.src_id, bb.id AS catalog_src_id,
+            3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep,
+            3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) < %s AS match
+            FROM temp_source AS a, LATERAL (
+            SELECT b.* FROM radcat.{} AS b
+            WHERE q3c_join(a.ra, a.dec, b.ra, b.dec, %s)
+            ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
+        values = (0.5*imobj.bmin, 2.*imobj.radius)
+        cur.execute(psycopg2.sql.SQL(sql).format(
+            psycopg2.sql.Identifier(catalog)), values)
+        rows = cur.fetchall()
+        cur.execute('DROP TABLE temp_source')
+        conn.commit()
 
+        match_logger.info('-------------------------------------------------'
+                          '-------------')
+        match_logger.info('VLITE_src_id match catalog_src_id '
+                          'separation (arcsec)')
+        match_logger.info('-------------------------------------------------'
+                          '-------------') 
+        for row in rows:
+            if row['match']:
+                catalog_matched.append(row['catalog_src_id'])
+            match_logger.info('{}\t\t{}\t{}\t{}'.format(
+                row['src_id'], row['match'], row['catalog_src_id'], row['sep']))
 
-    # Cross-match inside the DB
+    # Store results for insertion into database
     else:
-        match_logger.info('Attempting to match {} sources from this image to '
-                          'the {} sky catalog...'.format(len(sources), catalog))
         # Skip the sources which already have results for this catalog
         # (from a different image)
         assoc_ids = []
@@ -487,19 +497,16 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
                           format(len(sources) - len(assoc_ids)))
 
         # Find nearest neighbor within half a beam
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        sql = '''SELECT a.id AS assoc_id, bb.*,
+        sql = '''SELECT a.id AS assoc_id, bb.*, 
             3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep
             FROM assoc_source AS a, LATERAL (
             SELECT b.* FROM radcat.{} AS b
             WHERE a.id IN %s AND q3c_join(a.ra, a.dec, b.ra, b.dec, %s)
-            ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1)
-            AS bb'''
+            ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
         values = (tuple(assoc_ids), (0.5*(imobj.bmin/3600.)))
         cur.execute(psycopg2.sql.SQL(sql).format(
             psycopg2.sql.Identifier(catalog)), values)
         rows = cur.fetchall()
-        cur.close()
 
         matched_ids = []
         for row in rows:
@@ -518,6 +525,8 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, match_in_db):
             else:
                 if src.nmatches is None:
                     src.nmatches = 0
+
+    cur.close()
 
     match_logger.info (' -- number of matches: {}'.format(len(catalog_matched)))
 

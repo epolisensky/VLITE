@@ -8,24 +8,25 @@ where to find the VLITE images and which local database to
 connect to (see :ref:`config_desc` for details).
 Since it was built specifically for VLITE, **vdp** assumes
 a particular directory structure in which it looks for all
-files ending with "IPln1.fits":
+files ending with "IPln1.fits" for VLITE or "IMSC.fits" for VCSS:
 
-  ``/root_directory/year-month/day/Images/``
+  ``/root_directory/year-month/day/image_directory/``
 
-Or, for example: ``/extraid/vpipe/processed/2018-03/26/Images/``
+Or, for example, ``/extraid/vpipe/processed/2018-03/26/Images/``
+for VLITE or, ``/data3/vpipe/vcss/2017-09/21/Mosaics/`` for VCSS.
 
 If you leave the "month" or "year" parameters blank in the
 configuration file, **vdp** will look for VLITE images
 in ``/root_directory/Images/``.
 
-.. note:: The user will need write permissions in ``Images/``
+.. note:: The user will need write permissions in image directory
 	  and its parent directory.
 
 The database can be created at runtime, so it does not need
 to exist before starting the pipeline. If connecting to an
 existing database, the user must either be the owner of that
 database or a superuser due to the permissions needed while
-running **vdp**. The database user vpipe can be used for
+running **vdp**. The database user vpipe should be used for
 running **vdp** on roadrunner.
 
 Running the Code
@@ -159,14 +160,40 @@ VLA A configuration, 15-45 s/image for B, and 5-15 s/image
 for C & D configurations, on average. The bottleneck is source
 finding/measurement with PyBDSF.
 
+*********************
+Stopping the Pipeline
+*********************
+Execution times can be long (hours/days) when processing many
+images. There may be times when you need to stop the pipeline
+before it has completed and restart it later. A handler has
+been implemented (thanks to an internet blogger) to gracefully
+break out of the processing loop. A keyboard interrupt (CTRL-C)
+will signal the pipeline to stop once it has finished processing
+the current image and exit as if the run had completed normally.
+
+You can simply restart the pipeline with same configuration file.
+**vdp** will skip any file it finds is already in the database
+*image* table if the *reprocess* configuration file option is
+turned off. You may also want to edit the *day* and/or *files*
+lists in the configuration file to run only the ones remaining
+so there aren't hundreds of lines printed about skipping over
+already-processed images.
+
+If things have gone completely off the rails and you need
+to kill the pipeline NOW, hitting CTRL-C nine times will
+override the graceful exit and send a real keyboard interrupt
+to Python. Basically, just keep doing CTRL-C until everything
+comes grinding to a halt. No guarantees on the state of the
+database after that, though.
+
 *************
 Data Products
 *************
-A ``PyBDSF/`` directory is created in the ``Images/`` parent directory
+A ``PyBDSF/`` directory is created in the image parent directory
 which stores the PyBDSF generated log files and ds9 regions
 files for each image. A log file is also generated in the root
 directory, or appended to if it already exists, with every run of
-the pipeline The database contains all results from
+the pipeline. The database contains all results from
 each stage of the pipeline. See :ref:`database` for more
 information.
 
@@ -239,6 +266,10 @@ The contents are described in more detail below.
     List of two-digit daily directories to process under the
     ``year-mo`` parent directory. To process all, leave as
     empty list, ``[]``. Otherwise, ``[01, 02, 03, etc.]``.
+  *image directory*
+    Name of the sub-directory where the image files are
+    located under ``root_directory/year-month/day``.
+    The default is ``Images/`` if left blank.
   *files*
     Lists of files to process in each daily directory. To process
     all, leave as empty nested list, ``[[]]``. Otherwise,

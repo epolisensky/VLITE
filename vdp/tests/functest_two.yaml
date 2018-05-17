@@ -20,6 +20,7 @@ setup:
   year: 2017
   month: 08
   day: [30]                   # list of days to process; [] = all
+  image directory:            # blank defaults to Images/
   # list files to process - put different days in separate lists; [[]] = all
   files: [[1.5GHz.0137+331.IPln1.fits, 6GHz.0137+331.IPln1.fits]]
   database name: functest

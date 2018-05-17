@@ -107,6 +107,9 @@ def add_image(conn, img, status, delete=False):
         Initialized Image object with updated id attribute,
         if newly added to the database.
     """
+    # Increase the image count by one
+    dbclasses.Image.num_images += 1
+
     cur = conn.cursor()
     
     # Add new image to DB

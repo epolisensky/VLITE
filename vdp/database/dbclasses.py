@@ -103,17 +103,20 @@ class Image(object):
     num_images = 0
     
     def __init__(self, image):
-        pri = re.findall('\/([0-9.]+[A-Z])', image)
-        try:
-            if pri[0][-1:] == 'M':
-                pri_freq = float(pri[0][:-1]) / 1000. # GHz
-            else:
-                pri_freq = float(pri[0][:-1]) # GHz
-            # project code 13B-266 is at 1.5 GHz
-            if pri_freq == 13:
-                pri_freq = 1.5
-        except IndexError:
-            pri_freq = None
+        if image.endswith('IMSC.fits'):
+            pri_freq = 3
+        else:
+            pri = re.findall('\/([0-9.]+[A-Z])', image)
+            try:
+                if pri[0][-1:] == 'M':
+                    pri_freq = float(pri[0][:-1]) / 1000. # GHz
+                else:
+                    pri_freq = float(pri[0][:-1]) # GHz
+                # project code 13B-266 is at 1.5 GHz
+                if pri_freq == 13:
+                    pri_freq = 1.5
+            except IndexError:
+                pri_freq = None
         self.id = None
         self.filename = image
         self.imsize = None
@@ -142,9 +145,6 @@ class Image(object):
         self.radius = None
         self.nearest_problem = None
         self.separation = None
-
-        # Increase the image count by one
-        Image.num_images += 1
 
 
     @classmethod
@@ -191,11 +191,25 @@ class Image(object):
         except KeyError:
             self.obs_ra = None
             self.error_id = 1
+        if self.obs_ra == 0:
+            try:
+                self.obs_ra = hdr['CRVAL1'] # deg
+                self.error_id = None
+            except KeyError:
+                self.obs_ra = None
+                self.error_id = 1
         try:
             self.obs_dec = hdr['OBSDEC'] # deg
         except KeyError:
             self.obs_dec = None
             self.error_id = 1
+        if self.obs_dec == 0:
+            try:
+                self.obs_dec = hdr['CRVAL2'] # deg
+                self.error_id = None
+            except KeyError:
+                self.obs_dec = None
+                self.error_id = 1
         try:
             self.pixel_scale = abs(hdr['CDELT1']) * 3600. # arcsec/pixel
         except KeyError:

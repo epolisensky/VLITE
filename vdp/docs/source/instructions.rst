@@ -18,7 +18,11 @@ attributes are written to a text file which is then read and bulk
 inserted into the database as a new table in the "radcat" schema.
 Follow the instructions below to add or update a catalog.
 
-1. If adding a new catalog, create a new entry for it in the
+1. Move the catalog into the catalog directory defined in
+   ``radiocatalogs.catalogio.catalogdir``. This is in
+   /home/vpipe/vdp/resources/RadioCatalogs on roadrunner.
+
+2. Create a new entry for the catalog in the
    catalog dictionary at the top of the ``radiocatalogs.catalogio``
    module. Add the name of the catalog as a new key and a
    dictionary as its value which contains the key 'id' and a
@@ -37,29 +41,18 @@ Follow the instructions below to add or update a catalog.
 	     'catalog_id' of the sources matches the 'id' of the
 	     catalog in the **radcat.catalogs** table.
 
-2. Write a new function, or update the existing, to read the
+3. Write a new function, or update the existing, to read the
    catalog in the ``radiocatalogs.catalogio`` module. Name the
    function "read_[catalog name]", where "[catalog_name]" is
    whatever you specified in the catalog dictionary. Use one
    of the other catalog reading functions as a template.
-3. The final step is to add a couple of lines, or update the
+4. The final step is to add a couple of lines, or update the
    existing ones if necessary, in the ``radiocatalogs.radcatdb.add_table``
    function to call the function to read the catalog. For example::
 
      elif tblname == 'nvss':
          sources = catalogio.read_nvss()
 
-
-.. _update_beam:
-
-Updating the Primary Beam Correction Files
-------------------------------------------
-In the future, the primary beam correction will be dependent
-on the primary observing frequency. The ``priband_beam_dict``
-in the function ``sourcefinding.beam_tools.read_fitted_beam()``
-anticipates having a separate file for each primary observing
-band. Simply update the file name associated with each
-primary frequency once they are ready.
 
 .. _update_qa:
 
@@ -80,8 +73,8 @@ function.
 
 .. _update_beam_corr:
 
-Updating the Beam Correction
-----------------------------
+Updating the Primary Beam Correction
+------------------------------------
 The ``sourcefinding.beam_tools`` module contains the functions
 to read the fitted beam file and find the nearest correction
 factor when given an angular distance from the image center.
@@ -89,7 +82,8 @@ factor when given an angular distance from the image center.
 set up to accept a separate file for each primary frequency.
 Simply add the correct text file name as the value to the
 corresponding primary frequency key in the dictionary
-``priband_beam_dict``.
+``priband_beam_dict``. The files will need to be located
+in /home/vpipe/vdp/resources on roadrunner.
 
 .. _change_res:
 
