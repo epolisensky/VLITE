@@ -642,9 +642,9 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         output object.
     """
     # STAGE 2 -- Source finding + 2nd quality check
-    logger.info('**********************')
-    logger.info('STAGE 2: SOURCE FINDNG')
-    logger.info('**********************')
+    logger.info('***********************')
+    logger.info('STAGE 2: SOURCE FINDING')
+    logger.info('***********************')
 
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)

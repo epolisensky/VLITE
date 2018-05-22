@@ -81,6 +81,13 @@ To quit the interactive session, type "\\q".
 	  choose to be vpipe, just remember with great
 	  power comes great responsibility. Query wisely.
 
+You will need to add the pgsql/bin directory to your user's
+path in order to run PostgreSQL's client-side applications
+like psql without supplying the full directory path::
+
+  PATH=/usr/local/pgsql/bin:$PATH
+  export PATH
+
 Summarized below are some psql meta-commands you might find useful:
 
 \\df[tn]
