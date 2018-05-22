@@ -21,16 +21,17 @@ class TestSFBranches(unittest.TestCase):
         """Define variables to be used by all tests and
         connect the database, overwriting existing tables
         every time."""
-        self.dirs = ['/home/erichards/work/data/test/2540-06/03/Images/']
-        self.files = [[]]
+        self.dirs = ['/data3/vpipe/processed/2015-03/31/Images/',
+                     '/nfsshare/vpipe/processed/2017-07/25/Images/']
+        self.files = [['13B-266.deepfield.IPln1.fits'],
+                      ['1.5GHz.J0205-206.IPln1.fits']]
         self.catalogs = ['NVSS']
         self.sfparams = {'mode' : 'default', 'thresh' : 'hard', 'scale' : 1.0}
         self.qaparams = {'min nvis' : 1000.,
                          'max sensitivity metric' : 3000.,
                          'max beam axis ratio' : 4.,
                          'max source count metric' : 10.}
-        self.conn = vdp.dbinit('branchtest', 'erichards', True,
-                               self.qaparams, True)
+        self.conn = vdp.dbinit('branchtest', 'vpipe', True, self.qaparams, True)
 
 
     def tearDown(self):

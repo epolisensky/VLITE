@@ -26,7 +26,7 @@ def read_fitted_beam(pri_freq):
     """
     # In the future, there will be a separate file for each
     # primary observing frequency.
-    beamdir = '/home/erichards/work/data/'
+    beamdir = '/home/vpipe/VLITE/vdp/resources'
     priband_beam_dict = {0.3 : 'FITBEAM_FINAL_DOMEGA.txt',
                          1.5 : 'FITBEAM_FINAL_DOMEGA.txt',
                          3 : 'FITBEAM_FINAL_DOMEGA.txt',
