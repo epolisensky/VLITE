@@ -214,6 +214,7 @@ def create(conn, params, safe=False):
                 isl_resid_rms DOUBLE PRECISION,
                 isl_resid_mean DOUBLE PRECISION,
                 distance_from_center REAL,
+                polar_angle REAL,
                 snr REAL,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)

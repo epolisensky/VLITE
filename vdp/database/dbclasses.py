@@ -9,6 +9,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
@@ -33,6 +34,8 @@ class Image(object):
         into the database **image** table.
     filename : str
         Full directory path for the image file.
+    wcsobj : object
+        image header converted to WCS object
     imsize : str
         Image size in pixels -- (``NAXIS1``, ``NAXIS2``).
     obs_ra : float
@@ -119,6 +122,7 @@ class Image(object):
                 pri_freq = None
         self.id = None
         self.filename = image
+        self.wcsobj = None
         self.imsize = None
         self.obs_ra = None
         self.obs_dec = None
@@ -156,18 +160,16 @@ class Image(object):
     def read(self):
         """Reads FITS image data and header."""
         try:
-            data, header = fits.getdata(self.filename, header=True)
-            return data, header
+            hdu = fits.open(self.filename, mode='update')
+            hdr = hdu[0].header
+            return hdu, hdr
         except:
             dbclasses_logger.error('\nERROR: Problem reading image.')
 
 
-    def write(self, data, header, owrite=False):
-        """Writes FITS image data and header."""
-        try:
-            fits.writeto(self.filename, data, header, overwrite=owrite)
-        except TypeError: # astropy version < 1.3
-            fits.writeto(self.filename, data, header, clobber=owrite)
+    def write(self, hdu, header):
+        """Updates FITS image header"""
+        hdu.flush()
 
 
     def header_attrs(self, hdr):
@@ -186,6 +188,9 @@ class Image(object):
         except KeyError:
             self.imsize = None
             self.error_id = 1
+
+        self.wcsobj = wcs.WCS(hdr).celestial
+
         try:
             self.obs_ra = hdr['OBSRA'] # deg
         except KeyError:
@@ -324,7 +329,7 @@ class Image(object):
             self.radius = round((r * self.pixel_scale) / 3600., 2) # in deg
         except AttributeError:
             try:
-                data, hdr = self.read()
+                hdu, hdr=self.read()
                 r = (hdr['NAXIS2'] / 2.) * scale
                 self.radius = round(r * hdr['CDELT2'], 2) # in deg
             except KeyError:
@@ -613,6 +618,8 @@ class DetectedSource(object):
     dist_from_center : float
         Angular separation between the source location and image
         pointing center (degrees).
+    polar_angle : float
+        Polar angle (West of North) of source in image (degrees).
     id : int
         Uniquely identifies the source in the **assoc_source** table.
     res_class : str
@@ -672,6 +679,7 @@ class DetectedSource(object):
         self.code = None
         self.assoc_id = None
         self.dist_from_center = None
+        self.polar_angle = None
         # assoc_source attributes
         self.id = None
         self.res_class = None
@@ -743,6 +751,22 @@ class DetectedSource(object):
         src_loc = SkyCoord(self.ra, self.dec, unit='deg')
         self.dist_from_center = img_center.separation(src_loc).degree
 
+    def calc_polar_angle(self, imobj):
+        """Calculates a source's polar angle, W of N
+        and sets the ``polar_angle`` attribute.
+
+        Parameters
+        ----------
+        imobj : ``database.dbclasses.Image`` instance
+            Initialized Image object with attribute values
+            set from header info.
+        """
+        world = np.array([[self.ra, self.dec]])
+        pcoordS = imobj.wcsobj.wcs_world2pix([[self.ra, self.dec]],1)
+        world = np.array([[imobj.obs_ra, imobj.obs_dec]])
+        pcoordI = imobj.wcsobj.wcs_world2pix(world,1)
+        theta = np.arctan2(pcoordS[0][0]-pcoordI[0][0], pcoordS[0][1]-pcoordI[0][1]) #rad
+        self.polar_angle = theta * 180.0/np.pi #deg
 
     def correct_flux(self, pri_freq):
         """Applies a 1-D radial correction to all flux measurements
@@ -860,6 +884,7 @@ def translate(img, out):
         newsrcs[-1].cast(oldsrc)
         newsrcs[-1].image_id = img.id
         newsrcs[-1].calc_center_dist(img)
+        newsrcs[-1].calc_polar_angle(img)
 
     return newsrcs
 
@@ -871,7 +896,7 @@ def init_image(impath):
 
     """
     imobj = Image(impath)
-    data, hdr = imobj.read()
+    hdu, hdr = imobj.read()
     # Use header info to set attributes
     imobj.header_attrs(hdr)
     # Fix header keywords for PyBDSF, if necessary
@@ -887,6 +912,7 @@ def init_image(impath):
         hdr['BPA'] = imobj.bpa
         header_changed = True
     if header_changed:
-        imobj.write(data, hdr, owrite=True)
+        imobj.write(hdu, hdr)
 
+    hdu.close()
     return imobj

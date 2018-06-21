@@ -270,9 +270,9 @@ def cfgparse(cfgfile):
     if sfparams['mode'] != 'default' and sfparams['mode'] != 'minimize_islands':
         raise ConfigError('Source finding mode must be default or '
                           'minimize_islands.')
-    if sfparams['scale'] < 0 or sfparams['scale'] > 1:
+    if sfparams['scale'] < 0 or sfparams['scale'] > 10:
         raise ConfigError('The image radius scale factor must be a number '
-                          'between 0 and 1.')
+                          'between 0 and 10.')
 
     # Set default QA requirements if not specified
     if opts['quality checks']:
@@ -308,7 +308,7 @@ def cfgparse(cfgfile):
                     qaparams['max source count metric'])
             except ValueError:
                 raise ConfigError('max source count metric must be a number.')
-            
+
     return stages, opts, setup, sfparams, qaparams, dirs
 
 
