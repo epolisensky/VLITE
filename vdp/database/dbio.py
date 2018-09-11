@@ -118,15 +118,15 @@ def add_image(conn, img, status, delete=False):
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
-            config, nvis, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
+            config, nvis, niter, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
             stage, error_id, nearest_problem, separation) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
-                img.noise, img.peak, img.config, img.nvis, img.mjdtime,
+                img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
                 img.stage, img.error_id, img.nearest_problem, img.separation)
         cur.execute(sql, vals)
@@ -139,14 +139,14 @@ def add_image(conn, img, status, delete=False):
             obs_dec = %s, pixel_scale = %s, object = %s, obs_date = %s, 
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
-            nvis = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
+            nvis = %s, niter = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
             nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
             error_id = %s, nearest_problem = %s, separation = %s
             WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
-                img.noise, img.peak, img.config, img.nvis, img.mjdtime,
+                img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
                 img.stage, None, img.error_id, img.nearest_problem,
                 img.separation, img.id)

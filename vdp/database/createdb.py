@@ -21,7 +21,9 @@ def make_error(cur, params):
                    'PyBDSF failed to process' : 7,
                    'zero sources extracted' : 8,
                    'source count metric > {}'.
-                   format(params['max source count metric']) : 9}
+                   format(params['max source count metric']) : 9,
+                   'number of CLEAN iterations < {}'.
+                   format(params['min niter']) : 10}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
@@ -131,6 +133,7 @@ def create(conn, params, safe=False):
                 peak REAL,
                 config VARCHAR(3),
                 nvis INTEGER,
+                niter INTEGER,
                 mjdtime DOUBLE PRECISION,
                 tau_time REAL,
                 duration REAL,

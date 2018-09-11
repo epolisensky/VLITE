@@ -26,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 
 # Create logger
@@ -194,7 +194,9 @@ def cfgparse(cfgfile):
         # If days = [], process every day in month directory
         try:
             if len(days) < 1:
-                days = sorted(next(os.walk(monthdir))[1])
+                tmp = sorted(next(os.walk(monthdir))[1])
+                for i in tmp:
+                    if len(i)==2: days.append(i) #assume only want the 2-digit day dirs
         except TypeError:
             raise ConfigError('setup: day: must be a list (i.e. [{}])'.format(
                 days))
@@ -209,10 +211,10 @@ def cfgparse(cfgfile):
         # Define path to processing directories
         dirs = []
         for day in days:
-            try:
-                day = format(int(day), '02')
-            except ValueError:
-                continue
+#            try:
+#                day = format(int(day), '02')
+#            except ValueError:
+#                continue
             procdir = os.path.join(monthdir, day, imgdir)
             # Check full image path
             if not os.path.isdir(procdir):
@@ -308,6 +310,14 @@ def cfgparse(cfgfile):
                     qaparams['max source count metric'])
             except ValueError:
                 raise ConfigError('max source count metric must be a number.')
+        if qaparams['min niter'] is None:
+            qaparams['min niter'] = 1000.
+        else:
+            try:
+                qaparams['min niter'] = float(
+                    qaparams['min niter'])
+            except ValueError:
+                raise ConfigError('min niter must be a number.')
 
     return stages, opts, setup, sfparams, qaparams, dirs
 

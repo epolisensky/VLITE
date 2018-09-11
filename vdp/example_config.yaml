@@ -19,7 +19,7 @@ setup:
   root directory: /path/to/data/
   year: 2018
   month: 05
-  day: [17]                   # list of days to process; [] = all
+  day: ['17']                 # list of days to process; entries must be strings; [] = all
   image directory:            # blank defaults to Images/
   # list files to process - put different days in separate lists; [[]] = all
   files: [[]]
@@ -43,3 +43,4 @@ image_qa_params:
   max sensitivity metric:          # (default 3000 mJy/bm s^1/2)
   max beam axis ratio:             # (default 4)
   max source count metric:         # (default 10)
+  min niter:                       # (default 1000)

@@ -70,6 +70,8 @@ class Image(object):
         Very Large Array configuration.
     nvis : int
         Number of visibilities in the data after calibration.
+    niter : int
+        Number of CLEAN iterations
     mjdtime : float
         Modified Julian Date (days since 0h Nov 17, 1858).
     tau_time : float
@@ -139,6 +141,7 @@ class Image(object):
         self.peak = None
         self.config = None
         self.nvis = None
+        self.niter = None
         self.mjdtime = None
         self.tau_time = None
         self.duration = None
@@ -297,6 +300,21 @@ class Image(object):
             self.nvis = None
             self.error_id = 1
         try:
+            self.niter = hdr['CLEANNIT']
+        except KeyError:
+            try:
+                self.niter = hdr['NITER']
+            except KeyError:
+                try:
+                    hl = list(hdr['HISTORY'])
+                    for line in hl:
+                        x = re.findall('NITER=\s+([0-9]\S+)', line)
+                        if len(x)>0:
+                            self.niter=int(x[0])
+                except KeyError:
+                    self.niter = None
+                    self.error_id = 1    
+        try:
             self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME']
         except KeyError:
             self.mjdtime = None
@@ -346,8 +364,9 @@ class Image(object):
         4. beam semi-major/semi-minor axis > max_ellip (too elliptical)
         5. target is NCP or a planet
         6. a known bright radio source is in the field-of-view (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), Perseus A (3C84), the Sun, the Moon, Jupiter, Galactic Center)
+        10. number of CLEAN iterations (niter) < min_niter
 
-        Images that fail checks 1-5 are aborted and do not proceed
+        Images that fail checks 1-5,10 are aborted and do not proceed
         to source finding. Images are flagged if they fail check 6,
         but do continue on.
 
@@ -385,6 +404,16 @@ class Image(object):
                                   'maximum of {}.'.format(
                                       sensitivity_metric, max_sensitivity))
             self.error_id = 3
+            return
+        else: pass
+
+        # Check number of CLEAN interations (NITER)
+        min_niter = params['min niter']
+        if self.niter < min_niter:
+            dbclasses_logger.info('IMAGE FAILED QA: number of iterations '
+                                  '(NITER) {} < allowed minimum of {}.'.
+                                  format(self.niter, min_niter))
+            self.error_id = 10
             return
         else: pass
 
@@ -454,6 +483,7 @@ class Image(object):
             return
         else: pass
 
+        #all checks passed:
         dbclasses_logger.info('...image passed.')
 
 
