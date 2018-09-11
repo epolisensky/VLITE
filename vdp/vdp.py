@@ -693,7 +693,8 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     # Stop if the image failed the source count QA
     if qa:
         if imobj.error_id is not None:
-            sources = None
+            if imobj.error_id != 6:
+                sources = None
     else:
         imobj.error_id = None
 
@@ -983,6 +984,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                     os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
                 if sources is None:
                     # Image failed to process
+                    logger.info('sources is none!')
                     continue
                 # STAGE 3 -- Source association
                 if sa:
