@@ -26,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.0.2'
+__version__ = '2.0.3'
 
 
 # Create logger
@@ -675,7 +675,8 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         # Drop sources outside the (scaled) image FOV (radius)
         if imobj.filename.endswith('IPln1.fits'):
             sources = [src for src in sources if \
-                       src.dist_from_center <= imobj.radius]
+                       src.dist_from_center <= imobj.radius and \
+                       src.e_ra > 1e-7 and src.e_dec > 1e-7]
             logger.info(' -- {}/{} sources are inside the circular FOV '
                         'with radius {} degree(s)'.format(
                             len(sources), out.nsrc, imobj.radius))
