@@ -811,24 +811,26 @@ class DetectedSource(object):
             Primary frequency of the observations in GHz.
         """
         # Correct for beam response - only 1D (sym. beam) for now
-        pb_power = beam_tools.find_nearest_pbcorr(self.dist_from_center,
+        pb_power,pb_err = beam_tools.find_nearest_pbcorr(self.dist_from_center,
                                                   pri_freq)
         # List of attributes to correct
-        attrs = ['total_flux', 'e_total_flux', 'peak_flux', 'e_peak_flux',
-                 'total_flux_isl', 'total_flux_islE', 'rms_isl', 'mean_isl',
+#        attrs = ['total_flux', 'e_total_flux', 'peak_flux', 'e_peak_flux',
+#                 'total_flux_isl', 'total_flux_islE', 'rms_isl', 'mean_isl',
+#                 'resid_rms', 'resid_mean']
+        attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl', 'mean_isl',
                  'resid_rms', 'resid_mean']
         for attr in attrs:
             corr_val = getattr(self, attr) / pb_power
             setattr(self, attr, corr_val)
         # Compute S/N of source detection
         self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
-        # Add 20% systematic uncertainty to all flux errors
+        # Add systematic uncertainty to all flux errors
         self.e_total_flux = np.sqrt(
-            (self.total_flux * 0.2)**2. + self.e_total_flux**2.)
+            (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
         self.e_peak_flux = np.sqrt(
-            (self.peak_flux * 0.2)**2. + self.e_peak_flux**2.)
+            (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
         self.total_flux_islE = np.sqrt(
-            (self.total_flux_isl * 0.2)**2. + self.total_flux_islE**2.)
+            (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
 
 
 def dict2attr(obj, dictionary):

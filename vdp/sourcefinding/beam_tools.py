@@ -9,7 +9,7 @@ import numpy as np
 def read_fitted_beam(pri_freq):
     """Reads the fitted beam file which contains
     the correction factor as a function of distance
-    from the image center at every 10 arcseconds.
+    from the image center at every 2.5 arcseconds.
 
     Parameters
     ----------
@@ -23,20 +23,24 @@ def read_fitted_beam(pri_freq):
         correction factor ('power') as a function
         of the distance from the image center
         in degrees ('angle').
+    priband_beam_dict[pri_freq][1]: float
+        The uncertainity of the primary beam 
+        correction. Add in quadrature to flux
+        uncertainty
     """
-    # In the future, there will be a separate file for each
+    # There is a separate file and uncertainty for each
     # primary observing frequency.
     beamdir = '/home/vpipe/VLITE/vdp/resources'
-    priband_beam_dict = {0.3 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         1.5 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         3 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         6 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         10 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         15 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         22 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         33 : 'FITBEAM_FINAL_DOMEGA.txt',
-                         45 : 'FITBEAM_FINAL_DOMEGA.txt'}
-    beamfile = os.path.join(beamdir, priband_beam_dict[pri_freq])
+    priband_beam_dict = {0.3 : ['FITBEAM_FINAL_DOMEGA.txt',0.03],
+                         1.5 : ['FITBEAMv2_1.5GHz_DOMEGA.txt',0.03],
+                         3 : ['FITBEAMv2_3GHz_DOMEGA.txt',0.03],
+                         6 : ['FITBEAMv2_6GHz_DOMEGA.txt',0.03],
+                         10 : ['FITBEAMv2_10GHz_DOMEGA.txt',0.03],
+                         15 : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
+                         22 : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
+                         33 : ['FITBEAMv2_33GHz_DOMEGA.txt',0.03],
+                         45 : ['FITBEAMv2_15+22+33+45GHz_DOMEGA.txt',0.05]}
+    beamfile = os.path.join(beamdir, priband_beam_dict[pri_freq][0])
     with open(beamfile, 'r') as f:
         lines = f.readlines()
 
@@ -47,7 +51,7 @@ def read_fitted_beam(pri_freq):
         pbdict['power'].append(float(data[1]))
         pbdict['domega'].append(float(data[2]))
 
-    return pbdict
+    return pbdict,priband_beam_dict[pri_freq][1]
 
 
 def find_nearest_pbcorr(angle, pri_freq):
@@ -66,11 +70,14 @@ def find_nearest_pbcorr(angle, pri_freq):
     -------
     pbdata['power'][idx] : float
         Primary beam correction factor.
+    err : float
+        Uncertainity of the primary beam correction. 
+        Add in quadrature to flux uncertainty
     """
-    pbdata = read_fitted_beam(pri_freq)
+    pbdata,err = read_fitted_beam(pri_freq)
     idx = (np.abs(np.array(pbdata['angle']) - angle)).argmin()
     
-    return pbdata['power'][idx]
+    return pbdata['power'][idx],err
 
 
 def expected_nsrc(pri_freq, rms, max_angle=1.5, sigma=5.):
@@ -108,7 +115,7 @@ def expected_nsrc(pri_freq, rms, max_angle=1.5, sigma=5.):
     wenss_n = 0.497
     wenss_n2 = -1.0 / wenss_n
     # Read fitted beam file
-    pbdata = read_fitted_beam(pri_freq)
+    pbdata,err = read_fitted_beam(pri_freq)
     nexp = 0
     for i in range(len(pbdata['angle'])):
         if pbdata['angle'][i] > max_angle:
