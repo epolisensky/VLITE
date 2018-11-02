@@ -172,11 +172,11 @@ is also added in quadrature to the PyBDSF
 reported 1-sigma statistical uncertainties on all flux error
 measurements in the **corrected_flux** table only. The applied
 primary beam correction factor was determined empirically and
-depends only on the source's distance from the image center,
-which is also recorded in the **corrected_flux** table in degrees
+depends on the source's distance from the image center,
+which is also recorded in the **corrected_flux** table in degrees,
 and the primary observing frequency.
 In the future, this will likely become more sophisticated
-using a 2-D approach.
+using a 2-D approach and an additional polar angle dependence.
 Corrected fluxes are only computed if the *save to database*
 option is turned on in the configuration file.
 
