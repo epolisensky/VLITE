@@ -60,6 +60,7 @@ in the order they are listed:
    - beam info (i.e. ``BMAJ``, ``BMIN``, ``BPA``)
    - ``ACTNOISE``
    - ``NVIS``
+   - ``CLEANNIT`` or ``NITER`` or ``NITER`` in a ``HISTORY``
    - ``MJDTIME``
    - ``STARTIME``
    - ``TAU_TIME``
@@ -86,8 +87,10 @@ in the order they are listed:
    - Taurus A
    - Virgo A (M87)
    - Galactic Center
+10. the number of CLEAN iterations (``NITER``) must be < some
+    minimum value (default is 1000)
 
-Requirements 2-4 have a default value which is used
+Requirements 2-4,10 have a default value which is used
 unless otherwise specified through the corresponding option under
 **image_qa_params** in the configuration file. The above requirements
 and their values are recorded in the database **error** table.
@@ -163,15 +166,17 @@ Properties of the sources and islands are written to the database
 **detected_source** and **detected_island** tables, respectively.
 A ds9 region file is also created for every image. A 1-D primary
 beam correction factor is applied to all flux measurements from
-PyBDSF and recorded in the **corrected_flux** table. A 20%
-systematic uncertainty is also added in quadrature to the PyBDSF
+PyBDSF and recorded in the **corrected_flux** table. A 
+systematic uncertainty (3-5% specific to the primary frequency)
+is also added in quadrature to the PyBDSF
 reported 1-sigma statistical uncertainties on all flux error
 measurements in the **corrected_flux** table only. The applied
 primary beam correction factor was determined empirically and
 depends only on the source's distance from the image center,
-which is also recorded in the **corrected_flux** table in degrees.
+which is also recorded in the **corrected_flux** table in degrees
+and the primary observing frequency.
 In the future, this will likely become more sophisticated
-using a 2-D, primary frequency-dependent approach.
+using a 2-D approach.
 Corrected fluxes are only computed if the *save to database*
 option is turned on in the configuration file.
 
@@ -186,7 +191,7 @@ if PyBDSF failed to process it for any reason or if there were no
 sources extracted. Any image that takes longer than 5 minutes for
 PyBDSF to process will fail with a timeout error to avoid PyBDSF
 getting stuck trying to fit Gaussians to large imaging artifacts.
-We also define a metric developed by E. Polisensky to flag images
+We also define a metric to flag images
 where the number of detected sources is much larger than what is
 expected based on source counts from the WENSS survey and the image's
 noise. The difference between the actual number of sources and the

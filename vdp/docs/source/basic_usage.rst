@@ -338,5 +338,6 @@ The contents are described in more detail below.
     Default is 10.
   *min niter*
     Minimum number of CLEAN interations. Important for 
-    reliable source fluxes. Image header keyword ``NITER``. 
+    reliable source fluxes. Image header keyword ``NITER``
+    or ``CLEANNIT`` or ``NITER`` in a ``HISTORY`` line. 
     Default is 1000.
