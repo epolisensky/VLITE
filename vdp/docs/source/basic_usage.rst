@@ -336,3 +336,7 @@ The contents are described in more detail below.
     Maximum allowed metric for source counts. Defined as:
     (actual_num_sources - expected_num_sources) / expected_num_sources.
     Default is 10.
+  *min niter*
+    Minimum number of CLEAN interations. Important for 
+    reliable source fluxes. Image header keyword ``NITER``. 
+    Default is 1000.

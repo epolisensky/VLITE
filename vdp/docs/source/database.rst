@@ -79,14 +79,14 @@ flux measurement error.
   *id* column in the **image** table and the *image_id* columns
   in the **detected_source** and **detected_island** tables
 - *total_flux*: primary beam corrected total integrated flux (mJy)
-- *e_total_flux*: 1-sigma statistical + 20% systematic error on the
+- *e_total_flux*: 1-sigma statistical + systematic error on the
   corrected total integrated flux (mJy)
 - *peak_flux*: primary beam corrected peak flux density per beam (mJy/beam)
-- *e_peak_flux*: 1-sigma statistical + 20% systematic error on the
+- *e_peak_flux*: 1-sigma statistical + systematic error on the
   corrected peak flux (mJy/beam)
 - *isl_total_flux*: primary beam corrected total integrated flux density
   of the island in which the source is located (mJy)
-- *isl_e_total_flux*: 1-sigma statistical + 20% systematic error on the
+- *isl_e_total_flux*: 1-sigma statistical + systematic error on the
   corrected island integrated flux (mJy)
 - *isl_rms*: average background rms noise of the island (mJy/beam)
 - *isl_mean*: avearage background mean value of the island (mJy/beam)
@@ -96,6 +96,7 @@ flux measurement error.
   island (mJy/beam)
 - *distance_from_center*: angular separation between the source position
   and the image pointing center (degrees)
+- *polar_angle*: angle west of north of source in image plane (degrees)
 - *snr*: signal-to-noise ratio of the source detection; defined as
   (*peak_flux* - *isl_mean*) / *isl_rms*
 
@@ -259,6 +260,7 @@ in the table, as well.
 - *config*: VLA configuration; header keyword ``CONFIG``
 - *nvis*: number of visibilities in the data before imaging; header
   keyword ``NVIS``
+- *niter*: number of CLEAN iterations; header keyword ``NITER``
 - *mjdtime*: Modified Julian Date at the start of the observations;
   header keyword ``MJDTIME`` + header keyword ``STARTIME``
 - *tau_time*: total integration time on source (sec); header
