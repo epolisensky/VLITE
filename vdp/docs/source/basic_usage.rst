@@ -74,6 +74,8 @@ required and optional command line arguments::
                           source(s) after follow-up
     --add_catalog         adds any new sky survey catalogs to a table in the
                           database "skycat" schema
+    --update_pbcor        update corrected_flux table with primary beam
+                          corrections
 
 ``-q, --quiet`` turns off printing of log messages to
 the console. They will still be recorded in the log file.
@@ -126,6 +128,12 @@ added code to ``radiocatalogs.catalogio`` and
 ``radiocatalogs.radcatdb`` to read a new radio catalog and need
 to add it to an existing database's "radcat" schema.
 See :ref:`add_new_catalog` for more information.
+
+``--update_pbcor`` reads each row of the image table, fetches
+each image's detected_sources and updates the corrected_flux table
+with primary beam corrections. Intended for use when new primary
+beam models are available. Beam models for each primary observing
+frequency are set in read_fitted_beam in sourcefinding/beam_tools.py
 
 .. _batch_proc:
 

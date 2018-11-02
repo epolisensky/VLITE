@@ -107,23 +107,9 @@ class Image(object):
     # A class variable to count the number of images
     num_images = 0
     
-    def __init__(self, image):
-        if image.endswith('IMSC.fits'):
-            pri_freq = 3
-        else:
-            pri = re.findall('\/([0-9.]+[A-Z])', image)
-            try:
-                if pri[0][-1:] == 'M':
-                    pri_freq = float(pri[0][:-1]) / 1000. # GHz
-                else:
-                    pri_freq = float(pri[0][:-1]) # GHz
-                # project code 13B-266 is at 1.5 GHz
-                if pri_freq == 13:
-                    pri_freq = 1.5
-            except IndexError:
-                pri_freq = None
+    def __init__(self):
         self.id = None
-        self.filename = image
+        self.filename = None
         self.wcsobj = None
         self.imsize = None
         self.obs_ra = None
@@ -133,7 +119,7 @@ class Image(object):
         self.obs_date = None
         self.map_date = None
         self.obs_freq = None
-        self.pri_freq = pri_freq
+        self.pri_freq = None
         self.bmaj = None
         self.bmin = None
         self.bpa = None
@@ -153,6 +139,23 @@ class Image(object):
         self.nearest_problem = None
         self.separation = None
 
+    def process_image(self, image):
+        if image.endswith('IMSC.fits'):
+            pri_freq = 3
+        else:
+            pri = re.findall('\/([0-9.]+[A-Z])', image)
+            try:
+                if pri[0][-1:] == 'M':
+                    pri_freq = float(pri[0][:-1]) / 1000. # GHz
+                else:
+                    pri_freq = float(pri[0][:-1]) # GHz
+                # project code 13B-266 is at 1.5 GHz
+                if pri_freq == 13:
+                    pri_freq = 1.5
+            except IndexError:
+                pri_freq = None
+        self.filename = image
+        self.pri_freq = pri_freq
 
     @classmethod
     def image_count(cls):
@@ -814,9 +817,6 @@ class DetectedSource(object):
         pb_power,pb_err = beam_tools.find_nearest_pbcorr(self.dist_from_center,
                                                   pri_freq)
         # List of attributes to correct
-#        attrs = ['total_flux', 'e_total_flux', 'peak_flux', 'e_peak_flux',
-#                 'total_flux_isl', 'total_flux_islE', 'rms_isl', 'mean_isl',
-#                 'resid_rms', 'resid_mean']
         attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl', 'mean_isl',
                  'resid_rms', 'resid_mean']
         for attr in attrs:
@@ -927,7 +927,8 @@ def init_image(impath):
     the ``header_attrs`` object method.
 
     """
-    imobj = Image(impath)
+    imobj = Image()
+    imobj.process_image(impath)
     hdu, hdr = imobj.read()
     # Use header info to set attributes
     imobj.header_attrs(hdr)

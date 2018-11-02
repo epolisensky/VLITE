@@ -28,18 +28,22 @@ def read_fitted_beam(pri_freq):
         correction. Add in quadrature to flux
         uncertainty
     """
+    if pri_freq > 2.:
+        pri_freq=str(int(pri_freq))
+    else:
+        pri_freq=str(pri_freq)
     # There is a separate file and uncertainty for each
     # primary observing frequency.
     beamdir = '/home/vpipe/VLITE/vdp/resources'
-    priband_beam_dict = {0.3 : ['FITBEAM_FINAL_DOMEGA.txt',0.03],
-                         1.5 : ['FITBEAMv2_1.5GHz_DOMEGA.txt',0.03],
-                         3 : ['FITBEAMv2_3GHz_DOMEGA.txt',0.03],
-                         6 : ['FITBEAMv2_6GHz_DOMEGA.txt',0.03],
-                         10 : ['FITBEAMv2_10GHz_DOMEGA.txt',0.03],
-                         15 : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
-                         22 : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
-                         33 : ['FITBEAMv2_33GHz_DOMEGA.txt',0.03],
-                         45 : ['FITBEAMv2_15+22+33+45GHz_DOMEGA.txt',0.05]}
+    priband_beam_dict = {'0.3' : ['FITBEAM_FINAL_DOMEGA.txt',0.03],
+                         '1.5' : ['FITBEAMv2_1.5GHz_DOMEGA.txt',0.03],
+                         '3' : ['FITBEAMv2_3GHz_DOMEGA.txt',0.03],
+                         '6' : ['FITBEAMv2_6GHz_DOMEGA.txt',0.03],
+                         '10' : ['FITBEAMv2_10GHz_DOMEGA.txt',0.03],
+                         '15' : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
+                         '22' : ['FITBEAMv2_15+22GHz_DOMEGA.txt',0.03],
+                         '33' : ['FITBEAMv2_33GHz_DOMEGA.txt',0.03],
+                         '45' : ['FITBEAMv2_15+22+33+45GHz_DOMEGA.txt',0.05]}
     beamfile = os.path.join(beamdir, priband_beam_dict[pri_freq][0])
     with open(beamfile, 'r') as f:
         lines = f.readlines()
@@ -76,7 +80,7 @@ def find_nearest_pbcorr(angle, pri_freq):
     """
     pbdata,err = read_fitted_beam(pri_freq)
     idx = (np.abs(np.array(pbdata['angle']) - angle)).argmin()
-    
+
     return pbdata['power'][idx],err
 
 

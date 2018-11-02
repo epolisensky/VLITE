@@ -237,24 +237,42 @@ def add_sources(conn, img, sources):
     cur.close()
 
 
-def add_corrected(conn, src):
+def add_corrected(conn, src, status=None):
     """Inserts primary beam corrected flux values into
     the database **corrected_flux** table.
 
+    status : tuple
+        If ``None``, a new src is added to the
+        corrected_flux table. If not ``None``, the 
+        src_id and image_id stored in the tuple is used to 
+        update the correct row in the corrected_flux table.
     """
     cur = conn.cursor()
 
-    cur.execute('''INSERT INTO corrected_flux (
-        src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
-        e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
-        isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, snr) VALUES (
-        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)''',
-                (src.src_id, src.isl_id, src.image_id, src.total_flux,
-                 src.e_total_flux, src.peak_flux, src.e_peak_flux,
-                 src.total_flux_isl, src.total_flux_islE, src.rms_isl,
-                 src.mean_isl, src.resid_rms, src.resid_mean,
-                 src.dist_from_center, src.polar_angle, src.snr))
-
+    #Add new:
+    if status is None:
+        cur.execute('''INSERT INTO corrected_flux (
+            src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
+            e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
+            isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, snr) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)''',
+                    (src.src_id, src.isl_id, src.image_id, src.total_flux,
+                     src.e_total_flux, src.peak_flux, src.e_peak_flux,
+                     src.total_flux_isl, src.total_flux_islE, src.rms_isl,
+                     src.mean_isl, src.resid_rms, src.resid_mean,
+                     src.dist_from_center, src.polar_angle, src.snr))
+    #Or update existing:
+    else:
+        src_id = status[0]
+        img_id = status[1]
+        sql = '''UPDATE corrected_flux SET total_flux = %s, e_total_flux = %s, peak_flux = %s,
+            e_peak_flux = %s, isl_total_flux = %s, isl_e_total_flux = %s, isl_rms = %s, isl_mean = %s,
+            isl_resid_rms = %s, isl_resid_mean = %s WHERE src_id = %s AND image_id = %s'''
+        vals= (src.total_flux, src.e_total_flux, src.peak_flux, src.e_peak_flux,
+                     src.total_flux_isl, src.total_flux_islE, src.rms_isl,
+                     src.mean_isl, src.resid_rms, src.resid_mean, src_id, img_id)
+        cur.execute(sql, vals)
+        
     conn.commit()
     cur.close()
 
@@ -577,7 +595,7 @@ def add_vlite_unique(conn, src, image_id, update=False):
     conn.commit()
     cur.close()
 
-    
+
 def get_image_sources(conn, image_id):
     """Returns a list of sources belonging to a
     particular image from the **detected_source** table.
@@ -603,13 +621,21 @@ def get_image_sources(conn, image_id):
     rows = cur.fetchall()
 
     conn.commit()
-    cur.close()
 
     detected_sources = []
     for row in rows:
         detected_sources.append(dbclasses.DetectedSource())
         dbclasses.dict2attr(detected_sources[-1], row)
+        cur.execute('SELECT * FROM detected_island WHERE isl_id = %s AND image_id = %s', (detected_sources[-1].isl_id,detected_sources[-1].image_id))
+        row2=cur.fetchone()
+        detected_sources[-1].rms_isl         = row2['rms']
+        detected_sources[-1].mean_isl        = row2['mean']
+        detected_sources[-1].resid_rms       = row2['resid_rms']
+        detected_sources[-1].resid_mean      = row2['resid_mean']
+        detected_sources[-1].total_flux_isl  = row2['total_flux']
+        detected_sources[-1].total_flux_islE = row2['e_total_flux']
 
+    cur.close()
     return detected_sources
 
 
@@ -903,3 +929,34 @@ def remove_images(conn, images):
     
     conn.commit()
     cur.close()
+
+def update_corrected(conn):
+    """Updates the corrected_flux table with primary beam corrections.
+    Reads image table, fetches all detected sources for each image,
+    corrects source fluxes for primary beam.
+    
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    """
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute('SELECT id,filename,imsize,obs_ra,obs_dec,pixel_scale,object,obs_date,map_date,obs_freq,primary_freq,bmaj,bmin,bpa,noise,peak,config,nvis,niter,mjdtime,tau_time,duration,nsrc,rms_box,error_id,stage,radius,nearest_problem,separation FROM image')
+    rows = cur.fetchall()
+    cur.close()
+
+    for row in rows:
+        print row
+        imobj=dbclasses.Image()
+        dbclasses.dict2attr(imobj, row)
+        imobj.pri_freq = row['primary_freq']
+        img_id=imobj.id
+        priband=imobj.pri_freq
+        sources=get_image_sources(conn,img_id)
+        for src in sources:
+            src.calc_center_dist(imobj)
+            src.correct_flux(priband)
+            add_corrected(conn,src,status=(src.src_id,src.image_id))
+
+    conn.commit()
+

@@ -26,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 
 
 # Create logger
@@ -1204,6 +1204,9 @@ def main():
     parser.add_argument('--add_catalog', action='store_true',
                         help='adds any new sky survey catalogs to a table in '
                         'the database "radcat" schema')
+    parser.add_argument('--update_pbcor', action='store_true',
+                        help='update corrected_flux table with primary '
+                        'beam corrections')    
     args = parser.parse_args()
     
     # Start the timer
@@ -1224,7 +1227,7 @@ def main():
 
     # Find existing/create/overwrite database
     if any([args.remove_catalog_matches, args.remove_source,
-            args.remove_image, args.manually_add_match, args.add_catalog]):
+            args.remove_image, args.manually_add_match, args.add_catalog, args.update_pbcor]):
         opts['overwrite'] = False
     conn = dbinit(setup['database name'], setup['database user'],
                   opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
@@ -1346,6 +1349,14 @@ def main():
         radcatdb.create(conn)
         conn.close()
         sys.exit(0)
+
+    # Option to update corrected_flux table with primary beam corrections
+    if args.update_pbcor:
+        logger.info('Updating corrected_flux table...')
+        dbio.update_corrected(conn)
+        conn.close()
+        logger.info('Done.')
+        sys.exit(0)        
     
     # Process images
     process(conn, stages, opts, dirs, setup['files'],
