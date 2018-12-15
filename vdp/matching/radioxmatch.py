@@ -13,6 +13,7 @@ from psycopg2 import sql
 from radiocatalogs import catalogio
 from database import dbclasses, dbio
 import matchfuncs
+from math import sqrt
 
 
 # create logger
@@ -325,6 +326,20 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 asrc.dec = (asrc.e_dec * asrc.e_dec) * (
                     (asrc.dec / cur_sigdec_sq) + (src.dec / (
                         src.e_dec * src.e_dec)))
+                #now fluxes, they were PBCORed in Stage 2
+                cur_sigtotal_sq = asrc.e_ave_total * asrc.e_ave_total
+                cur_sigpeak_sq  = asrc.e_ave_peak * asrc.e_ave_peak
+                asrc.e_ave_total = np.sqrt(1. / (
+                    (1. / cur_sigtotal_sq) + (1. / (src.e_total_flux * src.e_total_flux))))
+                asrc.e_ave_peak  = np.sqrt(1. / (
+                    (1. / cur_sigpeak_sq) + (1. / (src.e_peak_flux * src.e_peak_flux))))
+                asrc.ave_total = (asrc.e_ave_total * asrc.e_ave_total) * (
+                    (asrc.ave_total / cur_sigtotal_sq) + (src.ave_total / (
+                        src.e_ave_total * src.e_ave_total)))
+                asrc.ave_peak  = (asrc.e_ave_peak * asrc.e_ave_peak) * (
+                    (asrc.ave_peak / cur_sigpeak_sq) + (src.ave_peak / (
+                        src.e_ave_peak * src.e_ave_peak)))
+                ###
                 asrc.ndetect += 1
                 assoc_matched.append(asrc)
             else:

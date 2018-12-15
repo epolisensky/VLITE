@@ -32,6 +32,14 @@ in the same spatial resolution class.
 - *res_class*: spatial resolution class (see :ref:`source_assoc`)
 - *ndetect*: number of images in which the source was detected
 - *nmatches*: number of matches to other radio catalog sources
+- *ave_total*: weighted average of corrected total flux light curve (mJy)
+- *e_ave_total*: error on the weighted average of corrected total flux light curve (mJy) 
+- *ave_peak*: weighted average of corrected peak flux light curve (mJy/beam)
+- *e_ave_peak*: error on the weighted average of corrected peak flux light curve (mJy/beam)
+- *v_total*: variability metric of corrected total flux light curve
+- *v_peak*: variability metric of corrected peak flux light curve
+- *eta_total*: variability significance metric of corrected total flux light curve
+- *eta_peak*: variability significance metric of corrected peak flux light curve
 
 .. _catalog_match:
 
@@ -63,9 +71,9 @@ corrected_flux
 All flux measurements from PyBDSF are corrected for VLITE's primary
 beam response. A scale factor is applied to account for
 decreasing sensitivity with increasing distance from the image's
-pointing center. A 20% systematic uncertainty is also added
-(in quadrature) to the PyBDSF statistical uncertainties for every
-flux measurement error.
+pointing center. A primary observing frequency specific systematic 
+uncertainty is also added (in quadrature) to the PyBDSF statistical 
+uncertainties for every flux measurement error, typically 3%.
 
 - *src_id*: non-unique id number assigned by PyBDSF to each detected
   source in an image; uniquely referenced by combination of
@@ -99,6 +107,9 @@ flux measurement error.
 - *polar_angle*: angle west of north of source in image plane (degrees)
 - *snr*: signal-to-noise ratio of the source detection; defined as
   (*peak_flux* - *isl_mean*) / *isl_rms*
+- *assoc_id*: references the *id* column of the **assoc_source**;
+  rows with the same *assoc_id* value are associated detections
+  of the same source in different images
 
 .. _detected_island:
 
@@ -216,6 +227,22 @@ This is a look-up table containing explanations for each possible
 - *id*: referenced by the *error_id* column in the **image** table;
   updates cascade to that table
 - *reason*: reason why an image was given that particular *error_id*
+
+ id : reason                            
+--------------------------------------------------------------------
+-  1 : image missing necessary header keyword(s)
+-  2 : number of visibilities < *min nvis*
+-  3 : sensitivity metric (noise x sqrt(int. time)) <= 0 or > *max sensitivity metric*
+-  4 : beam axis ratio > *max beam axis ratio*
+-  5 : bad imaging target (NCP or planet)
+-  6 : problem source in image field-of-view
+-  7 : PyBDSF failed to process
+-  8 : zero sources extracted
+-  9 : source count metric > *max source count metric*
+- 10 : number of CLEAN iterations < *min niter*
+
+
+
 
 .. _image:
 

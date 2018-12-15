@@ -110,6 +110,14 @@ def create(conn, params, safe=False):
                 res_class VARCHAR(1),
                 ndetect INTEGER,
                 nmatches INTEGER,
+                ave_total DOUBLE PRECISION,
+                e_ave_total DOUBLE PRECISION,
+                ave_peak DOUBLE PRECISION,
+                e_ave_peak DOUBLE PRECISION,
+                v_total DOUBLE PRECISION,
+                v_peak DOUBLE PRECISION,
+                eta_total DOUBLE PRECISION,
+                eta_peak DOUBLE PRECISION,  
                 PRIMARY KEY (id)
             )
             WITH (fillfactor=90);
@@ -219,6 +227,7 @@ def create(conn, params, safe=False):
                 distance_from_center REAL,
                 polar_angle REAL,
                 snr REAL,
+                assoc_id INTEGER,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)
                   REFERENCES detected_source (src_id, image_id)

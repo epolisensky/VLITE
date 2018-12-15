@@ -667,6 +667,24 @@ class DetectedSource(object):
     detected : bool
         Whether or not the source was detected in the image (used
         for the **vlite_unique** table).
+    ave_total : float
+        Weighted average of corrected total flux for associated sources 
+        observed more than once (mJy)
+    e_ave_total : float
+        Error on the weighted average of corrected total flux (mJy)
+    ave_peak : float
+        Weighted average of corrected peak flux for associated sources 
+        observed more than once (mJy/beam)
+    e_ave_peak : float
+        Error on the weighted average of corrected peak flux (mJy/beam)
+    v_total : float
+        Variability metric of associated source ave_total
+    v_peak : float
+        Variability metric of associated source ave_peak
+    eta_total : float
+        Variability significance metric of associated source ave_total
+    eta_peak : float
+        Variability significance metric of associated source ave_peak    
 
     References
     ----------
@@ -718,6 +736,14 @@ class DetectedSource(object):
         self.res_class = None
         self.ndetect = None
         self.nmatches = None
+        self.ave_total = None
+        self.e_ave_total = None
+        self.ave_peak = None
+        self.e_ave_peak = None
+        self.v_total = None
+        self.v_peak = None
+        self.eta_total = None
+        self.eta_peak = None
         # vlite_unique attribute
         self.detected = None
 

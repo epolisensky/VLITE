@@ -10,6 +10,16 @@ from database import dbclasses
 # create logger
 dbio_logger = logging.getLogger('vdp.database.dbio')
 
+def weighted_avg_and_std(values, weights):
+    """Return the weighted average and standard deviation.
+    values, weights -- Numpy ndarrays with the same shape.
+    """
+    average = np.average(values, weights=weights)
+    # Fast and numerically precise:
+    variance = np.average((values-average)**2, weights=weights)
+    return (average, math.sqrt(variance))
+
+
 
 def record_config(conn, cfgfile, logfile, start_time, exec_time, nimages,
                   stages, opts, setup, sfparams, qaparams):
@@ -254,13 +264,14 @@ def add_corrected(conn, src, status=None):
         cur.execute('''INSERT INTO corrected_flux (
             src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
             e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
-            isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, snr) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s ,%s)''',
+            isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, snr, assoc_id) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                     (src.src_id, src.isl_id, src.image_id, src.total_flux,
                      src.e_total_flux, src.peak_flux, src.e_peak_flux,
                      src.total_flux_isl, src.total_flux_islE, src.rms_isl,
                      src.mean_isl, src.resid_rms, src.resid_mean,
-                     src.dist_from_center, src.polar_angle, src.snr))
+                     src.dist_from_center, src.polar_angle, src.snr,
+                     src.assoc_id))
     #Or update existing:
     else:
         src_id = status[0]
@@ -280,7 +291,8 @@ def add_corrected(conn, src, status=None):
 def add_assoc(conn, sources):
     """Adds a newly detected VLITE source to the
     **assoc_source** table and updates the 'assoc_id'
-    for that source in the **detected_source** table.
+    for that source in the **detected_source** table
+    and corrected_flux table.
 
     Parameters
     ----------
@@ -300,14 +312,18 @@ def add_assoc(conn, sources):
     
     for src in sources:
         cur.execute('''INSERT INTO assoc_source (
-            ra, e_ra, dec, e_dec, res_class, ndetect) VALUES (
-            %s, %s, %s, %s, %s, %s)
+            ra, e_ra, dec, e_dec, res_class, ndetect, ave_total, e_ave_total, ave_peak, e_ave_peak) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id''',
                     (src.ra, src.e_ra, src.dec, src.e_dec,
-                     src.res_class, src.ndetect))
+                     src.res_class, src.ndetect, src.total_flux,
+                     src.e_total_flux, src.peak_flux, src.e_peak_flux))
         src.id = cur.fetchone()[0]
         src.assoc_id = src.id
         cur.execute('''UPDATE detected_source SET assoc_id = %s
+            WHERE src_id = %s AND image_id = %s''',
+                    (src.assoc_id, src.src_id, src.image_id))
+        cur.execute('''UPDATE corrected_flux SET assoc_id = %s
             WHERE src_id = %s AND image_id = %s''',
                     (src.assoc_id, src.src_id, src.image_id))
 
@@ -316,11 +332,52 @@ def add_assoc(conn, sources):
     
     return sources
 
+def update_lcmetrics(conn, sources):
+    """Computes and updates the light curve metrics
+    in the **assoc_source** table
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    sources : list
+        DetectedSource objects extracted from the
+        **assoc_source** table which have been matched
+        to sources detected in the current image.
+    """
+    cur = conn.cursor()
+
+    for src in sources:
+        #update light curve metrics:
+        # fetch lightcurve: corrected fluxes and uncertainities
+        #sql='''SELECT b.total_flux, b.peak_flux, b.e_total_flux, b.e_peak_flux 
+        #FROM detected_source AS a, corrected_flux AS b WHERE 
+        #b.src_id=a.src_id AND b.image_id=a.image_id AND a.assoc_id= %s'''
+        sql='''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
+        FROM corrected_flux WHERE assoc_id= %s'''
+        values = (src.id)
+        cur.execute(sql, values)
+        numrows = int(cur.rowcount)
+        lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
+                        ('e_total','float'),('e_peak','float')], count=numrows)
+        wt=1./lc['e_total']**2
+        wp=1./lc['e_peak']**2
+        # calc weighted average and std dev
+        a1,s1= weighted_avg_and_std(lc['total'], wt)
+        a2,s2= weighted_avg_and_std(lc['peak'], wp)
+        # calc V
+        asrc.v_total=s1/a1
+        asrc.v_peak =s2/a2
+        # calc eta
+        asrc.eta_total=np.sum(wt*(lc['total']-a1)**2)/(numrows-1)
+        asrc.eta_peak =np.sum(wp*(lc['peak']-a2)**2)/(numrows-1)
+        ########
+                
 
 def update_matched_assoc(conn, sources):
     """Updates the RA & Dec of existing sources in the
     **assoc_source** table to the weighted average of all
-    detections.
+    detections. Also updates the light curve metrics
 
     Parameters
     ----------
@@ -335,8 +392,13 @@ def update_matched_assoc(conn, sources):
 
     for src in sources:
         cur.execute('''UPDATE assoc_source SET ra = %s, e_ra = %s, dec = %s,
-            e_dec = %s, ndetect = %s WHERE id = %s''',
-                    (src.ra, src.e_ra, src.dec, src.e_dec, src.ndetect, src.id))
+            e_dec = %s, ndetect = %s, ave_total = %s, e_ave_total = %s, 
+            ave_peak = %s, e_ave_peak = %s, v_total = %s, v_peak = %s, 
+            eta_total = %s, eta_peak = %s WHERE id = %s''',
+                    (src.ra, src.e_ra, src.dec, src.e_dec, src.ndetect,
+                     src.ave_total, src.e_ave_total, src.ave_peak,
+                     src.e_ave_peak, src.v_total, src.v_peak,
+                     src.eta_total, src.eta_peak, src.id))
 
     conn.commit()
     cur.close()
@@ -361,6 +423,31 @@ def update_detected_associd(conn, sources):
 
     for src in sources:
         cur.execute('''UPDATE detected_source SET assoc_id = %s
+            WHERE src_id = %s AND image_id = %s''',
+                    (src.assoc_id, src.src_id, src.image_id))
+
+    conn.commit()
+    cur.close()
+
+def update_corrected_associd(conn, sources):
+    """Updates the 'assoc_id' for sources in the
+    **corrected_flux** table which have been successfully
+    associated with existing VLITE sources in the 
+    **assoc_source** table.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    sources : list
+        DetectedSource objects detected in the current
+        image that have been associated with previous
+        VLITE sources in the **assoc_source** table.
+    """
+    cur = conn.cursor()
+
+    for src in sources:
+        cur.execute('''UPDATE corrected_flux SET assoc_id = %s
             WHERE src_id = %s AND image_id = %s''',
                     (src.assoc_id, src.src_id, src.image_id))
 

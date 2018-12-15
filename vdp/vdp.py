@@ -26,7 +26,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.0.4'
+__version__ = '2.1.0'
 
 
 # Create logger
@@ -758,16 +758,19 @@ def srcassoc(conn, imobj, sources, save):
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, radius, save)
     if save:
-        # Update assoc_id col for matched detected sources
+        # Update assoc_id col for matched detected sources & corrected_flux
         if detected_matched:
             dbio.update_detected_associd(conn, detected_matched)
+            dbio.update_corrected_associd(conn, detected_matched)
         # Add new (unmatched) detected sources to assoc_source table
         if detected_unmatched:
             # Updates assoc_id attribute
             detected_unmatched = dbio.add_assoc(conn, detected_unmatched)
-        # Update matched assoc_source positions
+        # Update matched assoc_source positions, etc.
         if assoc_matched:
             dbio.update_matched_assoc(conn, assoc_matched)
+            #update associated source light curve metrics
+            dbio.update_lcmetrics(conn, assoc_matched)
         # Check for VLITE unique (VU) sources that weren't detected in image
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
