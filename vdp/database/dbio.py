@@ -5,10 +5,12 @@ import psycopg2.extras
 import json
 import logging
 from database import dbclasses
-
+from math import sqrt
+import numpy as np
 
 # create logger
 dbio_logger = logging.getLogger('vdp.database.dbio')
+
 
 def weighted_avg_and_std(values, weights):
     """Return the weighted average and standard deviation.
@@ -17,7 +19,7 @@ def weighted_avg_and_std(values, weights):
     average = np.average(values, weights=weights)
     # Fast and numerically precise:
     variance = np.average((values-average)**2, weights=weights)
-    return (average, math.sqrt(variance))
+    return (average, sqrt(variance))
 
 
 
@@ -348,30 +350,30 @@ def update_lcmetrics(conn, sources):
     cur = conn.cursor()
 
     for src in sources:
-        #update light curve metrics:
-        # fetch lightcurve: corrected fluxes and uncertainities
-        #sql='''SELECT b.total_flux, b.peak_flux, b.e_total_flux, b.e_peak_flux 
-        #FROM detected_source AS a, corrected_flux AS b WHERE 
-        #b.src_id=a.src_id AND b.image_id=a.image_id AND a.assoc_id= %s'''
-        sql='''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
-        FROM corrected_flux WHERE assoc_id= %s'''
-        values = (src.id)
-        cur.execute(sql, values)
+        #fetch lightcurve: corrected fluxes and uncertainities
+        cur.execute('''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
+        FROM corrected_flux WHERE assoc_id= %s''',(src.id))
         numrows = int(cur.rowcount)
         lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
                         ('e_total','float'),('e_peak','float')], count=numrows)
         wt=1./lc['e_total']**2
         wp=1./lc['e_peak']**2
         # calc weighted average and std dev
-        a1,s1= weighted_avg_and_std(lc['total'], wt)
-        a2,s2= weighted_avg_and_std(lc['peak'], wp)
+        at,st= weighted_avg_and_std(lc['total'], wt)
+        ap,sp= weighted_avg_and_std(lc['peak'], wp)
         # calc V
-        asrc.v_total=s1/a1
-        asrc.v_peak =s2/a2
+        src.v_total=st/at
+        src.v_peak =sp/ap
         # calc eta
-        asrc.eta_total=np.sum(wt*(lc['total']-a1)**2)/(numrows-1)
-        asrc.eta_peak =np.sum(wp*(lc['peak']-a2)**2)/(numrows-1)
-        ########
+        src.eta_total=np.sum(wt*(lc['total']-at)**2)/(numrows-1)
+        src.eta_peak =np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
+        # update
+        cur.execute('''UPDATE assoc_source SET v_total = %s,
+            v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
+            (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
+
+    conn.commit()
+    cur.close()
                 
 
 def update_matched_assoc(conn, sources):
@@ -393,12 +395,10 @@ def update_matched_assoc(conn, sources):
     for src in sources:
         cur.execute('''UPDATE assoc_source SET ra = %s, e_ra = %s, dec = %s,
             e_dec = %s, ndetect = %s, ave_total = %s, e_ave_total = %s, 
-            ave_peak = %s, e_ave_peak = %s, v_total = %s, v_peak = %s, 
-            eta_total = %s, eta_peak = %s WHERE id = %s''',
+            ave_peak = %s, e_ave_peak = %s WHERE id = %s''',
                     (src.ra, src.e_ra, src.dec, src.e_dec, src.ndetect,
                      src.ave_total, src.e_ave_total, src.ave_peak,
-                     src.e_ave_peak, src.v_total, src.v_peak,
-                     src.eta_total, src.eta_peak, src.id))
+                     src.e_ave_peak, src.id))
 
     conn.commit()
     cur.close()

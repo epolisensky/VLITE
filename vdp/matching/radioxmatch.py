@@ -13,7 +13,6 @@ from psycopg2 import sql
 from radiocatalogs import catalogio
 from database import dbclasses, dbio
 import matchfuncs
-from math import sqrt
 
 
 # create logger
