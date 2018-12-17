@@ -107,6 +107,8 @@ uncertainties for every flux measurement error, typically 3%.
 - *polar_angle*: angle west of north of source in image plane (degrees)
 - *snr*: signal-to-noise ratio of the source detection; defined as
   (*peak_flux* - *isl_mean*) / *isl_rms*
+- *compactness*: Measure of source spatial extent based on its snr
+   and flux ratio. C > 1 is point-like, < 1 is extended source.
 - *assoc_id*: references the *id* column of the **assoc_source**;
   rows with the same *assoc_id* value are associated detections
   of the same source in different images

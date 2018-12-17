@@ -227,6 +227,7 @@ def create(conn, params, safe=False):
                 distance_from_center REAL,
                 polar_angle REAL,
                 snr REAL,
+                compactness REAL,
                 assoc_id INTEGER,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)

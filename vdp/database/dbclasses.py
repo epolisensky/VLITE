@@ -13,7 +13,7 @@ from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
-
+from math import sqrt
 
 # create logger
 dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
@@ -653,6 +653,10 @@ class DetectedSource(object):
         pointing center (degrees).
     polar_angle : float
         Polar angle (West of North) of source in image (degrees).
+    compactness: float
+        Measure of source extent. 
+        >= 1 : point-like
+        < 1  : extended
     id : int
         Uniquely identifies the source in the **assoc_source** table.
     res_class : str
@@ -731,6 +735,7 @@ class DetectedSource(object):
         self.assoc_id = None
         self.dist_from_center = None
         self.polar_angle = None
+        self.compactness = None
         # assoc_source attributes
         self.id = None
         self.res_class = None
@@ -857,6 +862,47 @@ class DetectedSource(object):
             (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
         self.total_flux_islE = np.sqrt(
             (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
+
+    def calc_compactness(self, imobj):
+        """Calculates a detected source's compactness
+        from its flux ratio, SNR, and arrary config.
+        Sets the ``compactness`` attribute.
+
+        Parameters
+        ----------
+        imobj : ``database.dbclasses.Image`` instance
+            Initialized Image object with attribute values
+            set from header info.
+        """
+        if imobj.config=='A' or imobj.config=='BnA':
+            a0 = 1.054294
+            a1 = 4.497675e-3
+            c0 = 18.277850
+            c1 = -1.917682
+        elif imobj.config=='B' or imobj.config=='CnB':
+            a0 = 1.028851
+            a1 = 2.17631e-3
+            c0 = 10.493944
+            c1 = -1.804784
+        elif imobj.config=='C' or imobj.config=='DnC':
+            a0 = 1.009783
+            a1 = 1.831983e-3
+            c0 = 16.324568
+            c1 = -2.090893
+        elif imobj.config=='D': #need to determine D config values
+            a0 = 1.0
+            a1 = 0.
+            c0 = 0.
+            c1 = 0.
+        else: #unknown config
+            a0 = 1.0
+            a1 = 0.
+            c0 = 0.
+            c1 = 0.
+        cfit  = a0+sqrt(a1+ c0*pow(self.snr,c1))
+        ratio = self.total_flux/self.peak_flux
+        self.compactness = cfit/ratio
+
 
 
 def dict2attr(obj, dictionary):

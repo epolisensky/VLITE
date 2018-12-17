@@ -703,11 +703,12 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         # Add source fit parameters to database tables
         dbio.add_sources(conn, imobj, sources)
         if sources is not None:
-            # Compute beam corrected fluxes & write to corrected_flux table
+            # Compute beam corrected fluxes, compactness, & write to corrected_flux table
             logger.info('Correcting all flux measurements for primary beam '
                         'response.')
             for src in sources:
                 src.correct_flux(imobj.pri_freq)
+                src.calc_compactness(imobj)
                 dbio.add_corrected(conn, src)
 
     return imobj, sources
