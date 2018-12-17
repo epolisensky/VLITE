@@ -333,11 +333,11 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 asrc.e_ave_peak  = np.sqrt(1. / (
                     (1. / cur_sigpeak_sq) + (1. / (src.e_peak_flux * src.e_peak_flux))))
                 asrc.ave_total = (asrc.e_ave_total * asrc.e_ave_total) * (
-                    (asrc.ave_total / cur_sigtotal_sq) + (src.ave_total / (
-                        src.e_ave_total * src.e_ave_total)))
+                    (asrc.ave_total / cur_sigtotal_sq) + (src.total_flux / (
+                        src.e_total_flux * src.e_total_flux)))
                 asrc.ave_peak  = (asrc.e_ave_peak * asrc.e_ave_peak) * (
-                    (asrc.ave_peak / cur_sigpeak_sq) + (src.ave_peak / (
-                        src.e_ave_peak * src.e_ave_peak)))
+                    (asrc.ave_peak / cur_sigpeak_sq) + (src.peak_flux / (
+                        src.e_peak_flux * src.e_peak_flux)))
                 ###
                 asrc.ndetect += 1
                 assoc_matched.append(asrc)
