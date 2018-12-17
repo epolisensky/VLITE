@@ -865,7 +865,7 @@ class DetectedSource(object):
 
     def calc_compactness(self, imobj):
         """Calculates a detected source's compactness
-        from its flux ratio, SNR, and arrary config.
+        from its flux ratio, SNR, and array config.
         Sets the ``compactness`` attribute.
 
         Parameters

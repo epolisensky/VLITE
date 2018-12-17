@@ -14,7 +14,11 @@ dbio_logger = logging.getLogger('vdp.database.dbio')
 
 def weighted_avg_and_std(values, weights):
     """Return the weighted average and standard deviation.
-    values, weights -- Numpy ndarrays with the same shape.
+
+    Parameters
+    ----------
+    values : numpy ndarray to be averaged
+    weights : ndarray with value weights.
     """
     average = np.average(values, weights=weights)
     # Fast and numerically precise:
@@ -293,8 +297,8 @@ def add_corrected(conn, src, status=None):
 def add_assoc(conn, sources):
     """Adds a newly detected VLITE source to the
     **assoc_source** table and updates the 'assoc_id'
-    for that source in the **detected_source** table
-    and corrected_flux table.
+    for that source in the **detected_source** and
+    **corrected_flux** tables.
 
     Parameters
     ----------
@@ -356,17 +360,17 @@ def update_lcmetrics(conn, sources):
         numrows = int(cur.rowcount)
         lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
                         ('e_total','float'),('e_peak','float')], count=numrows)
-        wt=1./lc['e_total']**2
-        wp=1./lc['e_peak']**2
+        wt = 1./lc['e_total']**2
+        wp = 1./lc['e_peak']**2
         # calc weighted average and std dev
-        at,st= weighted_avg_and_std(lc['total'], wt)
-        ap,sp= weighted_avg_and_std(lc['peak'], wp)
+        at,st = weighted_avg_and_std(lc['total'], wt)
+        ap,sp = weighted_avg_and_std(lc['peak'], wp)
         # calc V
-        src.v_total=st/at
-        src.v_peak =sp/ap
+        src.v_total = st/at
+        src.v_peak = sp/ap
         # calc eta
-        src.eta_total=np.sum(wt*(lc['total']-at)**2)/(numrows-1)
-        src.eta_peak =np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
+        src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
+        src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
         # update
         cur.execute('''UPDATE assoc_source SET v_total = %s,
             v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
@@ -1018,7 +1022,7 @@ def remove_images(conn, images):
     cur.close()
 
 def update_corrected(conn):
-    """Updates the corrected_flux table with primary beam corrections.
+    """Updates the **corrected_flux** table with primary beam corrections.
     Reads image table, fetches all detected sources for each image,
     corrects source fluxes for primary beam.
     
