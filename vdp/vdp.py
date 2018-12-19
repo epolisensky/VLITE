@@ -673,6 +673,9 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         # Translate PyBDSF output to DetectedSource objects
         sources = dbclasses.translate(imobj, out)
         # Drop sources outside the (scaled) image FOV (radius)
+        # Why did PyBDSF give sources with 0 positional errors?
+        #  Filter these out. How common is this? Are we losing real source
+        #  detections?
         if imobj.filename.endswith('IPln1.fits'):
             sources = [src for src in sources if \
                        src.dist_from_center <= imobj.radius and \
