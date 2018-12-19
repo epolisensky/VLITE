@@ -59,6 +59,9 @@ class BDSFImage(Image):
         self.max_iter = 5
         # Set our own default rms_box parameter
         self.set_rms_box()
+        # Setting force-fitting coords to None will not
+        #  affect blind source fitting
+        self.src_ra_dec = None
         # Set attributes from config file
         for key, value in kwargs.items():
             if key == 'rms_box':
@@ -73,7 +76,7 @@ class BDSFImage(Image):
             setattr(self, key, value)
 
 
-    def set_rms_box(self):
+            def set_rms_box(self):
         """Sets the PyBDSF ``rms_box`` parameter to a box size
         1/10th of the image size and a step size one third of
         the box size. This "VLITE default" ``rms_box`` yields slightly

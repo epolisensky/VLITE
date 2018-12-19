@@ -884,6 +884,85 @@ def catmatch(conn, imobj, sources, catalogs, save):
     return
 
 
+def nullfind(conn, imobj, sfparams, save, asrcs):
+    """Runs PyBDSF source finding in force-fitting mode
+    at locations of unmatched associated sources and 
+    inserts null detections into **detected_null** table 
+    if the *save to database* option is set to ``True``. 
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
+        Initialized Image object with attribute values
+        set from header info.
+    sfparams : dict
+        Specifies any non-default PyBDSF parameters to be 
+        used in source finding, including src_ra_dec
+        which gives the force-fit coordinates.
+    save : bool
+        If ``True``, the missed detections are saved
+        to the database **detected_null** tables.
+    asrcs : list
+        List of ``database.dbclasses.DetectedSource`` objects,
+        the unmatched associated sources to force-fit.
+    Returns
+    -------
+    sources : list
+        List of ``database.dbclasses.DetectedSource`` objects.
+        Attributes of each object are set from the PyBDSF
+        output object.
+    """
+
+    logger.info('***********************')
+    logger.info('FORCE FITTING FOR NULLS')
+    logger.info('***********************')
+
+
+    # Add the PyBDSF ``src_ra_dec'' parameter to sfparams as
+    # list of tuples with (RA,Dec) coords for force-fitting.
+    coords=[]
+    for src in asrcs:
+        coords.append((src.ra,src.dec))
+    sfparams['src_ra_dec'] = coords
+    # Initialize source finding image object
+    bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
+    # Run PyBDSF source finding
+    out = bdsfim.find_sources()
+
+    nulls=[]
+    if out is not None:
+        # Translate PyBDSF output to DetectedSource objects
+        sources = dbclasses.translate(imobj, out)
+        # Beam correct fluxes
+        logger.info('Correcting all flux measurements for primary beam '
+                        'response.')
+        for n,src in enumerate(sources): # *should be* in order with asrcs
+            src.correct_flux(imobj.pri_freq)
+            # Calculate pseudo-SNRs
+            src.snr=asrcs[n].ave_total / src.total_flux
+            # Check for null detections
+            if src.snr > 5.0: #should have been detected
+                nulls.append(src)
+                #set attributes:
+                nulls[-1].image_id = imobj.id
+                nulls[-1].assoc_id = asrcs[n].id
+                
+    else:
+        # PyBDSF failed to process
+        nulls = None
+        logger.info('PyBDSF failed to process force-fitting!')
+
+    if save:
+        if nulls is not None:
+            # Add null parameters to database table
+            dbio.add_nulls(conn, nulls)
+
+    return nulls
+
+
+
 def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     """This function handles the logic and transitions between
     processing stages.

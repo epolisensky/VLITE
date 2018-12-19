@@ -253,6 +253,49 @@ def add_sources(conn, img, sources):
     cur.close()
 
 
+def add_nulls(conn, sources):
+    """Inserts null finding and measurement results from
+    PyBDSF force-fitting stored as DetectedSource object 
+    attributes into the database **detected_null** table.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.    
+    sources : list
+        DetectedSource objects whose attributes are the
+        elliptical Gaussian force-fitting results.
+    """
+    cur = conn.cursor()
+
+    if sources is not None:
+        pass
+    else:
+        conn.commit()
+        cur.close()
+        return
+    
+    # Add sources to  detected_null table
+    dbio_logger.info('Adding detected nulls to database.')
+    for src in sources:
+        # Insert values into detected_null table
+        sql = '''INSERT INTO detected_null (
+            assoc_id, image_id, ra, dec, total_flux, e_total_flux, 
+            peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa, 
+            distance_from_center, polar_angle, snr, code) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            %s, %s, %s, %s, %s)'''
+        vals = (src.assoc_id, src.image_id, src.ra, src.dec, src.total_flux,
+                src.e_total_flux, src.peak_flux, src.e_peak_flux,
+                src.maj, src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                src.distance_from_center, src.polar_angle, src.snr, src.code)
+        cur.execute(sql, vals)
+
+    conn.commit()
+    cur.close()
+    
+
+
 def add_corrected(conn, src, status=None):
     """Inserts primary beam corrected flux values into
     the database **corrected_flux** table.

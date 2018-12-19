@@ -229,6 +229,7 @@ def create(conn, params, safe=False):
                 distance_from_center REAL,
                 polar_angle REAL,
                 snr REAL,
+                code TEXT,
                 PRIMARY KEY (assoc_id, image_id),
                 FOREIGN KEY (image_id)
                   REFERENCES detected_source (image_id)
