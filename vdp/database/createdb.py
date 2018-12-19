@@ -64,6 +64,7 @@ def create(conn, params, safe=False):
             DROP TABLE IF EXISTS catalog_match;
             DROP TABLE IF EXISTS corrected_flux;
             DROP TABLE IF EXISTS detected_source;
+            DROP TABLE IF EXISTS detected_null;
             DROP TABLE IF EXISTS detected_island;
             DROP TABLE IF EXISTS image;
             DROP TABLE IF EXISTS assoc_source;
@@ -207,6 +208,30 @@ def create(conn, params, safe=False):
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (isl_id, image_id)
                   REFERENCES detected_island (isl_id, image_id)
+                  ON DELETE CASCADE
+            );
+
+            CREATE TABLE detected_null (
+                assoc_id INTEGER NOT NULL,
+                image_id INTEGER NOT NULL,
+                ra DOUBLE PRECISION,
+                dec DOUBLE PRECISION,
+                total_flux DOUBLE PRECISION,
+                e_total_flux DOUBLE PRECISION,
+                peak_flux DOUBLE PRECISION,
+                e_peak_flux DOUBLE PRECISION,
+                maj DOUBLE PRECISION,
+                e_maj DOUBLE PRECISION,
+                min DOUBLE PRECISION,
+                e_min DOUBLE PRECISION,
+                pa DOUBLE PRECISION,
+                e_pa DOUBLE PRECISION,
+                distance_from_center REAL,
+                polar_angle REAL,
+                snr REAL,
+                PRIMARY KEY (assoc_id, image_id),
+                FOREIGN KEY (image_id)
+                  REFERENCES detected_source (image_id)
                   ON DELETE CASCADE
             );
 
