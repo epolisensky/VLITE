@@ -717,7 +717,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     return imobj, sources
 
 
-def srcassoc(conn, imobj, sources, save):
+def srcassoc(conn, imobj, sources, save, sfparams):
     """Associates through positional cross-matching sources
     extracted from the current image with previously detected
     VLITE sources stored in the **assoc_source** database table.
@@ -739,6 +739,9 @@ def srcassoc(conn, imobj, sources, save):
         association results and the 'assoc_id' is updated in the
         **detected_source** table. If ``False``, no results are
         saved to the database.
+    sfparams : dict
+        Specifies any non-default PyBDSF parameters to be 
+        used in source finding. Passed to nullfind
     
     Returns
     -------
@@ -761,6 +764,12 @@ def srcassoc(conn, imobj, sources, save):
     # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, radius, save)
+    print '*****'
+    print len(detected_matched)
+    print len(detected_unmatched)
+    print len(assoc_matched)
+    print len(assoc_unmatched)
+    print '*****'
     if save:
         # Update assoc_id col for matched detected sources & corrected_flux
         if detected_matched:
@@ -775,6 +784,9 @@ def srcassoc(conn, imobj, sources, save):
             dbio.update_matched_assoc(conn, assoc_matched)
             #update associated source light curve metrics
             dbio.update_lcmetrics(conn, assoc_matched)
+        # Check for null detections
+        if assoc_unmatched:
+            nullfind(conn, imobj, sfparams, save, assoc_unmatched)
         # Check for VLITE unique (VU) sources that weren't detected in image
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
@@ -916,7 +928,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     """
 
     logger.info('***********************')
-    logger.info('FORCE FITTING FOR NULLS')
+    logger.info('FORCE FITTING %d FOR NULLS' % len(asrcs))
     logger.info('***********************')
 
 
@@ -925,6 +937,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     coords=[]
     for src in asrcs:
         coords.append((src.ra,src.dec))
+        #print coords[-1]
     sfparams['src_ra_dec'] = coords
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
@@ -939,14 +952,14 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
         logger.info('Correcting all flux measurements for primary beam '
                         'response.')
         for n,src in enumerate(sources): # *should be* in order with asrcs
+            print '%d %f %f  %f %f  %f %f' % (n,coords[n][0],coords[n][1],asrcs[n].ra,asrcs[n].dec,src.ra,src.dec)
             src.correct_flux(imobj.pri_freq)
             # Calculate pseudo-SNRs
             src.snr=asrcs[n].ave_total / src.total_flux
             # Check for null detections
             if src.snr > 5.0: #should have been detected
                 nulls.append(src)
-                #set attributes:
-                nulls[-1].image_id = imobj.id
+                #set attributes not set by translate & correct_flux:
                 nulls[-1].assoc_id = asrcs[n].id
                 
     else:
@@ -1075,7 +1088,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                     continue
                 # STAGE 3 -- Source association
                 if sa:
-                    new_sources, imobj = srcassoc(conn, imobj, sources, save)
+                    new_sources, imobj = srcassoc(conn, imobj, sources, save, sfparams)
                     # STAGE 4 -- Sky survey catalog cross-matching
                     if cm: # sf + sa + cm - branch 12, 15
                         # Cross-match new sources only

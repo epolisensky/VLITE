@@ -76,7 +76,7 @@ class BDSFImage(Image):
             setattr(self, key, value)
 
 
-            def set_rms_box(self):
+    def set_rms_box(self):
         """Sets the PyBDSF ``rms_box`` parameter to a box size
         1/10th of the image size and a step size one third of
         the box size. This "VLITE default" ``rms_box`` yields slightly

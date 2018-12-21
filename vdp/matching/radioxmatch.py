@@ -357,6 +357,9 @@ def associate(conn, detected_sources, imobj, search_radius, save):
     match_logger.info(' -- number of new sources to add: {}'.format(
         len(detected_unmatched)))
 
+    print '*****'
+    print len(assoc_unmatched)
+    print '*****'
     return detected_matched, detected_unmatched, assoc_matched, assoc_unmatched
 
 

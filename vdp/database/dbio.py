@@ -426,7 +426,7 @@ def update_lcmetrics(conn, sources):
 def update_matched_assoc(conn, sources):
     """Updates the RA & Dec of existing sources in the
     **assoc_source** table to the weighted average of all
-    detections. Also updates the light curve metrics
+    detections. Also updates the light curve flux metrics
 
     Parameters
     ----------
