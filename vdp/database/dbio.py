@@ -281,14 +281,13 @@ def add_nulls(conn, sources):
         # Insert values into detected_null table
         sql = '''INSERT INTO detected_null (
             assoc_id, image_id, ra, dec, total_flux, e_total_flux, 
-            peak_flux, e_peak_flux, maj, e_maj, min, e_min, pa, e_pa, 
-            distance_from_center, polar_angle, snr, code) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s)'''
+            peak_flux, e_peak_flux, 
+            distance_from_center, polar_angle, snr) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            %s)'''
         vals = (src.assoc_id, src.image_id, src.ra, src.dec, src.total_flux,
                 src.e_total_flux, src.peak_flux, src.e_peak_flux,
-                src.maj, src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                src.distance_from_center, src.polar_angle, src.snr, src.code)
+                src.dist_from_center, src.polar_angle, src.snr)
         cur.execute(sql, vals)
 
     conn.commit()

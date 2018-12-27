@@ -220,16 +220,9 @@ def create(conn, params, safe=False):
                 e_total_flux DOUBLE PRECISION,
                 peak_flux DOUBLE PRECISION,
                 e_peak_flux DOUBLE PRECISION,
-                maj DOUBLE PRECISION,
-                e_maj DOUBLE PRECISION,
-                min DOUBLE PRECISION,
-                e_min DOUBLE PRECISION,
-                pa DOUBLE PRECISION,
-                e_pa DOUBLE PRECISION,
                 distance_from_center REAL,
                 polar_angle REAL,
                 snr REAL,
-                code TEXT,
                 PRIMARY KEY (assoc_id, image_id),
                 FOREIGN KEY (image_id)
                   REFERENCES image (id)

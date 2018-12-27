@@ -224,9 +224,10 @@ are either adapted or straight from their documentation.
 detected_null
 ***************
 Properties of sources NOT detected in an image that should've been. 
-Derived from forced-fitting Gaussians at the location of unmatched
-associated sources. A null is considered detected if the ratio of
-source average flux to fitted flux is > 5.
+Derived from forced-fitting at the location of each unmatched
+associated source an island with a size approximately the imaging beam. 
+A null is considered detected if the ratio of source average 
+flux to fitted flux is > 5.
 
 - *assoc_id*: references the *id* column of the **assoc_source**;
   rows with the same *assoc_id* value are associated null detections
@@ -235,23 +236,12 @@ source average flux to fitted flux is > 5.
   *id* column in the **image** table
 - *ra*: source right ascension of the fit (degrees) 
 - *dec*: source declination of the fit (degrees)
-- *total_flux*: beam corrected total integrated flux (mJy)
+- *total_flux*: beam corrected total integrated flux, set from island *max_value* (mJy)
 - *e_total_flux*: beam corrected 1-sigma statistical error on the total integrated
-  flux
-- *peak_flux*: beam corrected peak flux density per beam of the source (mJy/beam)
-- *e_peak_flux*: beam corrected 1-sigma statistical error on the peak flux (mJy/beam)
-- *maj*: the FWHM of the major axis of the source (arcsec);
-  PyBDSF output column *Maj*
-- *e_maj*: 1-sigma statistical error on the FWHM of the source
-  major axis (arcsec); PyBDSF output column *E_Maj*
-- *min*: the FWHM of the minor axis of the source (arcsec);
-  PyBDSF output column *Min*
-- *e_min*: 1-sigma statistical error on the FWHM of the source
-  minor axis (arcsec); PyBDSF output column *E_Min*
-- *pa*: position angle of the source major axis measured east
-  of north (degrees); PyBDSF output column *PA*
-- *e_pa*: 1-sigma statistical error on the source major axis
-  position angle (degrees); PyBDSF output column *E_PA*
+  flux, set from island *total_fluxE* (mJy)
+- *peak_flux*: beam corrected peak flux density per beam of the source, set to *total_flux* (mJy/beam)
+- *e_peak_flux*: beam corrected 1-sigma statistical error on the peak flux, set to *e_total_flux* (mJy/beam)
+  of north, set to image *bpa* (degrees);
 - *distance_from_center*: angular separation between the fitted position
   and the image pointing center (degrees)
 - *polar_angle*: angle west of north of fitted position in image plane (degrees)

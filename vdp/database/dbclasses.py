@@ -863,6 +863,35 @@ class DetectedSource(object):
         self.total_flux_islE = np.sqrt(
             (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
 
+        
+    #nulls need special handling
+    def correct_flux_null(self, pri_freq):
+        """Applies a 1-D radial correction to null flux measurements
+        from PyBDSF.
+
+        Parameters
+        ----------
+        pri_freq : float
+            Primary frequency of the observations in GHz.
+        """
+        # Correct for beam response - only 1D (sym. beam) for now
+        pb_power,pb_err = beam_tools.find_nearest_pbcorr(self.dist_from_center,
+                                                  pri_freq)
+        # List of attributes to correct
+        attrs = ['total_flux', 'peak_flux']
+        for attr in attrs:
+            corr_val = getattr(self, attr) / pb_power
+            setattr(self, attr, corr_val)
+        # Compute S/N of source detection
+        #self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
+        # Add systematic uncertainty to all flux errors
+        self.e_total_flux = np.sqrt(
+            (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
+        self.e_peak_flux = np.sqrt(
+            (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
+        #self.total_flux_islE = np.sqrt(
+        #    (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)        
+
     def calc_compactness(self, imobj):
         """Calculates a detected source's compactness
         from its flux ratio, SNR, and array config.
@@ -987,6 +1016,52 @@ def translate(img, out):
         newsrcs.append(DetectedSource())
         newsrcs[-1].cast(oldsrc)
         newsrcs[-1].image_id = img.id
+        newsrcs[-1].calc_center_dist(img)
+        newsrcs[-1].calc_polar_angle(img)
+
+    return newsrcs
+
+
+# nulls just use pybdsf islands and require
+# different handling than sources
+def translate_null(img, out, coords):
+    """Method to translate PyBDSF islands output within the
+    pipeline to DetectedSource objects 
+
+    Parameters
+    ----------
+    img : ``database.dbclasses.Image`` instance
+        Initialized Image object with attribute values
+        set from header info.
+    out : ``bdsf.image.Image`` instance
+        The object output by PyBDSF after running its
+        source finding task ``process_image()``. Contains
+        a list of ``bdsf.gaul2srl.Island`` objects which
+        are translated into DetectedSource objects.
+    coords : list of (RA, Dec) tuples specfying Island coords
+
+    Returns
+    -------
+    newsrcs : list
+        List of ``database.dbclasses.DetectedSource`` objects.
+        Attributes of each object are set from the PyBDSF
+        output object.    
+    """
+    # Translate PyBDSF output island objects to DetectedSource objects
+    newsrcs = []
+    for n,oldsrc in enumerate(out.islands):
+        newsrcs.append(DetectedSource())
+        newsrcs[-1].ra = coords[n][0]
+        newsrcs[-1].dec = coords[n][1]
+        newsrcs[-1].image_id = img.id
+        #set total flux to island max value,
+        # this gave best results compared to PySE force-fitting
+        newsrcs[-1].total_flux = oldsrc.max_value*1000.
+        #set flux err to island total flux err
+        newsrcs[-1].e_total_flux = oldsrc.total_fluxE*1000.
+        #set peak to total
+        newsrcs[-1].peak_flux = oldsrc.max_value
+        newsrcs[-1].e_peak_flux = oldsrc.total_fluxE        
         newsrcs[-1].calc_center_dist(img)
         newsrcs[-1].calc_polar_angle(img)
 

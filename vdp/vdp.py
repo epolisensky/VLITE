@@ -764,12 +764,12 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, radius, save)
-    print '*****'
-    print len(detected_matched)
-    print len(detected_unmatched)
-    print len(assoc_matched)
-    print len(assoc_unmatched)
-    print '*****'
+#    print '*****'
+#    print len(detected_matched)
+#    print len(detected_unmatched)
+#    print len(assoc_matched)
+#    print len(assoc_unmatched)
+#    print '*****'
     if save:
         # Update assoc_id col for matched detected sources & corrected_flux
         if detected_matched:
@@ -928,7 +928,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     """
 
     logger.info('***********************')
-    logger.info('FORCE FITTING %d FOR NULLS' % len(asrcs))
+    logger.info('CHECKING %d FOR NULLS' % len(asrcs))
     logger.info('***********************')
 
 
@@ -937,8 +937,11 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     coords=[]
     for src in asrcs:
         coords.append((src.ra,src.dec))
-        #print coords[-1]
+    print coords
+    
     sfparams['src_ra_dec'] = coords
+    sfparams['stop_at'] = 'isl' #stop at island finding
+    #sfparams['fix_to_beam'] = True # force Gaussians to beam size
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
@@ -947,13 +950,12 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     nulls=[]
     if out is not None:
         # Translate PyBDSF output to DetectedSource objects
-        sources = dbclasses.translate(imobj, out)
+        sources = dbclasses.translate_null(imobj, out, coords)
         # Beam correct fluxes
-        logger.info('Correcting all flux measurements for primary beam '
+        logger.info('Correcting null flux measurements for primary beam '
                         'response.')
         for n,src in enumerate(sources): # *should be* in order with asrcs
-            print '%d %f %f  %f %f  %f %f' % (n,coords[n][0],coords[n][1],asrcs[n].ra,asrcs[n].dec,src.ra,src.dec)
-            src.correct_flux(imobj.pri_freq)
+            src.correct_flux_null(imobj.pri_freq)
             # Calculate pseudo-SNRs
             src.snr=asrcs[n].ave_total / src.total_flux
             # Check for null detections
@@ -961,6 +963,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
                 nulls.append(src)
                 #set attributes not set by translate & correct_flux:
                 nulls[-1].assoc_id = asrcs[n].id
+            #print '%d %f %f  %f %f  %f %f  %.2f  %f %f' % (n,coords[n][0],coords[n][1],src.ra,src.dec,src.total_flux,src.e_total_flux,src.snr,src.dist_from_center,src.polar_angle)
                 
     else:
         # PyBDSF failed to process

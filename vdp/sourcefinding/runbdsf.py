@@ -59,9 +59,10 @@ class BDSFImage(Image):
         self.max_iter = 5
         # Set our own default rms_box parameter
         self.set_rms_box()
-        # Setting force-fitting coords to None will not
-        #  affect blind source fitting
+        # Setting force-fitting coords and stop_at to None 
+        #  will not affect blind source fitting
         self.src_ra_dec = None
+        self.stop_at = None
         # Set attributes from config file
         for key, value in kwargs.items():
             if key == 'rms_box':

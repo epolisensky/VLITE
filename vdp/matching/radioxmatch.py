@@ -299,11 +299,23 @@ def associate(conn, detected_sources, imobj, search_radius, save):
 
         cur.close()
 
+
+        # Track assoc_id of matches
+        matched_assoc_id=[]
+        
         # Create dictionary of src_id keys & associated values
         rowdict = {}
         for row in rows:
             rowdict[row['src_id']] = [row['assoc_id'], row['sep'], row['match']]
+            if row['match']:
+                matched_assoc_id.append(row['assoc_id'])
 
+        # Find the unmatched associated sources
+        for asrc in assoc_sources:
+            if asrc.id not in matched_assoc_id:
+                assoc_unmatched.append(asrc)
+
+        # Check the detected sources
         for src in detected_sources:
             # Get the associated source object
             asrc = [msrc for msrc in assoc_sources if \
@@ -346,7 +358,6 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 src.res_class = res_class
                 src.ndetect = 1
                 detected_unmatched.append(src)
-                assoc_unmatched.append(asrc)
             if not save:
                 match_logger.info('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
                     src.src_id, rowdict[src.src_id][2], asrc.id, asrc.ra,
@@ -357,9 +368,6 @@ def associate(conn, detected_sources, imobj, search_radius, save):
     match_logger.info(' -- number of new sources to add: {}'.format(
         len(detected_unmatched)))
 
-    print '*****'
-    print len(assoc_unmatched)
-    print '*****'
     return detected_matched, detected_unmatched, assoc_matched, assoc_unmatched
 
 
