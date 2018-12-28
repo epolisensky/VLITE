@@ -1060,8 +1060,8 @@ def translate_null(img, out, coords):
         #set flux err to island total flux err
         newsrcs[-1].e_total_flux = oldsrc.total_fluxE*1000.
         #set peak to total
-        newsrcs[-1].peak_flux = oldsrc.max_value
-        newsrcs[-1].e_peak_flux = oldsrc.total_fluxE        
+        newsrcs[-1].peak_flux = oldsrc.max_value*1000.
+        newsrcs[-1].e_peak_flux = oldsrc.total_fluxE*1000.
         newsrcs[-1].calc_center_dist(img)
         newsrcs[-1].calc_polar_angle(img)
 

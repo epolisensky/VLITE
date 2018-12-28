@@ -656,6 +656,9 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     logger.info('STAGE 2: SOURCE FINDING')
     logger.info('***********************')
 
+    #print sfparams
+    #print '*********************'
+
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
@@ -911,8 +914,8 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
         set from header info.
     sfparams : dict
         Specifies any non-default PyBDSF parameters to be 
-        used in source finding, including src_ra_dec
-        which gives the force-fit coordinates.
+        used in source finding. Will pass a copy with src_ra_dec,
+        which gives the force-fit coordinates, to process_image().
     save : bool
         If ``True``, the missed detections are saved
         to the database **detected_null** tables.
@@ -937,15 +940,22 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     coords=[]
     for src in asrcs:
         coords.append((src.ra,src.dec))
-    print coords
-    
-    sfparams['src_ra_dec'] = coords
-    sfparams['stop_at'] = 'isl' #stop at island finding
+    #print coords
+
+    sfparamsN=dict(sfparams)
+    sfparamsN['src_ra_dec'] = coords
+    sfparamsN['stop_at'] = 'isl' #stop at island finding
+    #print sfparamsN
+    #print '*********************'
+    #print sfparams
+    #print '*********************'
     #sfparams['fix_to_beam'] = True # force Gaussians to beam size
     # Initialize source finding image object
-    bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
+    bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparamsN)
     # Run PyBDSF source finding
     out = bdsfim.find_sources()
+    #print sfparams
+    #print '*********************'
 
     nulls=[]
     if out is not None:
@@ -957,7 +967,10 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
         for n,src in enumerate(sources): # *should be* in order with asrcs
             src.correct_flux_null(imobj.pri_freq)
             # Calculate pseudo-SNRs
-            src.snr=asrcs[n].ave_total / src.total_flux
+	    if src.total_flux < 1e-7: 
+		src.snr=0.
+	    else:
+                src.snr=asrcs[n].ave_total / src.total_flux
             # Check for null detections
             if src.snr > 5.0: #should have been detected
                 nulls.append(src)
