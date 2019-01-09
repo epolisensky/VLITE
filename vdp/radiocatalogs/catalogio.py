@@ -51,7 +51,7 @@ catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
                 'nvss' : {'id' : 13}, 'sevenc' : {'id' : 14},
                 'sumss' : {'id' : 15}, 'tgss' : {'id' : 16},
                 'txs' : {'id' : 17}, 'vlssr' : {'id' : 18},
-                'wenss': {'id' : 19}}
+                'wenss': {'id' : 19}, 'atlas': {'id' : 20}}
 
 
 def dms2deg(d, m, s):
@@ -1551,3 +1551,77 @@ def read_nrl_nvss(return_sources=False):
     catio_logger.info(' -- wrote {} NRL-NVSS sources to nrl_nvss_psql.txt'.
                       format(len(sources)))
     return sources
+
+
+def read_atlas(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the ATLAS survey catalog and writes them into a file in the 
+    same directory called atlas_psql.txt if the file does
+    not already exist.
+
+    Telescope/frequency: ATLAS 1.4 GHz
+
+    Spatial resolution: 11'' 
+    
+    """
+    catalog_dict['atlas']['telescope'] = 'ATLAS'
+    catalog_dict['atlas']['frequency'] = 1400
+    catalog_dict['atlas']['resolution'] = 11.
+    catalog_dict['atlas']['reference'] = 'Franzen et al. (2015)'
+    
+    psqlf = os.path.join(catalogdir, 'atlas_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
+    
+    sources = []
+    fname = os.path.join(catalogdir, 'atlasdr3.dat.txt')
+    fread = open(fname, 'r')
+    cnt = 1
+    while 1:
+        line = fread.readline()
+        if not line: break
+        if line[0] == 'E' or line[0] == 'C':
+            sources.append(CatalogSource())
+            line = line.split('|')
+            sources[-1].id = cnt
+            sources[-1].name = line[0][8:]
+            cnt += 1
+            h = int(line[1].split()[0])
+            m = int(line[1].split()[1])
+            s = float(line[1].split()[2])
+            sources[-1].ra = 15. * dms2deg(h, m, s) # deg
+            d = int(line[1].split()[3])
+            m = int(line[1].split()[4])
+            s = float(line[1].split()[5])
+            sources[-1].dec = dms2deg(d, m, s) # deg
+            sources[-1].total_flux = float(line[14]) # mJy
+            sources[-1].e_total_flux = float(line[15]) # mJy
+            sources[-1].peak_flux = float(line[12]) # mJy/beam
+            sources[-1].e_peak_flux = float(line[13]) # mJy/beam
+            sources[-1].rms = float(line[5]) # mJy/beam
+            sources[-1].e_ra = float(line[3])/3600.0 # deg
+            sources[-1].e_dec = float(line[4])/3600.0 # deg
+            #sources[-1].maj = float(line[9]) # arcsec
+            #sources[-1].min = float(line[10]) # arcsec
+            #sources[-1].pa = 0.0
+            sources[-1].field = line[21][:-1]
+            sources[-1].catalog_id = catalog_dict['atlas']['id']
+    fread.close()
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
+    catio_logger.info(' -- wrote {} ATLAS sources to atlas_psql.txt'.format(
+        len(sources)))
+    return sources
+

@@ -19,6 +19,7 @@ from errors import ConfigError
 from sourcefinding import runbdsf
 from matching import radioxmatch
 from radiocatalogs import catalogio, radcatdb
+from math import sqrt
 from yaml import load
 try:
     from yaml import CLoader as Loader
@@ -656,9 +657,6 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     logger.info('STAGE 2: SOURCE FINDING')
     logger.info('***********************')
 
-    #print sfparams
-    #print '*********************'
-
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparams)
     # Run PyBDSF source finding
@@ -767,12 +765,7 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     # Associate current sources with existing VLITE catalog 
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, radius, save)
-#    print '*****'
-#    print len(detected_matched)
-#    print len(detected_unmatched)
-#    print len(assoc_matched)
-#    print len(assoc_unmatched)
-#    print '*****'
+
     if save:
         # Update assoc_id col for matched detected sources & corrected_flux
         if detected_matched:
@@ -788,8 +781,8 @@ def srcassoc(conn, imobj, sources, save, sfparams):
             #update associated source light curve metrics
             dbio.update_lcmetrics(conn, assoc_matched)
         # Check for null detections
-        if assoc_unmatched:
-            nullfind(conn, imobj, sfparams, save, assoc_unmatched)
+#        if assoc_unmatched:
+#            nullfind(conn, imobj, sfparams, save, assoc_unmatched)
         # Check for VLITE unique (VU) sources that weren't detected in image
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
@@ -922,12 +915,6 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     asrcs : list
         List of ``database.dbclasses.DetectedSource`` objects,
         the unmatched associated sources to force-fit.
-    Returns
-    -------
-    sources : list
-        List of ``database.dbclasses.DetectedSource`` objects.
-        Attributes of each object are set from the PyBDSF
-        output object.
     """
 
     logger.info('***********************')
@@ -940,25 +927,20 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     coords=[]
     for src in asrcs:
         coords.append((src.ra,src.dec))
-    #print coords
 
-    sfparamsN=dict(sfparams)
-    sfparamsN['src_ra_dec'] = coords
-    sfparamsN['stop_at'] = 'isl' #stop at island finding
-    #print sfparamsN
-    #print '*********************'
-    #print sfparams
-    #print '*********************'
-    #sfparams['fix_to_beam'] = True # force Gaussians to beam size
+    nfparams=dict(sfparams) #copy params dict for null finding
+    nfparams['src_ra_dec'] = coords
+    nfparams['stop_at'] = 'isl' #stop at island finding
+    #nfparams['fix_to_beam'] = True # force Gaussians to beam size
+
     # Initialize source finding image object
-    bdsfim = runbdsf.BDSFImage(imobj.filename, **sfparamsN)
+    bdsfim = runbdsf.BDSFImage(imobj.filename, **nfparams)
     # Run PyBDSF source finding
     out = bdsfim.find_sources()
-    #print sfparams
-    #print '*********************'
 
-    nulls=[]
+    nulls=None
     if out is not None:
+        nulls=[]
         # Translate PyBDSF output to DetectedSource objects
         sources = dbclasses.translate_null(imobj, out, coords)
         # Beam correct fluxes
@@ -967,12 +949,10 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
         for n,src in enumerate(sources): # *should be* in order with asrcs
             src.correct_flux_null(imobj.pri_freq)
             # Calculate pseudo-SNRs
-	    if src.total_flux < 1e-7: 
-		src.snr=0.
-	    else:
-                src.snr=asrcs[n].ave_total / src.total_flux
+	    if src.total_flux < 0.: src.total_flux = 0.
+            src.snr = (asrcs[n].ave_total-src.total_flux)/sqrt(asrcs[n].e_ave_total**2 + src.e_total_flux**2)
             # Check for null detections
-            if src.snr > 5.0: #should have been detected
+            if src.snr > 10.0: #should have been detected
                 nulls.append(src)
                 #set attributes not set by translate & correct_flux:
                 nulls[-1].assoc_id = asrcs[n].id
@@ -980,7 +960,6 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
                 
     else:
         # PyBDSF failed to process
-        nulls = None
         logger.info('PyBDSF failed to process force-fitting!')
 
     if save:
@@ -988,7 +967,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
             # Add null parameters to database table
             dbio.add_nulls(conn, nulls)
 
-    return nulls
+    return
 
 
 
