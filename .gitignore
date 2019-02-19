@@ -1,7 +1,6 @@
 # ignore certain file types
 *.pyc
 *.sh
-*.txt
 
 # ignore directories
 config_files
