@@ -914,10 +914,10 @@ class DetectedSource(object):
             c0 = 10.493944
             c1 = -1.804784
         elif imobj.config=='C' or imobj.config=='DnC':
-            a0 = 1.009783
-            a1 = 1.831983e-3
-            c0 = 16.324568
-            c1 = -2.090893
+            a0 = 1.007876
+            a1 = 1.761468e-3
+            c0 = 12.600512
+            c1 = -2.002195
         elif imobj.config=='D': #need to determine D config values
             a0 = 1.0
             a1 = 0.

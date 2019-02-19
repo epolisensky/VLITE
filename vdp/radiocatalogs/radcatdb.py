@@ -134,7 +134,9 @@ def add_table(tblname, conn):
     elif tblname == 'nrl_nvss':
         sources = catalogio.read_nrl_nvss()
     elif tblname == 'atlas':
-        sources = catalogio.read_atlas()    
+        sources = catalogio.read_atlas()
+    elif tblname == 'lotssdr1':
+        sources = catalogio.read_lotssdr1()    
     else:
         radcatdb_logger.error('ERROR: No function to read catalog {}.'.
                               format(tblname))

@@ -51,7 +51,8 @@ catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
                 'nvss' : {'id' : 13}, 'sevenc' : {'id' : 14},
                 'sumss' : {'id' : 15}, 'tgss' : {'id' : 16},
                 'txs' : {'id' : 17}, 'vlssr' : {'id' : 18},
-                'wenss': {'id' : 19}, 'atlas': {'id' : 20}}
+                'wenss': {'id' : 19}, 'atlas': {'id' : 20},
+                'lotssdr1' : {'id' : 21}}
 
 
 def dms2deg(d, m, s):
@@ -1625,3 +1626,71 @@ def read_atlas(return_sources=False):
         len(sources)))
     return sources
 
+
+def read_lotssdr1(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the LOFAR 2m Sky Survey: LoTSS DR1, catalog and writes
+    them into a file in the same directory called lotssdr1_psql.txt
+    if the file does not already exist.
+
+    Telescope/frequency: LOFAR 150 MHz
+
+    Spatial resolution: 6''
+
+    """
+    catalog_dict['lotssdr1']['telescope'] = 'LOFAR'
+    catalog_dict['lotssdr1']['frequency'] = 150
+    catalog_dict['lotssdr1']['resolution'] = 6.
+    catalog_dict['lotssdr1']['reference'] = 'Shimwell et al. (2019)'
+    
+    psqlf = os.path.join(catalogdir, 'lotssdr1_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
+
+    fname = os.path.join(catalogdir, 'lotssdr1.dat')
+    sources = []
+    fread = open(fname, 'r')
+    cnt = 1
+    while 1:
+        line = fread.readline()
+        if not line: break
+        line = line.split()
+        sources.append(CatalogSource())
+        sources[-1].id = cnt
+        cnt += 1
+        sources[-1].name = line[0]
+        sources[-1].ra = float(line[1]) # deg
+        sources[-1].e_ra = float(line[2])# deg (total 1sigma error)
+        sources[-1].dec = float(line[3]) # deg
+        sources[-1].e_dec = float(line[4])# deg (total 1 sigma error)
+        sources[-1].total_flux = float(line[5]) # mJy
+        sources[-1].e_total_flux = float(line[6]) # mJy
+        sources[-1].peak_flux = float(line[7]) # mJy/bm
+        sources[-1].e_peak_flux = float(line[8]) # mJy/bm
+        sources[-1].maj   = float(line[9]) # arcsec
+        sources[-1].e_maj = float(line[10]) # arcsec
+        sources[-1].min   = float(line[11]) # arcsec
+        sources[-1].e_min = float(line[12]) # arcsec
+        sources[-1].pa    = float(line[13]) # deg
+        sources[-1].e_pa  = float(line[14]) # deg        
+        sources[-1].rms = float(line[15]) # mJy/bm
+        sources[-1].field = line[16]
+        sources[-1].catalog_id = catalog_dict['lotssdr1']['id']
+    fread.close()
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id))
+    catio_logger.info(' -- wrote {} LoTSS DR1 sources to lotssdr1_psql.txt'.format(
+        len(sources)))
+    return sources
