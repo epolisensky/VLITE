@@ -4,3 +4,4 @@
 
 # ignore directories
 config_files
+resources/RadioCatalogs
