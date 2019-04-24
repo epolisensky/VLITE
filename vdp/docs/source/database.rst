@@ -223,9 +223,7 @@ are either adapted or straight from their documentation.
 ***************
 detected_null
 ***************
-COMING SOON
-
-Properties of sources NOT detected in an image that should've been. 
+COMING SOON. Properties of sources NOT detected in an image that should've been. 
 Derived from forced-fitting at the location of each unmatched
 associated source an island with a size approximately the imaging beam. 
 A null is considered detected if the ratio of source average 
