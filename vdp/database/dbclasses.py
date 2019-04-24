@@ -7,13 +7,20 @@ import re
 import logging
 import numpy as np
 from astropy.io import fits
+from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.coordinates import  EarthLocation, AltAz
 from astropy.time import Time
 from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
 from math import sqrt
+
+VLALAT    = 34.078749   #VLA latitude  [deg]
+VLALON    = -107.617728 #VLA longitude [deg]
+VLAHEIGHT = 2124.0      #VLA height above sea level [m]
+locVLA=EarthLocation(lat=VLALAT*u.deg, lon=VLALON*u.deg, height=VLAHEIGHT*u.m)
 
 # create logger
 dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
@@ -42,6 +49,20 @@ class Image(object):
         Right ascension of image pointing center (degrees).
     obs_dec : float
         Declination of image pointing center (degrees).
+    glon : float
+        Galactic longitude of image pointing center (degrees).
+    glat : float
+        Galactic latitude of image pointing center (degrees).
+    az : float
+        Azimuth of image pointing center at start time (degrees).
+    alt : float
+        Altitude of image pointing center at start time (degrees).
+    delaltaz : float
+        Angle between alt/az at start and start + duration (degrees)
+    parangle : float
+        Parallactic angle of image pointing center (degrees)
+    lst : float
+        Local Sidereal Time of image at start time (hours) 
     pixel_scale : float
         Spatial conversion from pixel to angular size on the sky
         (arcseconds / pixel.)
@@ -114,6 +135,13 @@ class Image(object):
         self.imsize = None
         self.obs_ra = None
         self.obs_dec = None
+        self.glon = None
+        self.glat = None
+        self.az = None
+        self.alt = None
+        self.delaltaz = None
+        self.parangle = None
+        self.lst = None
         self.pixel_scale = None
         self.obj = None
         self.obs_date = None
@@ -319,6 +347,8 @@ class Image(object):
                     self.error_id = 1    
         try:
             self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME']
+            if hdr['STARTIME'] > 1.:
+                self.mjdtime = self.mjdtime - 1
         except KeyError:
             self.mjdtime = None
             self.error_id = 1
@@ -332,7 +362,48 @@ class Image(object):
         except KeyError:
             self.duration = None
             self.error_id = 1
-
+        try:
+            self.glon = hdr['GLON'] #deg
+            self.glat = hdr['GLAT']
+        except KeyError:
+            if self.obs_ra is not None and self.obs_dec is not None:
+                c=SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+                self.glon = c.galactic.l.deg
+                self.glat = c.galactic.b.deg
+            else:
+                self.glon = None
+                self.glat = None
+        if self.mjdtime is not None:
+            t = Time(self.mjdtime,format='mjd')
+            self.lst = t.sidereal_time('apparent','%fd' % VLALON).hour #hrs
+        else:
+            self.lst = None
+        try:
+            self.az = hdr['AZIM']
+            self.alt = hdr['ELEV']
+        except KeyError:
+            if self.obs_ra is not None and self.obs_dec is not None and self.mjdtime is not None and self.duration is not None:
+                t = Time(self.mjdtime,format='mjd')
+                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+                altaz=coord.transform_to(AltAz(obstime=t,location=locVLA))
+                self.az = altaz.az.deg
+                self.alt = altaz.alt.deg 
+            else:
+                self.az = None
+                self.alt = None
+        try:
+            self.parangle = hdr['PARANGLE']
+        except KeyError:
+            self.parangle = None
+        if self.obs_ra is not None and self.obs_dec is not None and self.mjdtime is not None and self.duration is not None:
+            coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+            t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
+            altaz_end = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
+            t_st = Time(self.mjdtime,format='mjd')
+            altaz_st = coord.transform_to(AltAz(obstime=t_st,location=locVLA))
+            self.delaltaz = SkyCoord(altaz_st.az,altaz_st.alt).separation(SkyCoord(altaz_end.az,altaz_end.alt)).degree #deg
+        else:
+            self.delaltaz = None
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.

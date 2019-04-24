@@ -154,6 +154,13 @@ def create(conn, params, safe=False):
                 error_id INTEGER,
                 nearest_problem TEXT,
                 separation REAL,
+                glon DOUBLE PRECISION,
+                glat DOUBLE PRECISION,
+                az DOUBLE PRECISION,
+                alt DOUBLE PRECISION,
+                delaltaz REAL,
+                parangle REAL,
+                lst DOUBLE PRECISION,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

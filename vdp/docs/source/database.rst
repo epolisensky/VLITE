@@ -223,6 +223,8 @@ are either adapted or straight from their documentation.
 ***************
 detected_null
 ***************
+COMING SOON
+
 Properties of sources NOT detected in an image that should've been. 
 Derived from forced-fitting at the location of each unmatched
 associated source an island with a size approximately the imaging beam. 
@@ -296,6 +298,18 @@ in the table, as well.
   header keyword ``OBSRA``
 - *obs_dec*: declination of image pointing center (degrees);
   header keyword ``OBSDEC``
+- *glon*: galactic longitude of image pointing center (degrees);
+  header keyword ``GLON`` or calculated if missing
+- *glat*: galactic latitude of image pointing center (degrees);
+  header keyword ``GLAT`` or calculated if missing
+- *az*: azimuth of image pointing center at mjdtime (degrees);
+  header keyword ``AZIM`` or calculated if missing
+- *alt*: altitude of image pointing center at mjdtime (degrees);
+  header keyword ``ELEV`` or calculated is missing
+- *delaltaz*: angular distance between alt,az at start and end of data (degrees);
+  end time is calculated by adding duration to mjdtime
+- *lst*: local sidereal time of image at start time (hrs)
+  calculated with astropy
 - *pixel_scale*: number of arcseconds spanned by each pixel in the
   image (arcsec/pixel); header keyword ``CDELT1`` or ``CDELT2``
 - *object*: name of the object being observed as given by the
