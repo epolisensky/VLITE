@@ -308,7 +308,7 @@ in the table, as well.
   header keyword ``ELEV`` or calculated is missing
 - *delaltaz*: angular distance between alt,az at start and end of data (degrees);
   end time is calculated by adding duration to mjdtime
-- *lst*: local sidereal time of image at start time (hrs)
+- *lst*: local sidereal time of image at mjdtime (hrs);
   calculated with astropy
 - *pixel_scale*: number of arcseconds spanned by each pixel in the
   image (arcsec/pixel); header keyword ``CDELT1`` or ``CDELT2``
