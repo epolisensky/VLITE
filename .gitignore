@@ -1,6 +1,11 @@
 # ignore certain file types
 *.pyc
 *.sh
+vdp/resources/RadioCatalogs/lotssdr1_psql.txt
+vdp/resources/RadioCatalogs/tgss_psql.txt
+vdp/resources/RadioCatalogs/first_psql.txt
+vdp/resources/RadioCatalogs/nrl_nvss_psql.txt
+vdp/resources/RadioCatalogs/nvss_psql.txt
 
 # ignore directories
 config_files
