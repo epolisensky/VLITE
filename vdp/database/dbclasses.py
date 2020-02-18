@@ -17,10 +17,21 @@ from database import pybdsfcat
 from sourcefinding import beam_tools
 from math import sqrt
 
+########################
+#temporarily needed while USNO sites are down for modernization
+#  expected completeion 30 Apr 2020
+from astropy.utils import iers
+iers.conf.iers_auto_url = u'ftp://cddis.gsfc.nasa.gov/pub/products/iers/finals2000A.all'
+########################
+
+RAD2DEG = 180.0/np.pi
+DEG2RAD = np.pi/180.0
+
 VLALAT    = 34.078749   #VLA latitude  [deg]
 VLALON    = -107.617728 #VLA longitude [deg]
 VLAHEIGHT = 2124.0      #VLA height above sea level [m]
 locVLA=EarthLocation(lat=VLALAT*u.deg, lon=VLALON*u.deg, height=VLAHEIGHT*u.m)
+#locVLA=EarthLocation.of_site('vla')
 
 # create logger
 dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
@@ -53,14 +64,30 @@ class Image(object):
         Galactic longitude of image pointing center (degrees).
     glat : float
         Galactic latitude of image pointing center (degrees).
-    az : float
-        Azimuth of image pointing center at start time (degrees).
-    alt : float
-        Altitude of image pointing center at start time (degrees).
-    delaltaz : float
-        Angle between alt/az at start and start + duration (degrees)
-    parangle : float
-        Parallactic angle of image pointing center (degrees)
+    az_star : float
+        Azimuth of image pointing center at start time from header (degrees).
+    el_star : float
+        Elevation of image pointing center at start time from header (degrees).
+    pa_star : float
+        Parallactic angle of image pointing center at start time from header (degrees).
+    az_end : float
+        Azimuth of image pointing center at end time from header (degrees).
+    el_end : float
+        Elevation of image pointing center at end time from header (degrees).
+    pa_end : float
+        Parallactic angle of image pointing center at end time from header (degrees).
+    az_i : float
+        Azimuth of image pointing center at mjdtime from astropy (degrees).
+    alt_i : float
+        Altitude of image pointing center at mjdtime from astropy (degrees).
+    parang_i : float
+        Parallactic angle of image pointing center at mjdtime from astropy (degrees).
+    az_f : float
+        Azimuth of image pointing center at mjdtime+duration from astropy (degrees).
+    alt_f : float
+        Altitude of image pointing center at mjdtime+duration from astropy (degrees).
+    parang_f : float
+        Parallactic angle of image pointing center at mjdtime+duration from astropy (degrees).
     lst : float
         Local Sidereal Time of image at start time (hours) 
     pixel_scale : float
@@ -78,9 +105,9 @@ class Image(object):
         Frequency of the simultaneously acquired primary
         band data (GHz).
     bmaj : float
-        Size of the beam semi-major axis (arcsec).
+        Size of the beam major axis FWHM (arcsec).
     bmin : float
-        Size of the beam semi-minor axis (arcsec).
+        Size of the beam minor axis FWHM (arcsec).
     bpa : float
         Beam position angle (degrees).
     noise : float
@@ -137,10 +164,18 @@ class Image(object):
         self.obs_dec = None
         self.glon = None
         self.glat = None
-        self.az = None
-        self.alt = None
-        self.delaltaz = None
-        self.parangle = None
+        self.az_star = None
+        self.el_star = None
+        self.pa_star = None
+        self.az_end = None
+        self.el_end = None
+        self.pa_end = None
+        self.az_i = None
+        self.alt_i = None
+        self.parang_i = None
+        self.az_f = None
+        self.alt_f = None
+        self.parang_f = None
         self.lst = None
         self.pixel_scale = None
         self.obj = None
@@ -346,9 +381,7 @@ class Image(object):
                     self.niter = None
                     self.error_id = 1    
         try:
-            self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME']
-            if hdr['STARTIME'] > 1.:
-                self.mjdtime = self.mjdtime - 1
+            self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME'] #day
         except KeyError:
             self.mjdtime = None
             self.error_id = 1
@@ -373,37 +406,66 @@ class Image(object):
             else:
                 self.glon = None
                 self.glat = None
+        try:
+            self.az_star = hdr['AZ_STAR']
+        except KeyError:
+            self.az_star = None
+        try:
+            self.el_star = hdr['EL_STAR']
+        except KeyError:
+            self.el_star = None
+        try:
+            self.pa_star = hdr['PA_STAR']
+        except KeyError:
+            self.pa_star = None
+        try:
+            self.az_end = hdr['AZ_END']
+        except KeyError:
+            self.az_end = None
+        try:
+            self.el_end = hdr['EL_END']
+        except KeyError:
+            self.el_end = None
+        try:
+            self.pa_end = hdr['PA_END']
+        except KeyError:
+            self.pa_end = None
         if self.mjdtime is not None:
             t = Time(self.mjdtime,format='mjd')
             self.lst = t.sidereal_time('apparent','%fd' % VLALON).hour #hrs
+            if self.obs_ra is not None and self.obs_dec is not None:
+                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+                altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
+                self.az_i = altaz.az.deg
+                self.alt_i = altaz.alt.deg
+                hrang = (15*self.lst) - self.obs_ra #deg
+                if hrang > 180: hrang -= 360
+                if hrang < -180: hrang += 360
+                tmp1 = np.sin(hrang*DEG2RAD)
+                tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
+                if self.duration is not None:
+                    t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
+                    lst_end = t_end.sidereal_time('apparent','%fd' % VLALON).hour #hrs
+                    altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
+                    self.az_f = altaz.az.deg
+                    self.alt_f = altaz.alt.deg
+                    hrang = (15*lst_end) - self.obs_ra #deg
+                    if hrang > 180: hrang -= 360
+                    if hrang < -180: hrang += 360
+                    tmp1 = np.sin(hrang*DEG2RAD)
+                    tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                    self.parang_f = np.arctan2(tmp1,tmp2)*RAD2DEG
+            else:
+                self.az_i = None
+                self.alt_i = None
+                self.parang_i = None
+                self.az_f = None
+                self.alt_f = None
+                self.parang_f = None
         else:
             self.lst = None
-        try:
-            self.az = hdr['AZIM']
-            self.alt = hdr['ELEV']
-        except KeyError:
-            if self.obs_ra is not None and self.obs_dec is not None and self.mjdtime is not None and self.duration is not None:
-                t = Time(self.mjdtime,format='mjd')
-                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
-                altaz=coord.transform_to(AltAz(obstime=t,location=locVLA))
-                self.az = altaz.az.deg
-                self.alt = altaz.alt.deg 
-            else:
-                self.az = None
-                self.alt = None
-        try:
-            self.parangle = hdr['PARANGLE']
-        except KeyError:
-            self.parangle = None
-        if self.obs_ra is not None and self.obs_dec is not None and self.mjdtime is not None and self.duration is not None:
-            coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
-            t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
-            altaz_end = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
-            t_st = Time(self.mjdtime,format='mjd')
-            altaz_st = coord.transform_to(AltAz(obstime=t_st,location=locVLA))
-            self.delaltaz = SkyCoord(altaz_st.az,altaz_st.alt).separation(SkyCoord(altaz_end.az,altaz_end.alt)).degree #deg
-        else:
-            self.delaltaz = None
+            
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.

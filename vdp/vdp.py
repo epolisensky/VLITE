@@ -930,8 +930,8 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
 
     nfparams=dict(sfparams) #copy params dict for null finding
     nfparams['src_ra_dec'] = coords
-    nfparams['stop_at'] = 'isl' #stop at island finding
     #nfparams['fix_to_beam'] = True # force Gaussians to beam size
+    nfparams['aperture'] = sqrt(imobj.bmin*imobj.bmaj)/imobj.pixel_scale #set radius of aperture for aperture flux and error calculation
 
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **nfparams)

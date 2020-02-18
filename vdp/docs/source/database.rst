@@ -300,12 +300,30 @@ in the table, as well.
   header keyword ``GLON`` or calculated if missing
 - *glat*: galactic latitude of image pointing center (degrees);
   header keyword ``GLAT`` or calculated if missing
-- *az*: azimuth of image pointing center at mjdtime (degrees);
-  header keyword ``AZIM`` or calculated if missing
-- *alt*: altitude of image pointing center at mjdtime (degrees);
-  header keyword ``ELEV`` or calculated is missing
-- *delaltaz*: angular distance between alt,az at start and end of data (degrees);
-  end time is calculated by adding duration to mjdtime
+- *az_star*: azimuth of image pointing center at mjdtime (degrees);
+  header keyword ``AZ_STAR``
+- *el_star*: altitude of image pointing center at mjdtime (degrees);
+  header keyword ``EL_STAR``
+- *pa_star*: parallactic angle of image pointing center at mjdtime (degrees);
+  header keyword ``PA_STAR``
+- *az_end*: azimuth of image pointing center at end of observation (degrees);
+  header keyword ``AZ_END``
+- *el_end*: altitude of image pointing center at end of observation (degrees);
+  header keyword ``EL_END``
+- *pa_end*: parallactic angle of image pointing center at end of observation (degrees);
+  header keyword ``PA_END``
+- *az_i*: azimuth of image pointing center at mjdtime (degrees);
+  calculated with astropy
+- *alt_i*: altitude of image pointing center at mjdtime (degrees);
+  calculated with astropy
+- *parang_i*: parallactic angle of image pointing center at mjdtime (degrees);
+  calculated with astropy
+- *az_f*: azimuth of image pointing center at mjdtime+duration (degrees);
+  calculated with astropy
+- *alt_f*: altitude of image pointing center at mjdtime+duration (degrees);
+  calculated with astropy
+- *parang_f*: parallactic angle of image pointing center at mjdtime+duration (degrees);
+  calculated with astropy
 - *lst*: local sidereal time of image at mjdtime (hrs);
   calculated with astropy
 - *pixel_scale*: number of arcseconds spanned by each pixel in the
@@ -320,9 +338,9 @@ in the table, as well.
   header keyword ``RESTFREQ`` or ``CRVAL3`` or ``CRVAL4``
 - *primary_freq*: frequency of the primary observations (GHz);
   taken from VLITE image filename
-- *bmaj*: image beam semi-major axis (arcsec); header keyword
+- *bmaj*: image beam FWHM major axis (arcsec); header keyword
   ``BMAJ`` or ``CLEANBMJ``
-- *bmin*: image beam semi-minor axis (arcsec); header keyword
+- *bmin*: image beam FWHM minor axis (arcsec); header keyword
   ``BMIN`` or ``CLEANBMN``
 - *bpa*: image beam position angle measured east of north (degrees);
   header keyword ``BPA`` or ``CLEANBPA``
@@ -335,7 +353,7 @@ in the table, as well.
   keyword ``NVIS``
 - *niter*: number of CLEAN iterations; header keyword ``NITER``
 - *mjdtime*: Modified Julian Date at the start of the observations;
-  header keyword ``MJDTIME`` + header keyword ``STARTIME``
+  integer header keyword ``MJDTIME`` + header keyword ``STARTIME``
 - *tau_time*: total integration time on source (sec); header
   keyword ``TAU_TIME``
 - *duration*: total duration of the observations (sec); header

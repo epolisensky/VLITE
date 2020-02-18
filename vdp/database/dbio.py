@@ -135,9 +135,12 @@ def add_image(conn, img, status, delete=False):
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
             config, nvis, niter, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
-            stage, error_id, nearest_problem, separation, glon, glat, az, alt, delaltaz, lst, parangle) 
+            stage, error_id, nearest_problem, separation, glon, glat, lst, az_star,
+            el_star, pa_star, az_end, el_end, pa_end, az_i, az_f, alt_i, alt_f,
+            parang_i, parang_f) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -145,7 +148,9 @@ def add_image(conn, img, status, delete=False):
                 img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
                 img.stage, img.error_id, img.nearest_problem, img.separation,
-                img.glon, img.glat, img.az, img.alt, img.delaltaz, img.lst, img.parangle)
+                img.glon, img.glat, img.lst, img.az_star, img.el_star, img.pa_star,
+                img.az_end, img.el_end, img.pa_end, img.az_i, img.az_f, img.alt_i,
+                img.alt_f, img.parang_i, img.parang_f)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -159,16 +164,19 @@ def add_image(conn, img, status, delete=False):
             nvis = %s, niter = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
             nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
             error_id = %s, nearest_problem = %s, separation = %s, glon = %s, glat = %s,
-            az = %s, alt = %s, delaltaz = %s, lst = %s, parangle = %s
-            WHERE id = %s'''
+            lst = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
+            el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
+            alt_f = %s, parang_i = %s, parang_f = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
                 img.stage, None, img.error_id, img.nearest_problem,
-                img.separation, img.glon, img.glat, img.az, img.alt, img.delaltaz,
-                img.lst, img.parangle, img.id)
+                img.separation, img.glon, img.glat, img.lst, img.az_star,
+                img.el_star, img.pa_star, img.az_end, img.el_end, img.pa_end,
+                img.az_i, img.az_f, img.alt_i, img.alt_f, img.parang_i,
+                img.parang_f, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -1053,6 +1061,7 @@ def remove_images(conn, images):
     cur = conn.cursor()
 
     for image in images:
+        print(image)
         cur.execute('SELECT id FROM image WHERE filename LIKE %s',
                     ('%'+image, ))
         try:
@@ -1062,8 +1071,7 @@ def remove_images(conn, images):
                              format(image))
         cur.execute('DELETE FROM image WHERE id = %s',
                     (image_id, ))
-    
-    conn.commit()
+        conn.commit()
     cur.close()
 
 def update_corrected(conn):
