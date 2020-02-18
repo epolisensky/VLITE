@@ -324,7 +324,7 @@ in the table, as well.
   calculated with astropy
 - *parang_f*: parallactic angle of image pointing center at mjdtime+duration (degrees);
   calculated with astropy
-- *lst*: local sidereal time of image at mjdtime (hrs);
+- *lst*: VLA local sidereal time at mjdtime (hrs);
   calculated with astropy
 - *pixel_scale*: number of arcseconds spanned by each pixel in the
   image (arcsec/pixel); header keyword ``CDELT1`` or ``CDELT2``
