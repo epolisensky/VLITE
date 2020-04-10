@@ -18,10 +18,32 @@ import matchfuncs
 # create logger
 match_logger = logging.getLogger('vdp.matching.radioxmatch')
 
-
+'''
+#contains array configs, mjd ranges of the cycles and the acceptable range of image bmins for source association
+res_dict = {
+    'A'  : {'1': {'mjd': [58179,58280], 'bmin': [2.85,4.27]}, '2': {'mjd': [58697,58778], 'bmin': [3.26,4.90]}},
+    'BnA': {'1': {'mjd': [58148,58179], 'bmin': [0,9e99]}, '2': {'mjd': [58660,58697], 'bmin': [0,9e99]}},
+    'B'  : {'1': {'mjd': [57996,58148], 'bmin': [10.77,16.16]}, '2': {'mjd': [58534.24,58660], 'bmin': [10.18,15.28]}},
+    'CnB': {'1': {'mjd': [57994,57996], 'bmin': [0,9e99]}, '2': {'mjd': [58519,58534.24], 'bmin': [0,9e99]}},
+    'C'  : {'1': {'mjd': [57954,57994], 'bmin': [43.94,65.91]}, '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30]}, '3': {'mjd': [58885,60000], 'bmin': [39.69,59.54]}},
+    'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,9e99]}},
+    'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60]}}
+}
+'''
 res_dict = {'A' : (0., 15.), 'B' : (15., 35.),
             'C' : (35., 60.), 'D' : (60., 9999.)}
 
+'''
+def getconfigcycle(mjd,bmin):
+    for config in res_dict.keys():
+        for cycle in res_dict[config].keys():
+            if mjd<=res_dict[config][cycle]['mjd'][1] and mjd>res_dict[config][cycle]['mjd'][0]:
+                if bmin<=res_dict[config][cycle]['bmin'][1] and bmin>=res_dict[config][cycle]['bmin'][0]:
+                    return config,cycle,0
+                else:
+                    return config,cycle,1
+    return 'Unk','Unk',1
+'''
 
 def write_regions(srclist, impath, ext='.reg'):
     """Writes a ds9 regions file from given source list.
@@ -48,7 +70,8 @@ def write_regions(srclist, impath, ext='.reg'):
             f.write('ellipse(%f,%f,%.2f",%.2f",%.1f) # text={%s}\n' % (
                 src.ra, src.dec, src.maj, src.min, src.pa + 90.0, src.name))
 
-
+            
+#need to add class too
 def filter_res(rows, res_class):
     """Filters out sources extracted from the database
     which originate from images with spatial resolutions

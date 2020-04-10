@@ -263,7 +263,9 @@ This is a look-up table containing explanations for each possible
 - *reason*: reason why an image was given that particular *error_id*
 
  id : reason                            
+
 --------------------------------------------------------------------
+
 -  1 : image missing necessary header keyword(s)
 -  2 : number of visibilities < *min nvis*
 -  3 : sensitivity metric (noise x sqrt(int. time)) <= 0 or > *max sensitivity metric*

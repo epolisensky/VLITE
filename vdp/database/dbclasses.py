@@ -27,11 +27,15 @@ iers.conf.iers_auto_url = u'ftp://cddis.gsfc.nasa.gov/pub/products/iers/finals20
 RAD2DEG = 180.0/np.pi
 DEG2RAD = np.pi/180.0
 
+'''
 VLALAT    = 34.078749   #VLA latitude  [deg]
 VLALON    = -107.617728 #VLA longitude [deg]
 VLAHEIGHT = 2124.0      #VLA height above sea level [m]
 locVLA=EarthLocation(lat=VLALAT*u.deg, lon=VLALON*u.deg, height=VLAHEIGHT*u.m)
-#locVLA=EarthLocation.of_site('vla')
+'''
+locVLA=EarthLocation.of_site('vla')
+VLALON = locVLA.lon.deg
+VLALAT = locVLA.lat.deg
 
 # create logger
 dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
@@ -293,6 +297,11 @@ class Image(object):
                 self.pixel_scale = None
                 self.error_id = 1
         try:
+            self.duration = hdr['DURATION'] # sec
+        except KeyError:
+            self.duration = None
+            self.error_id = 1
+        try:
             self.obj = hdr['OBJECT']
         except KeyError:
             self.obj = None
@@ -381,19 +390,46 @@ class Image(object):
                     self.niter = None
                     self.error_id = 1    
         try:
-            self.mjdtime = int(hdr['MJDTIME']) + hdr['STARTIME'] #day
+            self.mjdtime = float(int(hdr['MJDTIME'])) + hdr['STARTIME'] #day
+            t = Time(self.mjdtime,format='mjd')
+            self.lst = t.sidereal_time('apparent',VLALON).hour #hrs
+            if self.obs_ra is not None and self.obs_dec is not None:
+                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+                altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
+                self.az_i = altaz.az.deg
+                self.alt_i = altaz.alt.deg
+                hrang = (15*self.lst) - self.obs_ra #deg
+                if hrang > 180: hrang -= 360
+                if hrang < -180: hrang += 360
+                tmp1 = np.sin(hrang*DEG2RAD)
+                tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
+                if self.duration is not None:
+                    t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
+                    lst_end = t_end.sidereal_time('apparent',VLALON).hour #hrs
+                    altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
+                    self.az_f = altaz.az.deg
+                    self.alt_f = altaz.alt.deg
+                    hrang = (15*lst_end) - self.obs_ra #deg
+                    if hrang > 180: hrang -= 360
+                    if hrang < -180: hrang += 360
+                    tmp1 = np.sin(hrang*DEG2RAD)
+                    tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                    self.parang_f = np.arctan2(tmp1,tmp2)*RAD2DEG
         except KeyError:
             self.mjdtime = None
+            self.lst = None
+            self.az_i = None
+            self.alt_i = None
+            self.parang_i = None
+            self.az_f = None
+            self.alt_f = None
+            self.parang_f = None
             self.error_id = 1
         try:
             self.tau_time = hdr['TAU_TIME'] # sec
         except KeyError:
             self.tau_time = None
-            self.error_id = 1
-        try:
-            self.duration = hdr['DURATION'] # sec
-        except KeyError:
-            self.duration = None
             self.error_id = 1
         try:
             self.glon = hdr['GLON'] #deg
@@ -430,9 +466,10 @@ class Image(object):
             self.pa_end = hdr['PA_END']
         except KeyError:
             self.pa_end = None
+        '''
         if self.mjdtime is not None:
             t = Time(self.mjdtime,format='mjd')
-            self.lst = t.sidereal_time('apparent','%fd' % VLALON).hour #hrs
+            self.lst = t.sidereal_time('apparent',VLALON).hour #hrs
             if self.obs_ra is not None and self.obs_dec is not None:
                 coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
                 altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
@@ -446,7 +483,7 @@ class Image(object):
                 self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
                 if self.duration is not None:
                     t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
-                    lst_end = t_end.sidereal_time('apparent','%fd' % VLALON).hour #hrs
+                    lst_end = t_end.sidereal_time('apparent',VLALON).hour #hrs
                     altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
                     self.az_f = altaz.az.deg
                     self.alt_f = altaz.alt.deg
@@ -465,7 +502,7 @@ class Image(object):
                 self.parang_f = None
         else:
             self.lst = None
-            
+        '''            
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.
