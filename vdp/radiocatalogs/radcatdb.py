@@ -86,6 +86,7 @@ def add_table(tblname, conn):
             rms REAL,
             field TEXT,
             catalog_id INTEGER,
+            pt_like BOOLEAN,
             PRIMARY KEY (id),
             FOREIGN KEY (catalog_id)
               REFERENCES radcat.catalogs (id)

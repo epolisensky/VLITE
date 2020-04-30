@@ -141,6 +141,8 @@ class CatalogSource(object):
     catalog_id : int
         Uniquely identifies the radio catalog from which this
         source originates.
+    pt_like : boolean
+        True if source is point-like. Null if unknown
     assoc_id : int
         The id of the closest VLITE source in the
         **assoc_source** table.
@@ -168,6 +170,7 @@ class CatalogSource(object):
         self.rms = None # mJy/beam
         self.field = None
         self.catalog_id = None
+        self.pt_like = None
         self.assoc_id = None
         self.sep = None
 
@@ -231,12 +234,12 @@ def read_tgss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} TGSS sources to tgss_psql.txt'.format(
         len(sources)))
     return sources
@@ -290,11 +293,6 @@ def read_first(return_sources=False):
                 sources[-1].maj = float(line[10]) # arcsec
                 sources[-1].min = float(line[11]) # arcsec
                 sources[-1].pa = float(line[12])
-                # HACK! setting FIRST positional uncertainty to 1 arcsec
-                # actual uncertainties need to be calculated, see FIRST
-                # website or paper
-                # sources[-1].e_ra  = 1.0/3600.0 # deg
-                # sources[-1].e_dec = 1.0/3600.0 # deg
                 # HACK: FIRST positional uncertainty calculations given
                 # for FITTED bmaj & bmin. 
                 #  I'll assign these to e_ra & e_dec for lack of better method
@@ -309,12 +307,12 @@ def read_first(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} FIRST sources to first_psql.txt'.format(
         len(sources)))
     return sources
@@ -374,12 +372,12 @@ def read_sumss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} SUMSS sources to sumss_psql.txt'.format(
         len(sources)))
     return sources
@@ -411,7 +409,7 @@ def read_wenss(return_sources=False):
         pass
     
     sources = []
-    fname = os.path.join(catalogdir, 'WENS.COMPLETE.txt')
+    fname = os.path.join(catalogdir, 'WENS.COMPLETE')
     fread = open(fname, 'r')
     cnt = 1
     while 1:
@@ -435,17 +433,18 @@ def read_wenss(return_sources=False):
             sources[-1].maj = float(line[9]) # arcsec
             sources[-1].min = float(line[10]) # arcsec
             sources[-1].pa = float(line[11])
+            sources[-1].pt_like = line[12]
             sources[-1].catalog_id = catalog_dict['wenss']['id']
     fread.close()
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} WENSS sources to wenss_psql.txt'.format(
         len(sources)))
     return sources
@@ -545,12 +544,12 @@ def read_nvss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %s\n' % (
+                         '%s %s %s %s %s %s %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} NVSS sources to nvss_psql.txt'.format(
         len(sources)))
     return sources
@@ -618,12 +617,12 @@ def read_gleam(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} GLEAM sources to gleam_psql.txt'.format(
         len(sources)))
     return sources
@@ -686,6 +685,8 @@ def read_cosmos(return_sources=False):
             sources[-1].pa = float(line[18]) # deg
             # 0 = unresolved, 1 =resolved
             sources[-1].flagresolved = int(line[19])
+            if int(line[19])==0: sources[-1].pt_like = 'True'
+            else: sources[-1].pt_like = 'False'
             # 0 = single component, 1 = multi-component
             sources[-1].flagmulticom = int(line[20])
             sources[-1].name20 = line[21] # name in 20cm (1.4 GHz) catalog
@@ -701,12 +702,12 @@ def read_cosmos(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} COSMOS Legacy P-band sources to '
                       'cosmos_psql.txt'.format(len(sources)))
     return sources
@@ -767,12 +768,12 @@ def read_vlssr(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} VLSSr sources to vlssr_psql.txt'.format(
         len(sources)))
     return sources
@@ -828,12 +829,12 @@ def read_txs(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} TXS sources to txs_psql.txt'.format(
         len(sources)))
     return sources
@@ -892,12 +893,12 @@ def read_sevenc(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} 7C sources to sevenc_psql.txt'.format(
         len(sources)))
     return sources
@@ -961,12 +962,12 @@ def read_gpsr5(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} GPSR 5 GHz sources to gpsr5_psql.txt'.
                       format(len(sources)))
     return sources
@@ -1030,12 +1031,12 @@ def read_gpsr1(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} GPSR 1.4 GHz sources to gpsr1_psql.txt'.
                       format(len(sources)))
     return sources
@@ -1118,12 +1119,12 @@ def read_nordgc(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} Hyman-updated Nord GC 330 MHz catalog '
                       'sources to nordgc_psql.txt'.format(len(sources)))
     return sources
@@ -1185,12 +1186,12 @@ def read_lazio04(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} Lazio 2004 catalog sources to '
                       'lazio04_psql.txt'.format(len(sources)))
     return sources
@@ -1264,12 +1265,12 @@ def read_m31_glg04(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} GLG2004 M31 catalog sources to '
                       'm31_glg04_psql.txt'.format(len(sources)))
     return sources
@@ -1333,12 +1334,12 @@ def read_lotss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} LoTSS sources to lotss_psql.txt'.format(
         len(sources)))
     return sources
@@ -1398,12 +1399,12 @@ def read_lofar_lba(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} LOFAR_LBA/VWT2014 sources to '
                       'lofar_lba_psql.txt'.format(len(sources)))
     return sources
@@ -1472,12 +1473,12 @@ def read_lofar_hba(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} LOFAR_HBA/WVR2016 sources to '
                       'lofar_hba_psql.txt'.format(len(sources)))
     return sources
@@ -1543,12 +1544,12 @@ def read_nrl_nvss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} NRL-NVSS sources to nrl_nvss_psql.txt'.
                       format(len(sources)))
     return sources
@@ -1616,12 +1617,12 @@ def read_atlas(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} ATLAS sources to atlas_psql.txt'.format(
         len(sources)))
     return sources
@@ -1685,12 +1686,12 @@ def read_lotssdr1(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i\n' % (
+                         '%s %s %s %s %s %i %s\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
                              src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
-                             src.rms, src.field, src.catalog_id))
+                             src.rms, src.field, src.catalog_id, src.pt_like))
     catio_logger.info(' -- wrote {} LoTSS DR1 sources to lotssdr1_psql.txt'.format(
         len(sources)))
     return sources

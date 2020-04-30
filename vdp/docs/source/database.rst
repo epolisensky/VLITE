@@ -505,3 +505,6 @@ tables has the same format with the following columns:
 - *field*: name of the field, or image, where the source was detected
 - *catalog_id*: id number of the catalog that the source is in;
   references the *id* column of the **radcat.catalogs** table
+- *pt_like: boolean, True if catalog source is point-like. Null if unknown
+
+
