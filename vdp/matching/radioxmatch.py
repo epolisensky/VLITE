@@ -181,7 +181,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
 def associate(conn, detected_sources, imobj, search_radius, save):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
-    distance less than half the size of semi-minor axis of
+    distance less than half the size of minor axis of
     the current image's beam.
 
     Parameters
@@ -579,3 +579,71 @@ def catalogmatch(conn, sources, catalog, imobj, search_radius, save):
     match_logger.info (' -- number of matches: {}'.format(len(catalog_matched)))
 
     return sources, catalog_matched
+
+
+def check_clean(conn, sources, imobj):
+    """Calculates which sources were CLEANed.
+    If src within half BMIN of a CLEAN
+    component "clean" is assigned True
+    
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    sources : list
+        List of DetectedSource objects which need 
+        clean check.
+    imobj : ``database.dbclasses.Image`` instance
+        Initialized Image object with attribute values
+        set from header info.
+
+    Returns
+    -------
+    imobj : ``database.dbclasses.Image`` instance
+        Initialized Image object with updated attributes
+        from check clean results.
+    sources : list
+        List of ``database.dbclasses.DetectedSource`` objects
+        updated with check clean results
+    """
+    cur = conn.cursor()
+    
+    # Dump CCs into temporary table
+    sql = (
+        '''
+        CREATE TEMP TABLE temp_source (
+        ra DOUBLE PRECISION,
+        dec DOUBLE PRECISION
+        );
+        ''')
+    cur.execute(sql)
+    conn.commit()
+    for cc in imobj.cc:
+        cur.execute('''INSERT INTO temp_source (
+            ra, dec) VALUES (%s, %s)''', (cc[0], cc[1]))
+    conn.commit()
+    # Find CC within half a beam of each source
+    ncln=0
+    match = 0.5*imobj.bmin/3600 #deg
+    for src in sources:
+        sql = '''SELECT COUNT(1) FROM temp_source WHERE 
+            q3c_join(ra, dec, %s, %s, %s)'''
+        values = (src.ra, src.dec, match)
+        cur.execute(sql, values)
+        row = cur.fetchall()
+        count = int(row[0][0])
+        if count > 0:
+            src.clean = True
+            ncln+=1
+        else:
+            src.clean = False
+    imobj.nclean = ncln
+    cur.execute('DROP TABLE temp_source')
+    conn.commit()
+
+    cur.close()
+
+    match_logger.info(' -- found {}/{} sources were CLEANed'.
+                          format(ncln,imobj.nsrc))
+         
+    return imobj, sources

@@ -27,7 +27,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.1.1'
+__version__ = '2.3'
 
 
 # Create logger
@@ -146,7 +146,7 @@ def cfgparse(cfgfile):
     qaparams : dict
         Keys are the image quality parameters (min time on source (s),
         max noise (mJy/beam), max beam axis ratio, min problem source
-        separation (deg), and max source metric) and values are the user
+        separation (deg), max source metric, etc) and values are the user
         inputs. Defaults are defined if none are specified.        
     dirs : list
         List of strings specifying paths to daily image directories
@@ -212,10 +212,6 @@ def cfgparse(cfgfile):
         # Define path to processing directories
         dirs = []
         for day in days:
-#            try:
-#                day = format(int(day), '02')
-#            except ValueError:
-#                continue
             procdir = os.path.join(monthdir, day, imgdir)
             # Check full image path
             if not os.path.isdir(procdir):
@@ -319,6 +315,20 @@ def cfgparse(cfgfile):
                     qaparams['min niter'])
             except ValueError:
                 raise ConfigError('min niter must be a number.')
+        if qaparams['min bpix'] is None:
+            qaparams['min bpix'] = 2.8
+        else:
+            try:
+                qaparams['min bpix'] = float(qaparams['min bpix'])
+            except ValueError:
+                raise ConfigError('min bpix must be a number.')
+        if qaparams['max bpix'] is None:
+            qaparams['max bpix'] = 7
+        else:
+            try:
+                qaparams['max bpix'] = float(qaparams['max bpix'])
+            except ValueError:
+                raise ConfigError('max bpix must be a number.')
 
     return stages, opts, setup, sfparams, qaparams, dirs
 
@@ -703,11 +713,17 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     else:
         imobj.error_id = None
 
+    # Determine which sources were CLEANed
+    if sources is not None:
+        logger.info('Checking which sources were CLEANed.')
+        imobj, sources = radioxmatch.check_clean(conn, sources, imobj)
+
     if save:
         # Add source fit parameters to database tables
         dbio.add_sources(conn, imobj, sources)
         if sources is not None:
-            # Compute beam corrected fluxes, compactness, & write to corrected_flux table
+            # Compute beam corrected fluxes, compactness,
+            #  & write to corrected_flux table
             logger.info('Correcting all flux measurements for primary beam '
                         'response.')
             for src in sources:

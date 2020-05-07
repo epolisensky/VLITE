@@ -127,30 +127,32 @@ def add_image(conn, img, status, delete=False):
     dbclasses.Image.num_images += 1
 
     cur = conn.cursor()
+
+    jpri_cals=json.dumps(img.pri_cals)
     
     # Add new image to DB
     if status is None:
         dbio_logger.info('Adding new entry to image table.')
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
-            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
-            config, nvis, niter, mjdtime, tau_time, duration, radius, nsrc, rms_box, 
+            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, config,
+            nvis, niter, mjdtime, tau_time, duration, radius, nsrc, nclean, rms_box, 
             stage, error_id, nearest_problem, separation, glon, glat, lst, az_star,
             el_star, pa_star, az_end, el_end, pa_end, az_i, az_f, alt_i, alt_f,
-            parang_i, parang_f) 
+            parang_i, parang_f, pri_cals) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
-        vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
+        vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
-                img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
+                img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
                 img.stage, img.error_id, img.nearest_problem, img.separation,
                 img.glon, img.glat, img.lst, img.az_star, img.el_star, img.pa_star,
                 img.az_end, img.el_end, img.pa_end, img.az_i, img.az_f, img.alt_i,
-                img.alt_f, img.parang_i, img.parang_f)
+                img.alt_f, img.parang_i, img.parang_f, jpri_cals)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -162,21 +164,21 @@ def add_image(conn, img, status, delete=False):
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
             bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
             nvis = %s, niter = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
+            nsrc = %s, nclean = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
             error_id = %s, nearest_problem = %s, separation = %s, glon = %s, glat = %s,
             lst = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
             el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
-            alt_f = %s, parang_i = %s, parang_f = %s WHERE id = %s'''
+            alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.nvis, img.niter, img.mjdtime,
-                img.tau_time, img.duration, img.radius, img.nsrc, img.rms_box,
+                img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
                 img.stage, None, img.error_id, img.nearest_problem,
                 img.separation, img.glon, img.glat, img.lst, img.az_star,
                 img.el_star, img.pa_star, img.az_end, img.el_end, img.pa_end,
                 img.az_i, img.az_f, img.alt_i, img.alt_f, img.parang_i,
-                img.parang_f, img.id)
+                img.parang_f, jpri_cals, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -213,9 +215,10 @@ def add_sources(conn, img, sources):
     cur = conn.cursor()
 
     # Update image table
-    sql = '''UPDATE image SET radius = %s, nsrc = %s, rms_box = %s, 
-        error_id = %s, stage = %s WHERE id = %s'''
-    vals = (img.radius, img.nsrc, img.rms_box, img.error_id, img.stage, img.id)
+    sql = '''UPDATE image SET radius = %s, nsrc = %s, nclean = %s, 
+        rms_box = %s, error_id = %s, stage = %s WHERE id = %s'''
+    vals = (img.radius, img.nsrc, img.nclean, img.rms_box,
+            img.error_id, img.stage, img.id)
     cur.execute(sql, vals)
 
     if sources is not None:
@@ -323,14 +326,15 @@ def add_corrected(conn, src, status=None):
         cur.execute('''INSERT INTO corrected_flux (
             src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
             e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
-            isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, snr, compactness, assoc_id) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+            isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, 
+            snr, compactness, clean, assoc_id) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                     (src.src_id, src.isl_id, src.image_id, src.total_flux,
                      src.e_total_flux, src.peak_flux, src.e_peak_flux,
                      src.total_flux_isl, src.total_flux_islE, src.rms_isl,
                      src.mean_isl, src.resid_rms, src.resid_mean,
                      src.dist_from_center, src.polar_angle, src.snr,
-                     src.compactness, src.assoc_id))
+                     src.compactness, src.clean, src.assoc_id))
     #Or update existing:
     else:
         src_id = status[0]

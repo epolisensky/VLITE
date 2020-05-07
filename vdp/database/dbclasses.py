@@ -132,6 +132,8 @@ class Image(object):
         Total time spanned by the observations in seconds.
     nsrc : int
         Number of sources extracted during source finding.
+    nclean : int
+        Number of sources that were CLEANed
     rms_box : str
         PyBDSF parameter used during source finding.
         From PyBDSF docs: "The first integer, boxsize, is the 
@@ -155,6 +157,10 @@ class Image(object):
     separation : float
         Angular separation between the nearest problem source
         and the image pointing center (degrees).
+    pri_cals : json
+        Primary calibrators used. Read from history extension
+    cc : list of (float, float)
+        (RA, Dec) list of clean components. Read from CC extension
     """
     # A class variable to count the number of images
     num_images = 0
@@ -199,12 +205,15 @@ class Image(object):
         self.tau_time = None
         self.duration = None
         self.nsrc = None
+        self.nclean = None
         self.rms_box = None
         self.error_id = None
         self.stage = 1
         self.radius = None
         self.nearest_problem = None
         self.separation = None
+        self.pri_cals = None
+        self.cc = None
 
     def process_image(self, image):
         if image.endswith('IMSC.fits'):
@@ -234,12 +243,14 @@ class Image(object):
         """Reads FITS image data and header."""
         try:
             hdu = fits.open(self.filename, mode='update')
+#            hdu = fits.open(self.filename)
             hdr = hdu[0].header
             return hdu, hdr
         except:
             dbclasses_logger.error('\nERROR: Problem reading image.')
 
-
+    # necessary if keywords needed by PyBDSF are missing or
+    #  incorrectly labeled (CTYPE3)
     def write(self, hdu, header):
         """Updates FITS image header"""
         hdu.flush()
@@ -466,43 +477,7 @@ class Image(object):
             self.pa_end = hdr['PA_END']
         except KeyError:
             self.pa_end = None
-        '''
-        if self.mjdtime is not None:
-            t = Time(self.mjdtime,format='mjd')
-            self.lst = t.sidereal_time('apparent',VLALON).hour #hrs
-            if self.obs_ra is not None and self.obs_dec is not None:
-                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
-                altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
-                self.az_i = altaz.az.deg
-                self.alt_i = altaz.alt.deg
-                hrang = (15*self.lst) - self.obs_ra #deg
-                if hrang > 180: hrang -= 360
-                if hrang < -180: hrang += 360
-                tmp1 = np.sin(hrang*DEG2RAD)
-                tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
-                self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
-                if self.duration is not None:
-                    t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
-                    lst_end = t_end.sidereal_time('apparent',VLALON).hour #hrs
-                    altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
-                    self.az_f = altaz.az.deg
-                    self.alt_f = altaz.alt.deg
-                    hrang = (15*lst_end) - self.obs_ra #deg
-                    if hrang > 180: hrang -= 360
-                    if hrang < -180: hrang += 360
-                    tmp1 = np.sin(hrang*DEG2RAD)
-                    tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
-                    self.parang_f = np.arctan2(tmp1,tmp2)*RAD2DEG
-            else:
-                self.az_i = None
-                self.alt_i = None
-                self.parang_i = None
-                self.az_f = None
-                self.alt_f = None
-                self.parang_f = None
-        else:
-            self.lst = None
-        '''            
+          
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.
@@ -538,8 +513,11 @@ class Image(object):
         5. target is NCP or a planet
         6. a known bright radio source is in the field-of-view (Cas A, Cygnus A, Taurus A, Hercules A, Virgo A (M87), Perseus A (3C84), the Sun, the Moon, Jupiter, Galactic Center)
         10. number of CLEAN iterations (niter) < min_niter
+        11. BMIN in pixels < bpix_min or > bpix_max
+        12. missing primary calibrators
+        13. missing CLEAN components
 
-        Images that fail checks 1-5,10 are aborted and do not proceed
+        Images that fail checks 1-5,10-11 are aborted and do not proceed
         to source finding. Images are flagged if they fail check 6,
         but do continue on.
 
@@ -613,6 +591,32 @@ class Image(object):
                                   'RA, Dec = 0, 0')
             self.error_id = 5
             return
+        else: pass
+
+        # Check BMIN in pixels
+        bpix_min = params['min bpix']
+        bpix_max = params['max bpix']
+        bpix = self.bmin/self.pixel_scale
+        if bpix < bpix_min:
+            dbclasses_logger.info('IMAGE FAILED QA: bmin in pixels '
+                                  '{} < allowed minimum of {}.'.
+                                  format(bpix, bpix_min))
+            self.error_id = 11
+            return
+        elif bpix > bpix_max:
+            dbclasses_logger.info('IMAGE FAILED QA: bmin in pixels '
+                                  '{} > allowed maximum of {}.'.
+                                  format(bpix, bpix_max))
+            self.error_id = 11
+            return
+        else: pass
+
+        # Check primary calibrators
+        if self.pri_cals is None: self.error_id = 12
+        else: pass
+
+        # Check CLEAN components
+        if self.cc is None: self.error_id = 13
         else: pass
 
         # Check angular separation from problem sources
@@ -822,11 +826,13 @@ class DetectedSource(object):
         Angular separation between the source location and image
         pointing center (degrees).
     polar_angle : float
-        Polar angle (West of North) of source in image (degrees).
+        Polar angle (East of North) of source in image (degrees).
     compactness: float
         Measure of source extent. 
         >= 1 : point-like
         < 1  : extended
+    clean : boolean
+        True if source was CLEANed.
     id : int
         Uniquely identifies the source in the **assoc_source** table.
     res_class : str
@@ -906,6 +912,7 @@ class DetectedSource(object):
         self.dist_from_center = None
         self.polar_angle = None
         self.compactness = None
+        self.clean = None
         # assoc_source attributes
         self.id = None
         self.res_class = None
@@ -999,7 +1006,7 @@ class DetectedSource(object):
         pcoordS = imobj.wcsobj.wcs_world2pix([[self.ra, self.dec]],1)
         world = np.array([[imobj.obs_ra, imobj.obs_dec]])
         pcoordI = imobj.wcsobj.wcs_world2pix(world,1)
-        theta = np.arctan2(pcoordS[0][0]-pcoordI[0][0], pcoordS[0][1]-pcoordI[0][1]) #rad
+        theta = np.arctan2(pcoordI[0][0]-pcoordS[0][0], pcoordS[0][1]-pcoordI[0][1]) #rad
         self.polar_angle = theta * 180.0/np.pi #deg
 
     def correct_flux(self, pri_freq):
@@ -1101,7 +1108,6 @@ class DetectedSource(object):
         cfit  = a0+sqrt(a1+ c0*pow(self.snr,c1))
         ratio = self.total_flux/self.peak_flux
         self.compactness = cfit/ratio
-
 
 
 def dict2attr(obj, dictionary):
@@ -1264,5 +1270,27 @@ def init_image(impath):
     if header_changed:
         imobj.write(hdu, hdr)
 
+    # Read primary calibrators from history extension
+    imobj.pri_cals=[]
+    for i in range(1,len(hdu)):
+        if hdu[i].header['EXTNAME']=='History':
+            for j in hdu[i].data['ENTRY']:
+                if 'Primary Calibrator' in j:
+                    k=j.split("=")[1].split("M")[0].lstrip().rstrip()
+                    if k not in imobj.pri_cals: imobj.pri_cals.append(k)
+
+    # Read CLEAN components from CC extension
+    xo = hdr['CRPIX1']
+    yo = hdr['CRPIX2']
+    w = wcs.WCS(hdr)
+    imobj.cc=[]
+    for i in range(1,len(hdu)):
+        if 'CC' in hdu[i].header['EXTNAME']:
+            for j in range(len(hdu[i].data['DELTAX'])):
+                x=xo+(hdu[i].data['DELTAX'][j]/hdr['CDELT1'])
+                y=yo+(hdu[i].data['DELTAY'][j]/hdr['CDELT2'])
+                pixcrd=w.wcs_pix2world([[x,y,1,1]],1)
+                ra,dec=pixcrd[0][0],pixcrd[0][1]
+                imobj.cc.append((ra,dec))
     hdu.close()
     return imobj

@@ -104,10 +104,11 @@ uncertainties for every flux measurement error, typically 3%.
   island (mJy/beam)
 - *distance_from_center*: angular separation between the source position
   and the image pointing center (degrees)
-- *polar_angle*: angle west of north of source in image plane (degrees)
+- *polar_angle*: angle east of north of source in image plane (degrees)
 - *snr*: signal-to-noise ratio of the source detection; defined as
   (*peak_flux* - *isl_mean*) / *isl_rms*
 - *compactness*: measures source spatial extent from its *snr* and flux ratio; C > 1 is point-like, < 1 is extended source
+- *clean*: if True source was CLEANed
 - *assoc_id*: references the *id* column of the **assoc_source**;
   rows with the same *assoc_id* value are associated detections
   of the same source in different images
@@ -276,7 +277,9 @@ This is a look-up table containing explanations for each possible
 -  8 : zero sources extracted
 -  9 : source count metric > *max source count metric*
 - 10 : number of CLEAN iterations < *min niter*
-
+- 11 : image bmin in pixels < *min bpix* or > *max bpix* 
+- 12 : image missing primary calibrators
+- 13 : image missing CLEAN components
 
 
 
@@ -365,6 +368,7 @@ in the table, as well.
   where *scale* is defined in the **pybdsf_params** section of the
   configuration file
 - *nsrc*: number of sources found in the image by PyBDSF
+- *nclean*: number of CLEANed sources in the image
 - *rms_box*: size and step size of the box used by PyBDSF to estimate
   the image background mean and noise (pixels)
 - *stage*: value of the highest **vdp** stage completed on the image:
@@ -384,6 +388,8 @@ in the table, as well.
   to cause imaging problems for VLITE
 - *separation*: angular separation between the VLITE image pointing
   center and the nearest known problem source (degrees)
+- *pri_cals*: list of primary calibrators used
+
 
 .. _run_config:
 
@@ -505,6 +511,6 @@ tables has the same format with the following columns:
 - *field*: name of the field, or image, where the source was detected
 - *catalog_id*: id number of the catalog that the source is in;
   references the *id* column of the **radcat.catalogs** table
-- *pt_like: boolean, True if catalog source is point-like. Null if unknown
+- *pt_like*: True or false if catalog source is point-like or not. Null if unknown
 
 

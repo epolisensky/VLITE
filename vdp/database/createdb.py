@@ -23,7 +23,11 @@ def make_error(cur, params):
                    'source count metric > {}'.
                    format(params['max source count metric']) : 9,
                    'number of CLEAN iterations < {}'.
-                   format(params['min niter']) : 10}
+                   format(params['min niter']) : 10,
+                   'bmin < {} or > {} pixels'.
+                   format(params['min bpix'],params['max bpix']) : 11,
+                   'image missing primary calibrators' : 12,
+                   'image missing CLEAN components' : 13}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):
@@ -148,6 +152,7 @@ def create(conn, params, safe=False):
                 duration REAL,
                 radius REAL,
                 nsrc INTEGER,
+                nclean INTEGER,
                 rms_box VARCHAR(14),
                 stage INTEGER,
                 catalogs_checked JSON,
@@ -169,6 +174,7 @@ def create(conn, params, safe=False):
                 alt_f REAL,
                 parang_f REAL,
                 lst DOUBLE PRECISION,
+                pri_cals JSON,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 
@@ -262,6 +268,7 @@ def create(conn, params, safe=False):
                 polar_angle REAL,
                 snr REAL,
                 compactness REAL,
+                clean BOOLEAN,
                 assoc_id INTEGER,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)
