@@ -851,7 +851,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
     
     catalogs = [catalog.lower() for catalog in catalogs]
     # Filter catalogs by resolution
-    filtered_catalogs = radioxmatch.filter_catalogs(conn, catalogs, imobj.bmin)
+    filtered_catalogs = radioxmatch.filter_catalogs(conn, catalogs, imobj.config)
     # Remove catalogs that have already been checked for this image
     if save:
         new_catalogs = dbio.update_checked_catalogs(

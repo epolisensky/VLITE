@@ -15,6 +15,7 @@ from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
+from matching import radioxmatch
 from math import sqrt
 
 ########################
@@ -39,6 +40,25 @@ VLALAT = locVLA.lat.deg
 
 # create logger
 dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
+
+# Define resolution dictionary
+# Contains array configs, mjd ranges of the cycles, NRAO semesters and
+#  the acceptable range of image bmins for source association
+res_dict = {
+    'A'  : {'1': {'mjd': [58179,58280], 'bmin': [2.85,4.27], 'semester': '2018A'}, 
+            '2': {'mjd': [58697,58778], 'bmin': [3.26,4.90], 'semester': '2019A'}},
+    'BnA': {'1': {'mjd': [58148,58179], 'bmin': [0,9e99], 'semester': ''},
+            '2': {'mjd': [58660,58697], 'bmin': [0,9e99], 'semester': ''}},
+    'B'  : {'1': {'mjd': [57996,58148], 'bmin': [10.77,16.16], 'semester': '2017B'},
+            '2': {'mjd': [58534.24,58660], 'bmin': [10.18,15.28], 'semester': '2019A'}},
+    'CnB': {'1': {'mjd': [57994,57996], 'bmin': [0,9e99], 'semester': ''},
+            '2': {'mjd': [58519,58534.24], 'bmin': [0,9e99], 'semester': ''}},
+    'C'  : {'1': {'mjd': [57954,57994], 'bmin': [43.94,65.91], 'semester': '2017A'},
+            '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30], 'semester': '2018B'},
+            '3': {'mjd': [58885,60000], 'bmin': [39.69,59.54], 'semester': '2020A'}},
+    'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,9e99], 'semester': ''}},
+    'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
+}
 
 
 class Image(object):
@@ -120,6 +140,10 @@ class Image(object):
         Peak brightness in the image (mJy/beam).
     config : str
         Very Large Array configuration.
+    cycle : int
+        VLITE cycle corresponding to config
+    semester: str
+        NRAO semester corresponding to config
     nvis : int
         Number of visibilities in the data after calibration.
     niter : int
@@ -161,6 +185,8 @@ class Image(object):
         Primary calibrators used. Read from history extension
     cc : list of (float, float)
         (RA, Dec) list of clean components. Read from CC extension
+    ass_flag : boolean
+        If True image meets requirments for source association
     """
     # A class variable to count the number of images
     num_images = 0
@@ -199,6 +225,8 @@ class Image(object):
         self.noise = None
         self.peak = None
         self.config = None
+        self.cycle = None
+        self.semester = None
         self.nvis = None
         self.niter = None
         self.mjdtime = None
@@ -214,6 +242,7 @@ class Image(object):
         self.separation = None
         self.pri_cals = None
         self.cc = None
+        self.ass_flag = None
 
     def process_image(self, image):
         if image.endswith('IMSC.fits'):
@@ -243,7 +272,6 @@ class Image(object):
         """Reads FITS image data and header."""
         try:
             hdu = fits.open(self.filename, mode='update')
-#            hdu = fits.open(self.filename)
             hdr = hdu[0].header
             return hdu, hdr
         except:
@@ -500,6 +528,19 @@ class Image(object):
                 self.radius = round(r * hdr['CDELT2'], 2) # in deg
             except KeyError:
                 self.radius = None
+
+                
+    def set_cycle(self):
+        """Sets image cycle, semester, and ass_flag"""
+        self.ass_flag = False
+        config = self.config
+        for cycle in res_dict[config].keys():
+            if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
+                self.semester = res_dict[config][cycle]['semester']
+                self.cycle = cycle
+                if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
+                    self.ass_flag = True
+                break
 
 
     def image_qa(self, params):
@@ -1269,6 +1310,9 @@ def init_image(impath):
         header_changed = True
     if header_changed:
         imobj.write(hdu, hdr)
+
+    # Set cycle, semester, ass_flag
+    imobj.set_cycle()
 
     # Read primary calibrators from history extension
     imobj.pri_cals=[]

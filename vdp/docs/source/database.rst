@@ -108,7 +108,7 @@ uncertainties for every flux measurement error, typically 3%.
 - *snr*: signal-to-noise ratio of the source detection; defined as
   (*peak_flux* - *isl_mean*) / *isl_rms*
 - *compactness*: measures source spatial extent from its *snr* and flux ratio; C > 1 is point-like, < 1 is extended source
-- *clean*: if True source was CLEANed
+- *clean*: True if source was CLEANed
 - *assoc_id*: references the *id* column of the **assoc_source**;
   rows with the same *assoc_id* value are associated detections
   of the same source in different images
@@ -354,6 +354,8 @@ in the table, as well.
 - *peak*: flux value of the brightest pixel in the image (mJy/beam);
   header keyword ``PEAK`` or ``DATAMAX``
 - *config*: VLA configuration; header keyword ``CONFIG``
+- *cycle*: VLITE configuration cycle, e.g. 1, 2, 3...
+- *semester*: NRAO semester of the VLITE observation
 - *nvis*: number of visibilities in the data before imaging; header
   keyword ``NVIS``
 - *niter*: number of CLEAN iterations; header keyword ``NITER``
@@ -389,7 +391,8 @@ in the table, as well.
 - *separation*: angular separation between the VLITE image pointing
   center and the nearest known problem source (degrees)
 - *pri_cals*: list of primary calibrators used
-
+- *ass_flag*: True if image *bmin* within range allowed for source 
+  association for image *config* and *cycle*
 
 .. _run_config:
 
