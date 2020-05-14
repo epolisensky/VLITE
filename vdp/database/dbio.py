@@ -128,21 +128,21 @@ def add_image(conn, img, status, delete=False):
 
     cur = conn.cursor()
 
-    jpri_cals=json.dumps(img.pri_cals)
+    if img.pri_cals == None: jpri_cals = None
+    else: jpri_cals=json.dumps(img.pri_cals)
     
     # Add new image to DB
     if status is None:
         dbio_logger.info('Adding new entry to image table.')
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
-            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, config,
-            cycle, semester, nvis, niter, mjdtime, tau_time, duration, radius, 
+            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, config, cycle, semester, nvis, niter, mjdtime, tau_time, duration, radius, 
             nsrc, nclean, rms_box, stage, error_id, nearest_problem, separation, 
             glon, glat, lst, az_star, el_star, pa_star, az_end, el_end, pa_end, 
-            az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag) 
+            az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag, ap_selfcal) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -152,7 +152,7 @@ def add_image(conn, img, status, delete=False):
                 img.stage, img.error_id, img.nearest_problem, img.separation,
                 img.glon, img.glat, img.lst, img.az_star, img.el_star, img.pa_star,
                 img.az_end, img.el_end, img.pa_end, img.az_i, img.az_f, img.alt_i,
-                img.alt_f, img.parang_i, img.parang_f, jpri_cals, img.ass_flag)
+                img.alt_f, img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.ap_selfcal)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -168,7 +168,7 @@ def add_image(conn, img, status, delete=False):
             error_id = %s, nearest_problem = %s, separation = %s, glon = %s, glat = %s,
             lst = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
             el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
-            alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s WHERE id = %s'''
+            alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s, ap_selfcal = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
@@ -178,7 +178,7 @@ def add_image(conn, img, status, delete=False):
                 img.separation, img.glon, img.glat, img.lst, img.az_star,
                 img.el_star, img.pa_star, img.az_end, img.el_end, img.pa_end,
                 img.az_i, img.az_f, img.alt_i, img.alt_f, img.parang_i,
-                img.parang_f, jpri_cals, img.id, img.ass_flag)
+                img.parang_f, jpri_cals, img.id, img.ass_flag, img.ap_selfcal)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources

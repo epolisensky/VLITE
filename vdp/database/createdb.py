@@ -112,7 +112,7 @@ def create(conn, params, safe=False):
                 e_ra DOUBLE PRECISION,
                 dec DOUBLE PRECISION,
                 e_dec DOUBLE PRECISION,
-                res_class VARCHAR(1),
+                res_class VARCHAR(3),
                 ndetect INTEGER,
                 nmatches INTEGER,
                 ave_total DOUBLE PRECISION,
@@ -145,6 +145,8 @@ def create(conn, params, safe=False):
                 noise REAL,
                 peak REAL,
                 config VARCHAR(3),
+                cycle VARCHAR(3),
+                semester VARCHAR(6),
                 nvis INTEGER,
                 niter INTEGER,
                 mjdtime DOUBLE PRECISION,
@@ -175,6 +177,8 @@ def create(conn, params, safe=False):
                 parang_f REAL,
                 lst DOUBLE PRECISION,
                 pri_cals JSON,
+                ass_flag BOOLEAN,
+		ap_selfcal BOOLEAN,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

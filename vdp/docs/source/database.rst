@@ -393,6 +393,9 @@ in the table, as well.
 - *pri_cals*: list of primary calibrators used
 - *ass_flag*: True if image *bmin* within range allowed for source 
   association for image *config* and *cycle*
+- *ap_selfcal*: True if amp & phase self cal applied to image.
+  Determined by counting number of SN tables in UVOUT file. 
+  Three SN tables mean A&P selfcal applied
 
 .. _run_config:
 

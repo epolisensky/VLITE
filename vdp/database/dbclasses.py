@@ -15,7 +15,6 @@ from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
-from matching import radioxmatch
 from math import sqrt
 
 ########################
@@ -47,16 +46,16 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 res_dict = {
     'A'  : {'1': {'mjd': [58179,58280], 'bmin': [2.85,4.27], 'semester': '2018A'}, 
             '2': {'mjd': [58697,58778], 'bmin': [3.26,4.90], 'semester': '2019A'}},
-    'BnA': {'1': {'mjd': [58148,58179], 'bmin': [0,9e99], 'semester': ''},
-            '2': {'mjd': [58660,58697], 'bmin': [0,9e99], 'semester': ''}},
+    'BnA': {'1': {'mjd': [58148,58179], 'bmin': [0,0], 'semester': ''},
+            '2': {'mjd': [58660,58697], 'bmin': [0,0], 'semester': ''}},
     'B'  : {'1': {'mjd': [57996,58148], 'bmin': [10.77,16.16], 'semester': '2017B'},
             '2': {'mjd': [58534.24,58660], 'bmin': [10.18,15.28], 'semester': '2019A'}},
-    'CnB': {'1': {'mjd': [57994,57996], 'bmin': [0,9e99], 'semester': ''},
-            '2': {'mjd': [58519,58534.24], 'bmin': [0,9e99], 'semester': ''}},
+    'CnB': {'1': {'mjd': [57994,57996], 'bmin': [0,0], 'semester': ''},
+            '2': {'mjd': [58519,58534.24], 'bmin': [0,0], 'semester': ''}},
     'C'  : {'1': {'mjd': [57954,57994], 'bmin': [43.94,65.91], 'semester': '2017A'},
             '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30], 'semester': '2018B'},
             '3': {'mjd': [58885,60000], 'bmin': [39.69,59.54], 'semester': '2020A'}},
-    'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,9e99], 'semester': ''}},
+    'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,0], 'semester': ''}},
     'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
 }
 
@@ -140,7 +139,7 @@ class Image(object):
         Peak brightness in the image (mJy/beam).
     config : str
         Very Large Array configuration.
-    cycle : int
+    cycle : str
         VLITE cycle corresponding to config
     semester: str
         NRAO semester corresponding to config
@@ -187,6 +186,8 @@ class Image(object):
         (RA, Dec) list of clean components. Read from CC extension
     ass_flag : boolean
         If True image meets requirments for source association
+    ap_selfcal : boolean
+	True if amp & phase self cal applied to image 
     """
     # A class variable to count the number of images
     num_images = 0
@@ -243,6 +244,7 @@ class Image(object):
         self.pri_cals = None
         self.cc = None
         self.ass_flag = None
+	self.ap_selfcal = None
 
     def process_image(self, image):
         if image.endswith('IMSC.fits'):
@@ -1315,19 +1317,22 @@ def init_image(impath):
     imobj.set_cycle()
 
     # Read primary calibrators from history extension
-    imobj.pri_cals=[]
+    pri_cals=[]
     for i in range(1,len(hdu)):
         if hdu[i].header['EXTNAME']=='History':
             for j in hdu[i].data['ENTRY']:
                 if 'Primary Calibrator' in j:
                     k=j.split("=")[1].split("M")[0].lstrip().rstrip()
-                    if k not in imobj.pri_cals: imobj.pri_cals.append(k)
+                    if k not in pri_cals: pri_cals.append(k)
+    if len(pri_cals) > 0: imobj.pri_cals = pri_cals
+    else: imobj.pri_cals = None
+        
 
     # Read CLEAN components from CC extension
     xo = hdr['CRPIX1']
     yo = hdr['CRPIX2']
     w = wcs.WCS(hdr)
-    imobj.cc=[]
+    cc=[]
     for i in range(1,len(hdu)):
         if 'CC' in hdu[i].header['EXTNAME']:
             for j in range(len(hdu[i].data['DELTAX'])):
@@ -1335,6 +1340,9 @@ def init_image(impath):
                 y=yo+(hdu[i].data['DELTAY'][j]/hdr['CDELT2'])
                 pixcrd=w.wcs_pix2world([[x,y,1,1]],1)
                 ra,dec=pixcrd[0][0],pixcrd[0][1]
-                imobj.cc.append((ra,dec))
+                cc.append((ra,dec))
+    if len(cc) > 0: imobj.cc = cc
+    else: imobj.cc = None
+
     hdu.close()
     return imobj

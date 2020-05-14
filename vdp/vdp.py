@@ -1099,56 +1099,64 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                     continue
                 # STAGE 3 -- Source association
                 if sa:
-                    new_sources, imobj = srcassoc(conn, imobj, sources, save, sfparams)
-                    # STAGE 4 -- Sky survey catalog cross-matching
-                    if cm: # sf + sa + cm - branch 12, 15
-                        # Cross-match new sources only
-                        catmatch(conn, imobj, new_sources, catalogs, save)
-                        if glob.glob(imgdir+'*matches.reg'):
-                            os.system(
-                                'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        logger.info('======================================='
-                                    '========================================')
-                        logger.info('Completed source finding, association, '
-                                    'and sky catalog cross-matching on image')
-                        logger.info('{}.'.format(imobj.filename))
-                        logger.info('======================================='
-                                    '========================================')
-                        if branch == 6:
-                            branch = 12
-                        if branch == 8:
-                            branch = 15
-                    else: # sf + sa - branch 11, 14
-                        if branch == 6:
-                            branch = 11
-                        if branch == 8:
-                            branch = 14
-                        logger.info('======================================='
-                                    '========================================')
-                        logger.info('Completed source finding and association '
-                                    'on image')
-                        logger.info('{}.'.format(imobj.filename))
-                        logger.info('======================================='
-                                    '========================================')
-                        continue
+                    if imobj.ass_flag:
+                        new_sources, imobj = srcassoc(conn, imobj, sources, save, sfparams)
+                        # STAGE 4 -- Sky survey catalog cross-matching
+                        if cm: # sf + sa + cm - branch 12, 15
+                            # Cross-match new sources only
+                            catmatch(conn, imobj, new_sources, catalogs, save)
+                            if glob.glob(imgdir+'*matches.reg'):
+                                os.system(
+                                    'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
+                            logger.info('======================================='
+                                        '========================================')
+                            logger.info('Completed source finding, association, '
+                                        'and sky catalog cross-matching on image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('======================================='
+                                        '========================================')
+                            if branch == 6:
+                                branch = 12
+                            if branch == 8:
+                                branch = 15
+                        else: # sf + sa - branch 11, 14
+                            if branch == 6:
+                                branch = 11
+                            if branch == 8:
+                                branch = 14
+                            logger.info('======================================='
+                                        '========================================')
+                            logger.info('Completed source finding and association '
+                                        'on image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('======================================='
+                                        '========================================')
+                            continue
+                    else:
+                        logger.info('Image ass_flag = {}, skipping source association'
+                                    '/catalog matching'.format(imobj.ass_flag))
                 else:
                     if cm: # sf + cm - branch 10, 13
-                        catmatch(conn, imobj, sources, catalogs, False)
-                        if glob.glob(imgdir+'*matches.reg'):
-                            os.system(
-                                'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                        logger.info('======================================='
-                                    '========================================')
-                        logger.info('Completed source finding and sky catalog '
-                                    'cross-matching to the extracted sources '
-                                    'from image')
-                        logger.info('{}.'.format(imobj.filename))
-                        logger.info('======================================='
-                                    '========================================')
-                        if branch == 6:
-                            branch = 10
-                        if branch == 8:
-                            branch = 13
+                        if imobj.ass_flag:
+                            catmatch(conn, imobj, sources, catalogs, False)
+                            if glob.glob(imgdir+'*matches.reg'):
+                                os.system(
+                                    'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
+                            logger.info('======================================='
+                                        '========================================')
+                            logger.info('Completed source finding and sky catalog '
+                                        'cross-matching to the extracted sources '
+                                        'from image')
+                            logger.info('{}.'.format(imobj.filename))
+                            logger.info('======================================='
+                                        '========================================')
+                            if branch == 6:
+                                branch = 10
+                            if branch == 8:
+                                branch = 13
+                        else:
+                            logger.info('Image ass_flag = {}, skipping catalog'
+                                    'matching'.format(imobj.ass_flag))
                     else: # sf only - branch 6, 8
                         logger.info('======================================='
                                     '========================================')
@@ -1159,78 +1167,82 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         continue
             else: # no sf
                 if sa:
-                    # Get sources from detected_source table
-                    sources = dbio.get_image_sources(conn, imobj.id)
-                    # Already caught case of no sf but stage < 2 in iminit
-                    if imobj.stage == 2: # no sa has been run yet
-                        new_sources, imobj = srcassoc(conn, imobj,
-                                                      sources, save)
-                        if cm: # sa + cm - branch 20
-                            # Cross-match new sources only
-                            catmatch(conn, imobj, new_sources, catalogs, save)
-                            if glob.glob(imgdir+'*matches.reg'):
-                                os.system(
-                                    'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            logger.info('Completed source association and sky '
-                                        'catalog cross-matching to the newly '
-                                        'detected sources from image')
-                            logger.info('{}.'.format(imobj.filename))
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            branch = 20
-                        else: # sa only - branch 19
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            logger.info('Completed source association for '
-                                        'image')
-                            logger.info('{}.'.format(imobj.filename))
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            branch = 19
-                    else: # stage > 2
-                        logger.info("\nNOTE: {}'s".format(imobj.filename))
-                        logger.info('sources have already been associated '
-                                    'with the existing VLITE catalog.')
-                        if cm: # cm only - branch 21
-                            assoc_sources = dbio.get_associated(conn, sources)
-                            if rematch:
-                                # Delete & redo matching
-                                assoc_sources = dbio.delete_matches(
-                                    conn, assoc_sources, imobj.id)
-                            else:
-                                if not updatematch:
-                                    # Cross-match new/un-matched sources only
-                                    assoc_sources = [src for src in \
-                                                     assoc_sources if \
-                                                     src.nmatches is None \
-                                                     or src.nmatches == 0]
+                    if imobj.ass_flag:
+                        # Get sources from detected_source table
+                        sources = dbio.get_image_sources(conn, imobj.id)
+                        # Already caught case of no sf but stage < 2 in iminit
+                        if imobj.stage == 2: # no sa has been run yet
+                            new_sources, imobj = srcassoc(conn, imobj,
+                                                          sources, save)
+                            if cm: # sa + cm - branch 20
+                                # Cross-match new sources only
+                                catmatch(conn, imobj, new_sources, catalogs, save)
+                                if glob.glob(imgdir+'*matches.reg'):
+                                    os.system(
+                                        'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                logger.info('Completed source association and sky '
+                                            'catalog cross-matching to the newly '
+                                            'detected sources from image')
+                                logger.info('{}.'.format(imobj.filename))
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                branch = 20
+                            else: # sa only - branch 19
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                logger.info('Completed source association for '
+                                            'image')
+                                logger.info('{}.'.format(imobj.filename))
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                branch = 19
+                        else: # stage > 2
+                            logger.info("\nNOTE: {}'s".format(imobj.filename))
+                            logger.info('sources have already been associated '
+                                        'with the existing VLITE catalog.')
+                            if cm: # cm only - branch 21
+                                assoc_sources = dbio.get_associated(conn, sources)
+                                if rematch:
+                                    # Delete & redo matching
+                                    assoc_sources = dbio.delete_matches(
+                                        conn, assoc_sources, imobj.id)
                                 else:
-                                    # Use all sources if updating
-                                    pass
-                            catmatch(conn, imobj, assoc_sources, catalogs, save)
-                            if glob.glob(imgdir+'*matches.reg'):
-                                os.system(
-                                    'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            logger.info('Completed sky catalog cross-matching '
-                                        'for image')
-                            logger.info('{}.'.format(imobj.filename))
-                            logger.info('====================================='
-                                        '====================================='
-                                        '=====')
-                            branch = 21
-                        else:
-                            # branch 18
-                            branch = 18
-                            continue
+                                    if not updatematch:
+                                        # Cross-match new/un-matched sources only
+                                        assoc_sources = [src for src in \
+                                                         assoc_sources if \
+                                                         src.nmatches is None \
+                                                         or src.nmatches == 0]
+                                    else:
+                                        # Use all sources if updating
+                                        pass
+                                catmatch(conn, imobj, assoc_sources, catalogs, save)
+                                if glob.glob(imgdir+'*matches.reg'):
+                                    os.system(
+                                        'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                logger.info('Completed sky catalog cross-matching '
+                                            'for image')
+                                logger.info('{}.'.format(imobj.filename))
+                                logger.info('====================================='
+                                            '====================================='
+                                            '=====')
+                                branch = 21
+                            else:
+                                # branch 18
+                                branch = 18
+                                continue
+                    else:
+                        logger.info('Image ass_flag = {}, skipping '
+                                    'catalog matching'.format(imobj.ass_flag))
                 else:
                     if cm: # cm only - branch 17
                         pass
