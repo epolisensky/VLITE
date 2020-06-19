@@ -396,6 +396,8 @@ in the table, as well.
 - *ap_selfcal*: True if amp & phase self cal applied to image.
   Determined by counting number of SN tables in UVOUT file. 
   Three SN tables mean A&P selfcal applied
+- *tsky*: 341 MHz brightness temp [K] from the Global Sky Model 
+  (de Oliveira-Costa et al. 2008)
 
 .. _run_config:
 

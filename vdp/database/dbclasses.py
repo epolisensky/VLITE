@@ -52,11 +52,27 @@ res_dict = {
             '2': {'mjd': [58534.24,58660], 'bmin': [10.18,15.28], 'semester': '2019A'}},
     'CnB': {'1': {'mjd': [57994,57996], 'bmin': [0,0], 'semester': ''},
             '2': {'mjd': [58519,58534.24], 'bmin': [0,0], 'semester': ''}},
-    'C'  : {'1': {'mjd': [57954,57994], 'bmin': [43.94,65.91], 'semester': '2017A'},
+    'C'  : {'V10': {'mjd': [56986,57953.99], 'bmin': [32.2,65.91], 'semester': 'many'},
+            '1': {'mjd': [57954,57994], 'bmin': [43.94,65.91], 'semester': '2017A'},
             '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30], 'semester': '2018B'},
             '3': {'mjd': [58885,60000], 'bmin': [39.69,59.54], 'semester': '2020A'}},
     'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,0], 'semester': ''}},
     'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
+}
+
+# Define beam offset & dictionary for each primary observing frequency.
+# Beams are offset from phase center by amount "offset" in given direction.
+# Angles are in deg, "E" of zenith direction (counter-clkwise looking into dish)
+# *Note P band primary observing images do NOT need offset correction
+offset = 6.5/60 #deg
+offset_dict = {'1.5' : -174.1,
+               '3' : 11.6,
+               '6' : 75.2,
+               '10' : 113.7,
+               '15' : -42.4,
+               '22' : -64.1,
+               '33' : -106.9,
+               '45' : -85.5
 }
 
 
@@ -283,6 +299,7 @@ class Image(object):
     #  incorrectly labeled (CTYPE3)
     def write(self, hdu, header):
         """Updates FITS image header"""
+        dbclasses_logger.info('Updating header of {}'.format(self.filename))
         hdu.flush()
 
 
@@ -542,9 +559,9 @@ class Image(object):
                 self.cycle = cycle
                 if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
                     self.ass_flag = True
-                break
-
-
+                break  
+        
+            
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
         to flag images with the following issues:
@@ -1036,7 +1053,7 @@ class DetectedSource(object):
         self.dist_from_center = img_center.separation(src_loc).degree
 
     def calc_polar_angle(self, imobj):
-        """Calculates a source's polar angle, W of N
+        """Calculates a source's polar angle, E of N
         and sets the ``polar_angle`` attribute.
 
         Parameters
@@ -1287,6 +1304,64 @@ def translate_null(img, out, coords):
     return newsrcs
 
 
+def set_apselfcal(img):
+    """Determines if image has amp & phase self cal
+
+    Parameters
+    ----------
+    img : ``database.dbclasses.Image`` instance
+        Initialized Image object with attribute
+        values set from header info.
+
+    Returns
+    -------
+    img : ``database.dbclasses.Image`` instance
+        Initialized Image object with attribute
+        ap_selfcal updated.
+    """
+    # Determine dir with uvout file
+    a = img.filename.split('/')
+    uvdir = ''
+    for i in range(len(a)-2):
+        uvdir += (a[i]+'/')
+    uvdir += 'UVFiles/'
+    # Check dir
+    if not os.path.isdir(uvdir):
+        img.ap_selfcal = None
+        dbclasses_logger.info('Did not find UVFiles dir {}.'.format(uvdir))
+        return img
+
+    # Determine name of uvout file
+    b = a[-1].split('.')
+    uvname1=''
+    for i in range(len(b)-2):
+        uvname1 += (b[i]+'.')
+    uvname = uvname1 + 'uvout.gz'
+    # Check file
+    if not os.path.isfile(os.path.join(uvdir,uvname)):
+        # unzipped?
+        uvname = uvname1 + 'uvout'
+        if not os.path.isfile(os.path.join(uvdir,uvname)):
+            img.ap_selfcal = None
+            dbclasses_logger.info('Did not find uvout file, with or w/o .gz {}'.format(uvname))
+            return img
+
+    # Count number of SN tables
+    cnt=0
+    with fits.open(os.path.join(uvdir,uvname)) as hdu:
+        for i in range(1,len(hdu)):
+            if hdu[i].header['EXTNAME'] == 'AIPS SN':
+                cnt+=1
+    if cnt == 3:
+        img.ap_selfcal = True
+    else:
+        img.ap_selfcal = False
+
+    dbclasses_logger.info('{}: cnt= {} ap_selfcal= {}'.format(uvname,cnt,img.ap_selfcal))
+
+    return img
+
+
 def init_image(impath):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
@@ -1315,6 +1390,9 @@ def init_image(impath):
 
     # Set cycle, semester, ass_flag
     imobj.set_cycle()
+
+    # Set ap_selfcal
+    imobj = set_apselfcal(imobj)
 
     # Read primary calibrators from history extension
     pri_cals=[]
