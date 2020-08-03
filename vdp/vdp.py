@@ -11,6 +11,8 @@ import re
 import argparse
 import logging
 import psycopg2
+import numpy as np
+import healpy as hp
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from datetime import datetime
 from break_handler import BreakHandler
@@ -27,7 +29,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.3'
+__version__ = '2.4'
 
 
 # Create logger
@@ -480,7 +482,7 @@ def vlite_unique(conn, src, image_id, radius):
     return src
 
 
-def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
+def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap):
     """This function handles ingestion of the image metadata
     into the database **image** table and represents the first
     stage in the VLITE Database Pipeline.
@@ -511,6 +513,10 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
         Fraction between 0 and 1 of the image radius to use.
         The full size of the image field-of-view is multiplied
         by this number.
+    nside : int
+        Nside parameter of healpy GSM skymap
+    skymap : float array
+        Healpy format GSM map for setting tsky of image table
 
     Returns
     -------
@@ -523,6 +529,9 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale):
     logger.info('**********************')
     logger.info('STAGE 1: READING IMAGE')
     logger.info('**********************')
+
+    # Set tsky
+    imobj.set_tsky(nside,skymap)
 
     # Set the radius size
     imobj.set_radius(scale)
@@ -1031,6 +1040,13 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     # Create and enable break handler
     bh = BreakHandler()
     bh.enable()
+
+    # Read GSM map for setting tsky in image table
+    fin = open('341.GSM','r')
+    skymap = np.loadtxt(fin)
+    fin.close()
+    nside = hp.get_nside(skymap)
+    
     # Begin loop through daily directories
     i = 0
     for imgdir in dirs:
@@ -1072,7 +1088,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             logger.info('Starting {}.'.format(imobj.filename))
             # STAGE 1 -- Add image to database
             imobj = iminit(conn, imobj, save, qa, qaparams, reproc, stages,
-                           sfparams['scale'])
+                           sfparams['scale'], nside, skymap)
             # Move on to next image if imobj is None
             if imobj is None:
                 continue

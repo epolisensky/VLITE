@@ -178,7 +178,8 @@ def create(conn, params, safe=False):
                 lst DOUBLE PRECISION,
                 pri_cals JSON,
                 ass_flag BOOLEAN,
-		ap_selfcal BOOLEAN,
+		nsn INTEGER,
+                tsky DOUBLE PRECISION,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

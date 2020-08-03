@@ -6,6 +6,7 @@ import os
 import re
 import logging
 import numpy as np
+import healpy as hp
 from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import SkyCoord
@@ -55,7 +56,7 @@ res_dict = {
     'C'  : {'V10': {'mjd': [56986,57953.99], 'bmin': [32.2,65.91], 'semester': 'many'},
             '1': {'mjd': [57954,57994], 'bmin': [43.94,65.91], 'semester': '2017A'},
             '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30], 'semester': '2018B'},
-            '3': {'mjd': [58885,60000], 'bmin': [39.69,59.54], 'semester': '2020A'}},
+            '3': {'mjd': [58885,59008], 'bmin': [39.69,59.54], 'semester': '2020A'}},
     'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,0], 'semester': ''}},
     'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
 }
@@ -202,8 +203,10 @@ class Image(object):
         (RA, Dec) list of clean components. Read from CC extension
     ass_flag : boolean
         If True image meets requirments for source association
-    ap_selfcal : boolean
-	True if amp & phase self cal applied to image 
+    nsn : int
+	Number of SN tables in UVOUT. 3 = amp & phase self cal applied to image 
+    tsky : float
+        Brightness temp of GSM map at image center
     """
     # A class variable to count the number of images
     num_images = 0
@@ -260,8 +263,9 @@ class Image(object):
         self.pri_cals = None
         self.cc = None
         self.ass_flag = None
-	self.ap_selfcal = None
-
+	self.nsn = None
+        self.tsky = None
+        
     def process_image(self, image):
         if image.endswith('IMSC.fits'):
             pri_freq = 3
@@ -525,6 +529,22 @@ class Image(object):
         except KeyError:
             self.pa_end = None
           
+    def set_tsky(self, nside, skymap):
+        """Sets the tsky attribute of the Image object, the
+        brightness temp of the 341 MHz GSM map
+
+        Parameters
+        ----------
+        nside : int
+            Healpy nside parameter of skymap
+        skymap : float array
+            GSM map in healpy format
+        """        
+        phi = self.glon
+        theta = 90 - self.glat
+        if phi < 0: phi += 360
+        idx = hp.pixelfunc.ang2pix(nside,theta*DEG2RAD,phi*DEG2RAD)
+        self.tsky = skymap[idx]
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.
@@ -560,7 +580,23 @@ class Image(object):
                 if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
                     self.ass_flag = True
                 break  
-        
+        #if ass_flag True, check if image within view of a "too-many-artifacts" bad source
+        if self.ass_flag:
+            bad_sources = {'3C286' : SkyCoord(202.784583, 30.509167, unit='deg'),
+                       '3C48' : SkyCoord(24.422083, 33.159722, unit='deg'),
+                       '3C147' : SkyCoord(85.650417, 49.851944, unit='deg'),
+                       '3C138' : SkyCoord(80.291250, 16.639444, unit='deg'),
+                       '3C84' : SkyCoord(49.950417, 41.511667, unit='deg')}
+            image_center = SkyCoord(self.obs_ra, self.obs_dec, unit='deg')
+            bad_sep = 3.0 #if image within this dist of bad_source turn off ass_flag
+            for src, loc in bad_sources.items():
+                ang_sep = image_center.separation(loc).degree
+                if ang_sep < bad_sep:
+                    self.ass_flag = False
+                    dbclasses_logger.info('SET_CYCLE WARNING: {} is in the '
+                                  'field-of-view'.format(src))
+                    break
+            
             
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
@@ -1304,8 +1340,8 @@ def translate_null(img, out, coords):
     return newsrcs
 
 
-def set_apselfcal(img):
-    """Determines if image has amp & phase self cal
+def set_nsn(img):
+    """Counts number of SN tables in UVOUT file
 
     Parameters
     ----------
@@ -1317,7 +1353,7 @@ def set_apselfcal(img):
     -------
     img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute
-        ap_selfcal updated.
+        nsn updated.
     """
     # Determine dir with uvout file
     a = img.filename.split('/')
@@ -1327,7 +1363,7 @@ def set_apselfcal(img):
     uvdir += 'UVFiles/'
     # Check dir
     if not os.path.isdir(uvdir):
-        img.ap_selfcal = None
+        img.nsn = None
         dbclasses_logger.info('Did not find UVFiles dir {}.'.format(uvdir))
         return img
 
@@ -1342,7 +1378,7 @@ def set_apselfcal(img):
         # unzipped?
         uvname = uvname1 + 'uvout'
         if not os.path.isfile(os.path.join(uvdir,uvname)):
-            img.ap_selfcal = None
+            img.nsn = None
             dbclasses_logger.info('Did not find uvout file, with or w/o .gz {}'.format(uvname))
             return img
 
@@ -1352,12 +1388,9 @@ def set_apselfcal(img):
         for i in range(1,len(hdu)):
             if hdu[i].header['EXTNAME'] == 'AIPS SN':
                 cnt+=1
-    if cnt == 3:
-        img.ap_selfcal = True
-    else:
-        img.ap_selfcal = False
+    img.nsn = cnt
 
-    dbclasses_logger.info('{}: cnt= {} ap_selfcal= {}'.format(uvname,cnt,img.ap_selfcal))
+    dbclasses_logger.info('{}: cnt= {} nsn= {}'.format(uvname,cnt,img.nsn))
 
     return img
 
@@ -1391,8 +1424,8 @@ def init_image(impath):
     # Set cycle, semester, ass_flag
     imobj.set_cycle()
 
-    # Set ap_selfcal
-    imobj = set_apselfcal(imobj)
+    # Set nsn
+    imobj = set_nsn(imobj)
 
     # Read primary calibrators from history extension
     pri_cals=[]
