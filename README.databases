@@ -1,0 +1,100 @@
+List & description of sql databases
+
+####################################
+# MAIN VLITE DATABASES
+# i.e. the only ones you need to 
+#      care about if you're not Emil
+####################################
+
+vcss : VCSS snapshots. Currently 1.1 + 1.2. Sources were not 
+       associated or matched to catalogs to speed up processing. 
+       Neither snapshots nor sources were beam corrected.
+
+vlite16d : VLITE D config daily images since July 2017.
+
+vlite16c : VLITE C config daily images since July 2017.
+
+vlite16b : VLITE B config daily images since July 2017.
+           Does not yet include images since June 2020.
+
+vlite16a : VLITE A config daily images since July 2017.
+
+vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
+          Processed with older VDP version, tables may
+	  not contain all columns from online docs
+
+vlite10c : VLITE10 C config images
+
+###################################
+# MISCELLANEOUS DATABASES
+# includes testing and special 
+#   projects
+###################################
+
+vlite16 : A staging area for processing images after
+	  config changes. The distribution of beam
+	  solid angles needs to be analyzed to set
+	  the acceptable range for source association
+	  in the resolution dictionary (res_dict in
+          dbclasses.py) before reprocessing into the
+	  corresponding vlite16[a-d] database
+
+hudf : Probably obsolete DB
+
+hudf2 : Probably obsolete DB
+
+hudffinal : The "final" A config VLITE HUDF image that 
+	    combined 3 images from 2018 & 3 from 2019, 
+	    WSCLEANed. DB includes raw
+	    final image and beam corrected image
+
+hudfdailybc : All daily A config images from normal 
+              VLITE imaging pipeline, beam corrected.
+	      Beams calculated with 20 sec step sizes
+
+hudfyearlybc : 2018 & 2019 images used in final image
+	       combined and WSCLEANed. Beam corrected
+               with 100 sec step sized beams
+
+hudf4min : Images from the final reimaged at 4 min 
+	   timescales. Raw images
+
+hudf4minbc : Like hudf4min but images beam corrected
+	     with 2 sec sampled beams
+
+hudfmiscbc : Other HUDF-covering images, beam corrected
+
+hudfb : Simona's WSCLEANed B config HUDF image.  
+	Beam corrected
+
+vcsstest : VCSS snapshots from 2019-03/05 with EP's 
+	   beam corrections. For testing
+
+vcsstestwp : VCSS snapshots from 2019-03/05 with WP's
+	   beam corrections. For testing
+
+vdptest : Generic DB for running tests of VDP
+
+timechop : Long exposure fields reimaged at shorter
+	   timescales. For testing
+
+beamoffset : Obsolete DB for testing. Can be dropped
+
+beamoffset2 : Obsolete DB for testing. Can be dropped
+
+cosmos10 : VLITE10 COSMOS imaged at 10 min 
+	   timescales (?)
+
+cosmos10injected : cosmos10 with fake transients injected
+		   (Weikert's NREIP project)
+
+cosmosdaily : COSMOS images from the daily pipeline
+
+deep10 : VLITE10 Deepfield imaged at 10 min
+	 timescales (?)
+
+deep10injected : deep10 with fake transients injected 
+	         (Weikert's NREIP project)
+
+deepdaily : Deepfield images from the daily pipeline
+

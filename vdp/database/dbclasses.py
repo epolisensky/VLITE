@@ -17,6 +17,7 @@ import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
 from math import sqrt
+from datetime import datetime
 
 ########################
 #temporarily needed while USNO sites are down for modernization
@@ -58,7 +59,8 @@ res_dict = {
             '2': {'mjd': [58441,58519], 'bmin': [32.20,48.30], 'semester': '2018B'},
             '3': {'mjd': [58885,59008], 'bmin': [39.69,59.54], 'semester': '2020A'}},
     'DnC': {'3': {'mjd': [58876,58885], 'bmin': [0,0], 'semester': ''}},
-    'D'  : {'3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
+    'D'  : {'2': {'mjd': [58360,58440], 'bmin': [117.58,176.37], 'semester': '2018A'},
+            '3': {'mjd': [58802,58876], 'bmin': [133.07,199.60], 'semester': '2019B'}}
 }
 
 # Define beam offset & dictionary for each primary observing frequency.
@@ -267,22 +269,7 @@ class Image(object):
         self.tsky = None
         
     def process_image(self, image):
-        if image.endswith('IMSC.fits'):
-            pri_freq = 3
-        else:
-            pri = re.findall('\/([0-9.]+[A-Z])', image)
-            try:
-                if pri[0][-1:] == 'M':
-                    pri_freq = float(pri[0][:-1]) / 1000. # GHz
-                else:
-                    pri_freq = float(pri[0][:-1]) # GHz
-                # project code 13B-266 is at 1.5 GHz
-                if pri_freq == 13:
-                    pri_freq = 1.5
-            except IndexError:
-                pri_freq = None
         self.filename = image
-        self.pri_freq = pri_freq
 
     @classmethod
     def image_count(cls):
@@ -316,6 +303,29 @@ class Image(object):
         if the missing header keyword is deemed important enough.        
 
         """
+        ### start with priband
+        try:
+            priband = hdr['PRIBAND']
+            if float(priband[:-3]) > 100:
+                self.pri_freq = float(priband[:-3])/1000 #GHz
+            else:
+                self.pri_freq = float(priband[:-3]) #GHz
+        except:
+            if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename: #VCSS mosaics/snapshots
+                self.pri_freq = 3
+            else:
+                pri = re.findall('\/([0-9.]+[A-Z])', self.filename)
+                try:
+                    if pri[0][-1:] == 'M':
+                        self.pri_freq = float(pri[0][:-1]) / 1000. # GHz
+                    else:
+                        self.pri_freq = float(pri[0][:-1]) # GHz
+                    # project code 13B-266 is at 1.5 GHz
+                    if self.pri_freq == 13:
+                        self.pri_freq = 1.5
+                except IndexError:
+                    self.pri_freq = None
+        ###
         try:
             naxis1 = hdr['NAXIS1']
             naxis2 = hdr['NAXIS2']
@@ -331,7 +341,7 @@ class Image(object):
         except KeyError:
             self.obs_ra = None
             self.error_id = 1
-        if self.obs_ra == 0:
+        if self.obs_ra == 0 or self.obs_ra is None:
             try:
                 self.obs_ra = hdr['CRVAL1'] # deg
                 self.error_id = None
@@ -343,7 +353,7 @@ class Image(object):
         except KeyError:
             self.obs_dec = None
             self.error_id = 1
-        if self.obs_dec == 0:
+        if self.obs_dec == 0 or self.obs_dec is None:
             try:
                 self.obs_dec = hdr['CRVAL2'] # deg
                 self.error_id = None
@@ -369,6 +379,8 @@ class Image(object):
             self.obj = None
         try:
             self.obs_date = hdr['DATE-OBS']
+            if len(self.obs_date)>10:
+                self.obs_date = hdr['DATE-OBS'][:10]
         except KeyError:
             self.obs_date = None
             self.error_id = 1
@@ -452,32 +464,35 @@ class Image(object):
                     self.niter = None
                     self.error_id = 1    
         try:
-            self.mjdtime = float(int(hdr['MJDTIME'])) + hdr['STARTIME'] #day
-            t = Time(self.mjdtime,format='mjd')
-            self.lst = t.sidereal_time('apparent',VLALON).hour #hrs
-            if self.obs_ra is not None and self.obs_dec is not None:
-                coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
-                altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
-                self.az_i = altaz.az.deg
-                self.alt_i = altaz.alt.deg
-                hrang = (15*self.lst) - self.obs_ra #deg
-                if hrang > 180: hrang -= 360
-                if hrang < -180: hrang += 360
-                tmp1 = np.sin(hrang*DEG2RAD)
-                tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
-                self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
-                if self.duration is not None:
-                    t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
-                    lst_end = t_end.sidereal_time('apparent',VLALON).hour #hrs
-                    altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
-                    self.az_f = altaz.az.deg
-                    self.alt_f = altaz.alt.deg
-                    hrang = (15*lst_end) - self.obs_ra #deg
+            if self.obs_date is not None:
+                date=self.obs_date.split('-')
+                #self.mjdtime = float(int(hdr['MJDTIME'])) + hdr['STARTIME'] #day
+                self.mjdtime = Time(datetime(int(date[0]),int(date[1]),int(date[2]))).mjd + float(hdr['STARTIME']) #day
+                t = Time(self.mjdtime,format='mjd')
+                self.lst = t.sidereal_time('apparent',VLALON).hour #hrs
+                if self.obs_ra is not None and self.obs_dec is not None:
+                    coord = SkyCoord(self.obs_ra, self.obs_dec, unit='deg', frame='fk5')
+                    altaz = coord.transform_to(AltAz(obstime=t,location=locVLA))
+                    self.az_i = altaz.az.deg
+                    self.alt_i = altaz.alt.deg
+                    hrang = (15*self.lst) - self.obs_ra #deg
                     if hrang > 180: hrang -= 360
                     if hrang < -180: hrang += 360
                     tmp1 = np.sin(hrang*DEG2RAD)
                     tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
-                    self.parang_f = np.arctan2(tmp1,tmp2)*RAD2DEG
+                    self.parang_i = np.arctan2(tmp1,tmp2)*RAD2DEG
+                    if self.duration is not None:
+                        t_end = Time(self.mjdtime+(self.duration/86400.),format='mjd') #end time
+                        lst_end = t_end.sidereal_time('apparent',VLALON).hour #hrs
+                        altaz = coord.transform_to(AltAz(obstime=t_end,location=locVLA))
+                        self.az_f = altaz.az.deg
+                        self.alt_f = altaz.alt.deg
+                        hrang = (15*lst_end) - self.obs_ra #deg
+                        if hrang > 180: hrang -= 360
+                        if hrang < -180: hrang += 360
+                        tmp1 = np.sin(hrang*DEG2RAD)
+                        tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                        self.parang_f = np.arctan2(tmp1,tmp2)*RAD2DEG
         except KeyError:
             self.mjdtime = None
             self.lst = None
@@ -539,12 +554,15 @@ class Image(object):
             Healpy nside parameter of skymap
         skymap : float array
             GSM map in healpy format
-        """        
-        phi = self.glon
-        theta = 90 - self.glat
-        if phi < 0: phi += 360
-        idx = hp.pixelfunc.ang2pix(nside,theta*DEG2RAD,phi*DEG2RAD)
-        self.tsky = skymap[idx]
+        """
+        if self.glon is None or self.glat is None:
+            self.tsky = None
+        else:
+            phi = self.glon
+            theta = 90 - self.glat
+            if phi < 0: phi += 360
+            idx = hp.pixelfunc.ang2pix(nside,theta*DEG2RAD,phi*DEG2RAD)
+            self.tsky = skymap[idx]
 
     def set_radius(self, scale):
         """Sets the radius attribute of the Image object.
@@ -569,17 +587,21 @@ class Image(object):
                 self.radius = None
 
                 
-    def set_cycle(self):
+    def set_cycle(self, alwaysass):
         """Sets image cycle, semester, and ass_flag"""
         self.ass_flag = False
         config = self.config
-        for cycle in res_dict[config].keys():
-            if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
-                self.semester = res_dict[config][cycle]['semester']
-                self.cycle = cycle
-                if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
-                    self.ass_flag = True
-                break  
+        if config is None:
+            self.semester = None
+            self.cycle = None
+        else:
+            for cycle in res_dict[config].keys():
+                if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
+                    self.semester = res_dict[config][cycle]['semester']
+                    self.cycle = cycle
+                    if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
+                        self.ass_flag = True
+                    break
         #if ass_flag True, check if image within view of a "too-many-artifacts" bad source
         if self.ass_flag:
             bad_sources = {'3C286' : SkyCoord(202.784583, 30.509167, unit='deg'),
@@ -596,6 +618,9 @@ class Image(object):
                     dbclasses_logger.info('SET_CYCLE WARNING: {} is in the '
                                   'field-of-view'.format(src))
                     break
+        #set ass_flag if 'always associated' option enabled
+        if alwaysass:
+            self.ass_flag = True
             
             
     def image_qa(self, params):
@@ -1126,8 +1151,6 @@ class DetectedSource(object):
         for attr in attrs:
             corr_val = getattr(self, attr) / pb_power
             setattr(self, attr, corr_val)
-        # Compute S/N of source detection
-        self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
         # Add systematic uncertainty to all flux errors
         self.e_total_flux = np.sqrt(
             (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
@@ -1136,6 +1159,9 @@ class DetectedSource(object):
         self.total_flux_islE = np.sqrt(
             (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
 
+    def calc_snr(self):
+        # Compute S/N of source detection
+        self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
         
     #nulls need special handling
     def correct_flux_null(self, pri_freq):
@@ -1355,6 +1381,11 @@ def set_nsn(img):
         Initialized Image object with attribute
         nsn updated.
     """
+    #Skip for VCSS images
+    if 'VCSS' or 'vcss' in img.filename:
+        img.nsn = None
+        return img
+
     # Determine dir with uvout file
     a = img.filename.split('/')
     uvdir = ''
@@ -1390,16 +1421,20 @@ def set_nsn(img):
                 cnt+=1
     img.nsn = cnt
 
-    dbclasses_logger.info('{}: cnt= {} nsn= {}'.format(uvname,cnt,img.nsn))
+    dbclasses_logger.info('{}: nsn= {}'.format(uvname,img.nsn))
 
     return img
 
 
-def init_image(impath):
+def init_image(impath,alwaysass):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
     the ``header_attrs`` object method.
 
+    Parameters
+    ----------
+    alwaysass : 'always associate' option. If True image sources
+              will always be associated
     """
     imobj = Image()
     imobj.process_image(impath)
@@ -1422,7 +1457,7 @@ def init_image(impath):
         imobj.write(hdu, hdr)
 
     # Set cycle, semester, ass_flag
-    imobj.set_cycle()
+    imobj.set_cycle(alwaysass)
 
     # Set nsn
     imobj = set_nsn(imobj)

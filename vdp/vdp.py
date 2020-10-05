@@ -275,6 +275,14 @@ def cfgparse(cfgfile):
         raise ConfigError('The image radius scale factor must be a number '
                           'between 0 and 10.')
 
+    # Check if beam corrected option is set
+    if opts['beam corrected'] is None:
+        opts['beam corrected'] = False
+
+    # Check if always associate option is set
+    if opts['always associate'] is None:
+        opts['always associate'] = False
+
     # Set default QA requirements if not specified
     if opts['quality checks']:
         if qaparams['min nvis'] is None:
@@ -631,7 +639,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
     return imobj
 
 
-def srcfind(conn, imobj, sfparams, save, qa, qaparams):
+def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
     """Runs PyBDSF source finding and inserts source 
     fit parameters into database  **detected_source**,
     **detected_island**, and **corrected_flux** tables,
@@ -660,6 +668,9 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
     qaparams : dict
         User-specified requirements from the configuration file for
         the source finding quality checks.
+    opts : dict
+        User-specified options from the configuration file. Needed
+        to decide on applying primary beam correction
 
     Returns
     -------
@@ -733,10 +744,17 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams):
         if sources is not None:
             # Compute beam corrected fluxes, compactness,
             #  & write to corrected_flux table
-            logger.info('Correcting all flux measurements for primary beam '
+            # To beam correct or not to beam correct...
+            if opts['beam corrected']: # images already are
+                logger.info('Image already beam corrected.')
+            else:
+                logger.info('Correcting all flux measurements for primary beam '
                         'response.')
+                for src in sources:
+                    src.correct_flux(imobj.pri_freq)
+            # Calc SNR, compactness, add to table
             for src in sources:
-                src.correct_flux(imobj.pri_freq)
+                src.calc_snr()
                 src.calc_compactness(imobj)
                 dbio.add_corrected(conn, src)
 
@@ -781,7 +799,7 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     logger.info('STAGE 3: SOURCE ASSOCIATION')
     logger.info('***************************')
 
-    # Limit cone search radius to image FOV for VLITE, bigger for VCSS
+    # Limit cone search radius to image FOV for VLITE, bigger for VCSS mosaics
     if imobj.filename.endswith('IPln1.fits'):
         radius = imobj.radius # deg
     else:
@@ -885,7 +903,7 @@ def catmatch(conn, imobj, sources, catalogs, save):
             dbio.update_stage(conn, imobj)
         return
 
-    # Limit cone search radius to image FOV for VLITE, bigger for VCSS
+    # Limit cone search radius to image FOV for VLITE, bigger for VCSS mosaics
     if imobj.filename.endswith('IPln1.fits'):
         radius = imobj.radius # deg
     else:
@@ -1036,6 +1054,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     reproc = opts['reprocess']
     rematch = opts['redo match']
     updatematch = opts['update match']
+    alwaysass = opts['always associate']
 
     # Create and enable break handler
     bh = BreakHandler()
@@ -1061,9 +1080,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             os.system('mkdir '+pybdsfdir)
 
         if not files[0]:
-            # Select all images that end with 'IPln1.fits'...
+            # Select all images that end with 'IPln1.fits' or 'pbcor.fits'...
             imglist = [f for f in os.listdir(imgdir) if \
-                       f.endswith('IPln1.fits')]
+                       f.endswith('IPln1.fits') or f.endswith('pbcor.fits')]
             # ...or 'IMSC.fits' for the VCSS mosaics
             if len(imglist) < 1:
                 imglist = [f for f in os.listdir(imgdir) if \
@@ -1077,7 +1096,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
         for img in imglist:
             impath = os.path.join(imgdir, img)
             # Initialize Image object & set attributes from header
-            imobjlist.append(dbclasses.init_image(impath))
+            imobjlist.append(dbclasses.init_image(impath,alwaysass))
 
         # Sort imobjlist by mjdtime
         imobjlist.sort(key=lambda x: x.mjdtime)
@@ -1096,7 +1115,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, sfparams, save,
-                                         qa, qaparams)
+                                         qa, qaparams, opts)
                 # Copy PyBDSF warnings from their log to ours
                 with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()

@@ -179,7 +179,7 @@ def create(conn, params, safe=False):
                 pri_cals JSON,
                 ass_flag BOOLEAN,
 		nsn INTEGER,
-                tsky DOUBLE PRECISION,
+                tsky REAL,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

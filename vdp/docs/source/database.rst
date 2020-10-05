@@ -360,7 +360,7 @@ in the table, as well.
   keyword ``NVIS``
 - *niter*: number of CLEAN iterations; header keyword ``NITER``
 - *mjdtime*: Modified Julian Date at the start of the observations;
-  integer header keyword ``MJDTIME`` + header keyword ``STARTIME``
+  Calculated from *obs_date* + header keyword ``STARTIME``
 - *tau_time*: total integration time on source (sec); header
   keyword ``TAU_TIME``
 - *duration*: total duration of the observations (sec); header

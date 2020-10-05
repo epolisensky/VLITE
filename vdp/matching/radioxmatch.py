@@ -261,7 +261,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 SELECT b.* FROM assoc_source AS b WHERE b.id IN %s
                 ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1)
                 AS bb'''
-            values = (0.5*imobj.bmin, tuple(assoc_ids))
+            values = (0.5*imobj.bmaj, tuple(assoc_ids))
             cur.execute(sql, values)
             rows = cur.fetchall()
             cur.execute('DROP TABLE temp_source')
@@ -284,7 +284,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 SELECT b.* FROM assoc_source AS b
                 WHERE a.image_id = %s AND b.id IN %s ORDER BY
                 q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
-            values = (0.5*imobj.bmin, imobj.id, tuple(assoc_ids))
+            values = (0.5*imobj.bmaj, imobj.id, tuple(assoc_ids))
             cur.execute(sql, values)
             rows = cur.fetchall()
 
@@ -580,6 +580,11 @@ def check_clean(conn, sources, imobj):
         List of ``database.dbclasses.DetectedSource`` objects
         updated with check clean results
     """
+    #if no clean components then do nothing
+    if imobj.cc is None:
+        match_logger.info(' -- no CLEAN components, returning.')
+        return imobj, sources
+    
     cur = conn.cursor()
     
     # Dump CCs into temporary table

@@ -68,9 +68,13 @@ class BDSFImage(Image):
             if key == 'rms_box':
                 if value == '' or value == 'None':
                     value = None
+                else:
+                    value = eval(value)
             if key == 'rms_box_bright':
                 if value == '' or value == 'None':
                     value = None
+                else:
+                    value = eval(value)
             if key == 'adaptive_thresh':
                 if value == '' or value == 'None':
                     value = None
