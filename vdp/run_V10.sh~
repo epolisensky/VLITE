@@ -1,0 +1,4 @@
+#!/bin/bash
+python vdp.py config_files/vlite10/201705_config.yaml
+python vdp.py config_files/vlite10/201706_config.yaml
+python vdp.py config_files/vlite10/201707_config.yaml

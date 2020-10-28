@@ -12,7 +12,7 @@ import psycopg2.extras
 from psycopg2 import sql
 from radiocatalogs import catalogio
 from database import dbclasses, dbio
-import matchfuncs
+from matching import matchfuncs
 
 
 # create logger

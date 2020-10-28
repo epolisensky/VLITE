@@ -10,7 +10,7 @@ import sys
 import logging
 import psycopg2
 from psycopg2 import sql
-import catalogio
+from radiocatalogs import catalogio
 
 # create logger
 radcatdb_logger = logging.getLogger('vdp.radiocatalogs.radcatdb')
@@ -229,7 +229,7 @@ def create(conn):
             continue
 
     if not atleastone:
-        print
+        #print
         radcatdb_logger.info('No new sky catalogs to add.')
 
     cur.close 

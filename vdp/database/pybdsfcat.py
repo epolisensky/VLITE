@@ -9,7 +9,7 @@ import os
 import sys
 import math
 import logging
-import dbclasses
+from database import dbclasses
 
 
 # create logger

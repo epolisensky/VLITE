@@ -31,6 +31,9 @@ vlite10c : VLITE10 C config images
 #   projects
 ###################################
 
+vlite10img : VLITE10 images from 2014-11/25 to 2017-07/19
+          Just images, no source finding.
+
 vlite16 : A staging area for processing images after
 	  config changes. The distribution of beam
 	  solid angles needs to be analyzed to set

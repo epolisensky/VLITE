@@ -53,7 +53,7 @@ def create(conn, params, safe=False):
         value is ``False``.
     """
     if not safe:
-        cont = raw_input(('\nWARNING: Any existing tables and data in this '
+        cont = input(('\nWARNING: Any existing tables and data in this '
                           'database will be deleted. Are you sure you want '
                           'to continue? '))
     else:

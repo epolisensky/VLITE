@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.4'
+__version__ = '2.5'
 
 
 # Create logger
@@ -95,7 +95,7 @@ def print_run_stats(start_time):
     """Prints general information about the just completed run 
     of the pipeline, including the number of
     images processed and the total execution time.
-    
+
     Parameters
     ----------
     start_time : ``datetime.datetime`` instance
@@ -153,7 +153,7 @@ def cfgparse(cfgfile):
     dirs : list
         List of strings specifying paths to daily image directories
         to be processed during the run.
-    """    
+    """
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
         stages = data['stages']
@@ -182,8 +182,8 @@ def cfgparse(cfgfile):
         dirs = [procdir]
     else:
         try:
-            mo = format(int(mo), '02') # force 2-digits
-        except: # Value/TypeError will be caught in isdir exception below
+            mo = format(int(mo), '02')  # force 2-digits
+        except:  # Value/TypeError will be caught in isdir exception below
             pass
 
         yrmo = '{}-{}'.format(yr, mo)
@@ -191,7 +191,7 @@ def cfgparse(cfgfile):
             monthdir = os.path.join(rootdir, yrmo)
         except AttributeError:
             raise ConfigError('Please provide a valid data root directory.')
-        if not os.path.isdir(monthdir): # check path with year-month
+        if not os.path.isdir(monthdir):  # check path with year-month
             raise ConfigError('Directory does not exist: {}'.format(monthdir))
 
         # If days = [], process every day in month directory
@@ -199,7 +199,8 @@ def cfgparse(cfgfile):
             if len(days) < 1:
                 tmp = sorted(next(os.walk(monthdir))[1])
                 for i in tmp:
-                    if len(i)==2: days.append(i) #assume only want the 2-digit day dirs
+                    if len(i) == 2:
+                        days.append(i)  # assume only want the 2-digit day dirs
         except TypeError:
             raise ConfigError('setup: day: must be a list (i.e. [{}])'.format(
                 days))
@@ -260,7 +261,7 @@ def cfgparse(cfgfile):
                     cat = cat.lower()
                     if cat not in catalog_opts:
                         print('\nCurrently available catalogs: {}\n'.
-                                    format(catalog_opts))
+                              format(catalog_opts))
                         raise ConfigError('Catalog {} is not a valid option'.
                                           format(cat))
             except TypeError:
@@ -354,7 +355,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     option in the configuration file is ``True``. All necessary
     tables, functions, and triggers are created through a call to 
     ``database.createdb.create()``.
-    
+
     Parameters
     ----------
     dbname : str
@@ -381,7 +382,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
     try:
         # DB exists
         conn = psycopg2.connect(host='localhost', database=dbname, user=user)
-        logger.info('Connected to database {}.'.format(dbname)) 
+        logger.info('Connected to database {}.'.format(dbname))
         if not overwrite:
             logger.info('Using existing database {}.'.format(dbname))
         else:
@@ -398,7 +399,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
         if not cur.fetchone()[0]:
             cur.close()
             logger.info('Radio catalog schema "radcat" not found. '
-                  'Creating tables now...')
+                        'Creating tables now...')
             radcatdb.create(conn)
         else:
             cur.close()
@@ -459,7 +460,7 @@ def vlite_unique(conn, src, image_id, radius):
     """
     # Start by checking if the VU source is already in the VU table
     existing = dbio.check_vlite_unique(conn, src.id)
-    if not existing: # returned empty list
+    if not existing:  # returned empty list
         # Newly detected VU source
         src.detected = True
         # Add source to vlite_unique table
@@ -482,7 +483,7 @@ def vlite_unique(conn, src, image_id, radius):
             # previously undetected VU source, now detected
             # (i.e. after re-doing source finding)
             entry = [row for row in existing if row[1] == image_id]
-            if not entry[0][2]: # if not detected
+            if not entry[0][2]:  # if not detected
                 # Update entry to detected = True
                 src.detected = True
                 dbio.add_vlite_unique(conn, src, image_id, update=True)
@@ -539,7 +540,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
     logger.info('**********************')
 
     # Set tsky
-    imobj.set_tsky(nside,skymap)
+    imobj.set_tsky(nside, skymap)
 
     # Set the radius size
     imobj.set_radius(scale)
@@ -558,14 +559,14 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
     if not any(stages.values()):
         if status is None:
             # image not in DB, so add it
-            imobj = dbio.add_image(conn, imobj, status) # branch 2
+            imobj = dbio.add_image(conn, imobj, status)  # branch 2
             global branch
             branch = 2
         else:
             if reproc:
                 if save:
                     # already processed, but re-doing -- sources NOT deleted
-                    imobj = dbio.add_image(conn, imobj, status) # branch 4
+                    imobj = dbio.add_image(conn, imobj, status)  # branch 4
                 else:
                     # just initialize if not writing to DB
                     logger.info('Initializing image.')
@@ -573,9 +574,9 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
             else:
                 # already processed & not re-doing
                 logger.info('Image already in database. Moving on...')
-                imobj = None # branch 3
+                imobj = None  # branch 3
                 branch = 3
-    else: # Running at least one stage
+    else:  # Running at least one stage
         if status is None:
             if stages['source finding']:
                 if save:
@@ -590,7 +591,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
                 logger.error('ERROR: Image {} not yet processed. '
                              'Source finding must be run before other stages.'.
                              format(imobj.filename))
-                imobj = None # branch 5
+                imobj = None  # branch 5
                 branch = 5
         else:
             if stages['source finding']:
@@ -614,7 +615,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
                     else:
                         # image has SF results & not re-processing
                         logger.info('Image already processed. Moving on...')
-                        imobj = None # branch 9
+                        imobj = None  # branch 9
                         branch = 9
             else:
                 # not running SF -- stage must be > 1
@@ -627,7 +628,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
                     logger.error('ERROR: Image {} does not have sources '
                                  'extracted yet. Source finding must be run '
                                  'before other stages.'.format(imobj.filename))
-                    imobj = None # branch 7
+                    imobj = None  # branch 7
                     branch = 7
 
     # Stop if the image failed a quality check except 6
@@ -635,7 +636,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
         if imobj is not None and imobj.error_id is not None:
             if imobj.error_id != 6:
                 imobj = None
-    
+
     return imobj
 
 
@@ -697,7 +698,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
 
     # Update stage
     imobj.stage = 2
-   
+
     if out is not None:
         # Write PyBDSF files to daily directory
         runbdsf.write_sources(out)
@@ -708,8 +709,8 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
         #  Filter these out. How common is this? Are we losing real source
         #  detections?
         if imobj.filename.endswith('IPln1.fits'):
-            sources = [src for src in sources if \
-                       src.dist_from_center <= imobj.radius and \
+            sources = [src for src in sources if
+                       src.dist_from_center <= imobj.radius and
                        src.e_ra > 1e-7 and src.e_dec > 1e-7]
             logger.info(' -- {}/{} sources are inside the circular FOV '
                         'with radius {} degree(s)'.format(
@@ -745,11 +746,11 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
             # Compute beam corrected fluxes, compactness,
             #  & write to corrected_flux table
             # To beam correct or not to beam correct...
-            if opts['beam corrected']: # images already are
+            if opts['beam corrected']:  # images already are
                 logger.info('Image already beam corrected.')
             else:
                 logger.info('Correcting all flux measurements for primary beam '
-                        'response.')
+                            'response.')
                 for src in sources:
                     src.correct_flux(imobj.pri_freq)
             # Calc SNR, compactness, add to table
@@ -786,7 +787,7 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     sfparams : dict
         Specifies any non-default PyBDSF parameters to be 
         used in source finding. Passed to nullfind
-    
+
     Returns
     -------
     detected_unmatched : list
@@ -801,11 +802,11 @@ def srcassoc(conn, imobj, sources, save, sfparams):
 
     # Limit cone search radius to image FOV for VLITE, bigger for VCSS mosaics
     if imobj.filename.endswith('IPln1.fits'):
-        radius = imobj.radius # deg
+        radius = imobj.radius  # deg
     else:
-        radius = 3. # deg
+        radius = 3.  # deg
 
-    # Associate current sources with existing VLITE catalog 
+    # Associate current sources with existing VLITE catalog
     detected_matched, detected_unmatched, assoc_matched, assoc_unmatched \
         = radioxmatch.associate(conn, sources, imobj, radius, save)
 
@@ -821,7 +822,7 @@ def srcassoc(conn, imobj, sources, save, sfparams):
         # Update matched assoc_source positions, etc.
         if assoc_matched:
             dbio.update_matched_assoc(conn, assoc_matched)
-            #update associated source light curve metrics
+            # update associated source light curve metrics
             dbio.update_lcmetrics(conn, assoc_matched)
         # Check for null detections
 #        if assoc_unmatched:
@@ -875,10 +876,11 @@ def catmatch(conn, imobj, sources, catalogs, save):
     logger.info('*********************************')
     logger.info('STAGE 4: MATCHING TO SKY CATALOGS')
     logger.info('*********************************')
-    
+
     catalogs = [catalog.lower() for catalog in catalogs]
     # Filter catalogs by resolution
-    filtered_catalogs = radioxmatch.filter_catalogs(conn, catalogs, imobj.config)
+    filtered_catalogs = radioxmatch.filter_catalogs(
+        conn, catalogs, imobj.config)
     # Remove catalogs that have already been checked for this image
     if save:
         new_catalogs = dbio.update_checked_catalogs(
@@ -905,9 +907,9 @@ def catmatch(conn, imobj, sources, catalogs, save):
 
     # Limit cone search radius to image FOV for VLITE, bigger for VCSS mosaics
     if imobj.filename.endswith('IPln1.fits'):
-        radius = imobj.radius # deg
+        radius = imobj.radius  # deg
     else:
-        radius = 3. # deg
+        radius = 3.  # deg
 
     # Cross-match VLITE sources with each catalog
     for catalog in new_catalogs:
@@ -927,10 +929,10 @@ def catmatch(conn, imobj, sources, catalogs, save):
         for src in sources:
             if src.nmatches == 0:
                 src = vlite_unique(conn, src, imobj.id, imobj.radius)
-                            
+
         # Update stage
         imobj.stage = 4
-        dbio.update_stage(conn, imobj)                
+        dbio.update_stage(conn, imobj)
 
     return
 
@@ -964,43 +966,45 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     logger.info('CHECKING %d FOR NULLS' % len(asrcs))
     logger.info('***********************')
 
-
     # Add the PyBDSF ``src_ra_dec'' parameter to sfparams as
     # list of tuples with (RA,Dec) coords for force-fitting.
-    coords=[]
+    coords = []
     for src in asrcs:
-        coords.append((src.ra,src.dec))
+        coords.append((src.ra, src.dec))
 
-    nfparams=dict(sfparams) #copy params dict for null finding
+    nfparams = dict(sfparams)  # copy params dict for null finding
     nfparams['src_ra_dec'] = coords
-    #nfparams['fix_to_beam'] = True # force Gaussians to beam size
-    nfparams['aperture'] = sqrt(imobj.bmin*imobj.bmaj)/imobj.pixel_scale #set radius of aperture for aperture flux and error calculation
+    # nfparams['fix_to_beam'] = True # force Gaussians to beam size
+    # set radius of aperture for aperture flux and error calculation
+    nfparams['aperture'] = sqrt(imobj.bmin*imobj.bmaj)/imobj.pixel_scale
 
     # Initialize source finding image object
     bdsfim = runbdsf.BDSFImage(imobj.filename, **nfparams)
     # Run PyBDSF source finding
     out = bdsfim.find_sources()
 
-    nulls=None
+    nulls = None
     if out is not None:
-        nulls=[]
+        nulls = []
         # Translate PyBDSF output to DetectedSource objects
         sources = dbclasses.translate_null(imobj, out, coords)
         # Beam correct fluxes
         logger.info('Correcting null flux measurements for primary beam '
-                        'response.')
-        for n,src in enumerate(sources): # *should be* in order with asrcs
+                    'response.')
+        for n, src in enumerate(sources):  # *should be* in order with asrcs
             src.correct_flux_null(imobj.pri_freq)
             # Calculate pseudo-SNRs
-	    if src.total_flux < 0.: src.total_flux = 0.
-            src.snr = (asrcs[n].ave_total-src.total_flux)/sqrt(asrcs[n].e_ave_total**2 + src.e_total_flux**2)
+            if src.total_flux < 0.:
+                src.total_flux = 0.
+            src.snr = (asrcs[n].ave_total-src.total_flux) / \
+                sqrt(asrcs[n].e_ave_total**2 + src.e_total_flux**2)
             # Check for null detections
-            if src.snr > 10.0: #should have been detected
+            if src.snr > 10.0:  # should have been detected
                 nulls.append(src)
-                #set attributes not set by translate & correct_flux:
+                # set attributes not set by translate & correct_flux:
                 nulls[-1].assoc_id = asrcs[n].id
-            #print '%d %f %f  %f %f  %f %f  %.2f  %f %f' % (n,coords[n][0],coords[n][1],src.ra,src.dec,src.total_flux,src.e_total_flux,src.snr,src.dist_from_center,src.polar_angle)
-                
+            # print '%d %f %f  %f %f  %f %f  %.2f  %f %f' % (n,coords[n][0],coords[n][1],src.ra,src.dec,src.total_flux,src.e_total_flux,src.snr,src.dist_from_center,src.polar_angle)
+
     else:
         # PyBDSF failed to process
         logger.info('PyBDSF failed to process force-fitting!')
@@ -1011,7 +1015,6 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
             dbio.add_nulls(conn, nulls)
 
     return
-
 
 
 def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
@@ -1061,11 +1064,11 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     bh.enable()
 
     # Read GSM map for setting tsky in image table
-    fin = open('341.GSM','r')
+    fin = open('341.GSM', 'r')
     skymap = np.loadtxt(fin)
     fin.close()
     nside = hp.get_nside(skymap)
-    
+
     # Begin loop through daily directories
     i = 0
     for imgdir in dirs:
@@ -1081,11 +1084,11 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
 
         if not files[0]:
             # Select all images that end with 'IPln1.fits' or 'pbcor.fits'...
-            imglist = [f for f in os.listdir(imgdir) if \
+            imglist = [f for f in os.listdir(imgdir) if
                        f.endswith('IPln1.fits') or f.endswith('pbcor.fits')]
             # ...or 'IMSC.fits' for the VCSS mosaics
             if len(imglist) < 1:
-                imglist = [f for f in os.listdir(imgdir) if \
+                imglist = [f for f in os.listdir(imgdir) if
                            f.endswith('IMSC.fits')]
         else:
             imglist = [f for f in files[i]]
@@ -1096,7 +1099,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
         for img in imglist:
             impath = os.path.join(imgdir, img)
             # Initialize Image object & set attributes from header
-            imobjlist.append(dbclasses.init_image(impath,alwaysass))
+            imobjlist.append(dbclasses.init_image(impath, alwaysass))
 
         # Sort imobjlist by mjdtime
         imobjlist.sort(key=lambda x: x.mjdtime)
@@ -1111,7 +1114,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             # Move on to next image if imobj is None
             if imobj is None:
                 continue
-            
+
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, sfparams, save,
@@ -1119,7 +1122,8 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                 # Copy PyBDSF warnings from their log to ours
                 with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()
-                warnings = [line.strip() for line in lines if 'WARNING' in line]
+                warnings = [line.strip()
+                            for line in lines if 'WARNING' in line]
                 if warnings:
                     logger.info('PyBDSF warnings:')
                     for warning in warnings:
@@ -1135,9 +1139,10 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                 # STAGE 3 -- Source association
                 if sa:
                     if imobj.ass_flag:
-                        new_sources, imobj = srcassoc(conn, imobj, sources, save, sfparams)
+                        new_sources, imobj = srcassoc(
+                            conn, imobj, sources, save, sfparams)
                         # STAGE 4 -- Sky survey catalog cross-matching
-                        if cm: # sf + sa + cm - branch 12, 15
+                        if cm:  # sf + sa + cm - branch 12, 15
                             # Cross-match new sources only
                             catmatch(conn, imobj, new_sources, catalogs, save)
                             if glob.glob(imgdir+'*matches.reg'):
@@ -1154,7 +1159,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                                 branch = 12
                             if branch == 8:
                                 branch = 15
-                        else: # sf + sa - branch 11, 14
+                        else:  # sf + sa - branch 11, 14
                             if branch == 6:
                                 branch = 11
                             if branch == 8:
@@ -1171,7 +1176,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('Image ass_flag = {}, skipping source association'
                                     '/catalog matching'.format(imobj.ass_flag))
                 else:
-                    if cm: # sf + cm - branch 10, 13
+                    if cm:  # sf + cm - branch 10, 13
                         if imobj.ass_flag:
                             catmatch(conn, imobj, sources, catalogs, False)
                             if glob.glob(imgdir+'*matches.reg'):
@@ -1191,8 +1196,8 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                                 branch = 13
                         else:
                             logger.info('Image ass_flag = {}, skipping catalog'
-                                    'matching'.format(imobj.ass_flag))
-                    else: # sf only - branch 6, 8
+                                        'matching'.format(imobj.ass_flag))
+                    else:  # sf only - branch 6, 8
                         logger.info('======================================='
                                     '========================================')
                         logger.info('Completed source finding on image')
@@ -1200,18 +1205,19 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('======================================='
                                     '========================================')
                         continue
-            else: # no sf
+            else:  # no sf
                 if sa:
                     if imobj.ass_flag:
                         # Get sources from detected_source table
                         sources = dbio.get_image_sources(conn, imobj.id)
                         # Already caught case of no sf but stage < 2 in iminit
-                        if imobj.stage == 2: # no sa has been run yet
+                        if imobj.stage == 2:  # no sa has been run yet
                             new_sources, imobj = srcassoc(conn, imobj,
                                                           sources, save)
-                            if cm: # sa + cm - branch 20
+                            if cm:  # sa + cm - branch 20
                                 # Cross-match new sources only
-                                catmatch(conn, imobj, new_sources, catalogs, save)
+                                catmatch(conn, imobj, new_sources,
+                                         catalogs, save)
                                 if glob.glob(imgdir+'*matches.reg'):
                                     os.system(
                                         'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1226,7 +1232,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                                             '====================================='
                                             '=====')
                                 branch = 20
-                            else: # sa only - branch 19
+                            else:  # sa only - branch 19
                                 logger.info('====================================='
                                             '====================================='
                                             '=====')
@@ -1237,12 +1243,13 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                                             '====================================='
                                             '=====')
                                 branch = 19
-                        else: # stage > 2
+                        else:  # stage > 2
                             logger.info("\nNOTE: {}'s".format(imobj.filename))
                             logger.info('sources have already been associated '
                                         'with the existing VLITE catalog.')
-                            if cm: # cm only - branch 21
-                                assoc_sources = dbio.get_associated(conn, sources)
+                            if cm:  # cm only - branch 21
+                                assoc_sources = dbio.get_associated(
+                                    conn, sources)
                                 if rematch:
                                     # Delete & redo matching
                                     assoc_sources = dbio.delete_matches(
@@ -1250,14 +1257,15 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                                 else:
                                     if not updatematch:
                                         # Cross-match new/un-matched sources only
-                                        assoc_sources = [src for src in \
-                                                         assoc_sources if \
-                                                         src.nmatches is None \
+                                        assoc_sources = [src for src in
+                                                         assoc_sources if
+                                                         src.nmatches is None
                                                          or src.nmatches == 0]
                                     else:
                                         # Use all sources if updating
                                         pass
-                                catmatch(conn, imobj, assoc_sources, catalogs, save)
+                                catmatch(conn, imobj, assoc_sources,
+                                         catalogs, save)
                                 if glob.glob(imgdir+'*matches.reg'):
                                     os.system(
                                         'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1279,9 +1287,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('Image ass_flag = {}, skipping '
                                     'catalog matching'.format(imobj.ass_flag))
                 else:
-                    if cm: # cm only - branch 17
+                    if cm:  # cm only - branch 17
                         pass
-                    else: # branches 2, 4 continued
+                    else:  # branches 2, 4 continued
                         continue
                     if imobj.stage > 2:
                         # Get detected, then assoc sources
@@ -1295,8 +1303,8 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         else:
                             if not updatematch:
                                 # Cross-match new/un-matched sources only
-                                assoc_sources = [src for src in assoc_sources \
-                                                 if src.nmatches is None or \
+                                assoc_sources = [src for src in assoc_sources
+                                                 if src.nmatches is None or
                                                  src.nmatches == 0]
                                 branch = 17.1
                             else:
@@ -1314,7 +1322,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
                         logger.info('{}.'.format(imobj.filename))
                         logger.info('======================================='
                                     '========================================')
-                    else: # branch 16
+                    else:  # branch 16
                         logger.info('======================================='
                                     '========================================')
                         logger.error('ERROR: Source association must be run '
@@ -1363,9 +1371,9 @@ def main():
                         'the database "radcat" schema')
     parser.add_argument('--update_pbcor', action='store_true',
                         help='update corrected_flux table with primary '
-                        'beam corrections')    
+                        'beam corrections')
     args = parser.parse_args()
-    
+
     # Start the timer
     start_time = datetime.now()
 
@@ -1433,12 +1441,12 @@ def main():
                         '2018-01/15/Images/10GHz.Mrk110.IPln1.fits), or '
                         'provide a text file with one filename per line:\n')
         try:
-            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img \
+            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img
                       in inp.split(',')]
         except IndexError:
             with open(inp, 'r') as f:
                 text = f.read()
-            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img \
+            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img
                       in text.strip().split('\n')]
         logger.info('Preparing to remove image(s) {} from the database.'.
                     format(images))
@@ -1500,7 +1508,7 @@ def main():
         dbio.add_catalog_match(conn, cmrows)
         conn.close()
         sys.exit(0)
-    
+
     # Option to add a new sky survey catalog to the database "radcat" schema
     if args.add_catalog:
         radcatdb.create(conn)
@@ -1513,8 +1521,8 @@ def main():
         dbio.update_corrected(conn)
         conn.close()
         logger.info('Done.')
-        sys.exit(0)        
-    
+        sys.exit(0)
+
     # Process images
     process(conn, stages, opts, dirs, setup['files'],
             setup['catalogs'], sfparams, qaparams)

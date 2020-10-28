@@ -1066,7 +1066,7 @@ def remove_images(conn, images):
     cur = conn.cursor()
 
     for image in images:
-        print(image)
+        #print(image)
         cur.execute('SELECT id FROM image WHERE filename LIKE %s',
                     ('%'+image, ))
         try:
@@ -1095,7 +1095,7 @@ def update_corrected(conn):
     cur.close()
 
     for row in rows:
-        print row
+        print(row)
         imobj=dbclasses.Image()
         dbclasses.dict2attr(imobj, row)
         imobj.pri_freq = row['primary_freq']
