@@ -282,7 +282,7 @@ class Image(object):
     def read(self):
         """Reads FITS image data and header."""
         try:
-            hdu = fits.open(self.filename, mode='update')
+            hdu = fits.open(self.filename, mode='readonly')
             hdr = hdu[0].header
             return hdu, hdr
         except:
@@ -293,7 +293,15 @@ class Image(object):
     def write(self, hdu, header):
         """Updates FITS image header"""
         dbclasses_logger.info('Updating header of {}'.format(self.filename))
-        hdu.flush()
+        #open in update mode
+        hdu2 = fits.open(self.filename, mode='update')
+        hdr2 = hdu2[0].header
+        hdr2['CTYPE3'] = header['CTYPE3']
+        hdr2['BMAJ'] = header['BMAJ']
+        hdr2['BMIN'] = header['BMIN']
+        hdr2['BPA'] = header['BPA']
+        hdu2.flush()
+        hdu2.close()
 
     def header_attrs(self, hdr):
         """Extracts all keywords of interest from the FITS image
@@ -667,7 +675,7 @@ class Image(object):
 
         # Check number of visibilities (NVIS)
         min_nvis = params['min nvis']
-        if self.nvis < min_nvis:
+        if self.nvis is not None and self.nvis < min_nvis:
             dbclasses_logger.info('IMAGE FAILED QA: number of visibilities '
                                   '(NVIS) {} < allowed minimum of {}.'.
                                   format(self.nvis, min_nvis))
@@ -697,7 +705,7 @@ class Image(object):
 
         # Check number of CLEAN interations (NITER)
         min_niter = params['min niter']
-        if self.niter < min_niter:
+        if self.niter is not None and self.niter < min_niter:
             dbclasses_logger.info('IMAGE FAILED QA: number of iterations '
                                   '(NITER) {} < allowed minimum of {}.'.
                                   format(self.niter, min_niter))

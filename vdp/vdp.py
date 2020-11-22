@@ -408,7 +408,7 @@ def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
         if safe_override:
             makenew = 'yes'
         else:
-            makenew = raw_input('\nCreate new database {}? '.format(dbname))
+            makenew = input('\nCreate new database {}? '.format(dbname))
         if makenew == 'y' or makenew == 'yes':
             conn = psycopg2.connect(host='localhost', database='postgres',
                                     user=user)
@@ -1102,7 +1102,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             imobjlist.append(dbclasses.init_image(impath, alwaysass))
 
         # Sort imobjlist by mjdtime
-        imobjlist.sort(key=lambda x: x.mjdtime)
+        imobjlist.sort(key=lambda x: x.mjdtime or 0)
 
         # Begin loop through time-sorted images
         for imobj in imobjlist:
@@ -1399,7 +1399,7 @@ def main():
 
     # Option to remove matching results for sky catalogs
     if args.remove_catalog_matches:
-        catalogs = raw_input('\nFor which catalogs would you like to remove '
+        catalogs = input('\nFor which catalogs would you like to remove '
                              'matching results? (List catalogs separated by '
                              'a comma.)\n')
         cat_list = [cat.lower() for cat in catalogs.split(', ')]
@@ -1418,7 +1418,7 @@ def main():
 
     # Option to remove sources from the **assoc_source** database table
     if args.remove_source:
-        inp = raw_input('\nPlease enter the id number(s) (i.e. 1, 2, 3) '
+        inp = input('\nPlease enter the id number(s) (i.e. 1, 2, 3) '
                         'of the source(s) you wish to remove from the '
                         'database assoc_source table, or provide a text '
                         'file with one id number per line:\n')
@@ -1436,7 +1436,7 @@ def main():
 
     # Option to remove images
     if args.remove_image:
-        inp = raw_input('\nPlease enter the image(s) filename(s) starting '
+        inp = input('\nPlease enter the image(s) filename(s) starting '
                         'at least with the year-month directory (i.e. '
                         '2018-01/15/Images/10GHz.Mrk110.IPln1.fits), or '
                         'provide a text file with one filename per line:\n')
@@ -1450,7 +1450,7 @@ def main():
                       in text.strip().split('\n')]
         logger.info('Preparing to remove image(s) {} from the database.'.
                     format(images))
-        confirm = raw_input('\nAre you sure? ')
+        confirm = input('\nAre you sure? ')
         if confirm == 'y' or confirm == 'yes':
             logger.info('Deleting image(s) from the database...')
             dbio.remove_images(conn, images)
@@ -1461,7 +1461,7 @@ def main():
 
     # Option to manually add catalog matching results
     if args.manually_add_match:
-        inp = raw_input('\nPlease enter the source assoc_source id, the '
+        inp = input('\nPlease enter the source assoc_source id, the '
                         'name of the catalog, and, optionally, the id of the '
                         'matched catalog source and the angular separation in '
                         'arcseconds, in that order one per line. '
@@ -1473,9 +1473,9 @@ def main():
             try:
                 int(inp[0])
                 cmatches.append(inp)
-                inp = raw_input()
+                inp = input()
             except IndexError:
-                inp = raw_input()
+                inp = input()
             except ValueError:
                 with open(inp, 'r') as f:
                     text = f.read()
