@@ -176,10 +176,25 @@ def cfgparse(cfgfile):
 
     # Perform checks on path to images
     if yr is None or mo is None:
-        procdir = os.path.join(rootdir, 'Images/')
+        if not imgdir:
+            imgdir='Images/'
+        procdir=rootdir+imgdir
+        print(procdir)
         if not os.path.isdir(procdir):
             raise ConfigError('Directory does not exist: {}'.format(procdir))
-        dirs = [procdir]
+        if not days:
+            dirs = [procdir]
+        else:
+            # Define path to processing directories
+            dirs = []
+            for day in days:
+                procdir = rootdir+imgdir+day
+                # Check full image path
+                if not os.path.isdir(procdir):
+                    print('\nSkipping non-existent directory {}'.format(procdir))
+                    continue
+                else:
+                    dirs.append(procdir)
     else:
         try:
             mo = format(int(mo), '02')  # force 2-digits
@@ -1017,7 +1032,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     return
 
 
-def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
+def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup):
     """This function handles the logic and transitions between
     processing stages.
 
@@ -1046,6 +1061,10 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
     qaparams : dict
         User-specified quality requirements or default values defined
         and set in ``cfgparse``.
+    setup : dict
+        Keys are the setup parameters (root directory, year, month, day,
+        files, database name, database user, and catalogs) and values
+        are the user-supplied inputs.
     """
     global branch
     # Define booleans from stages & opts dictionaries
@@ -1077,7 +1096,10 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams):
             logger.info('Pipeline terminated (keyboard interrupt).')
             break
         # Define/make directory for PyBDSF output
-        daydir = os.path.abspath(os.path.join(imgdir, '..'))
+        if setup['year'] is None and setup['month'] is None:
+            daydir = imgdir
+        else:
+            daydir = os.path.abspath(os.path.join(imgdir, '..'))
         pybdsfdir = os.path.join(daydir, 'PyBDSF/')
         if not os.path.isdir(pybdsfdir):
             os.system('mkdir '+pybdsfdir)
@@ -1464,22 +1486,22 @@ def main():
         inp = input('\nPlease enter the source assoc_source id, the '
                         'name of the catalog, and, optionally, the id of the '
                         'matched catalog source and the angular separation in '
-                        'arcseconds, in that order one per line. '
+                        'arcseconds, in that order one per line. NO COMMAS '
                         'Hit "q" when you are done. You may alternatively '
                         'provide a similarly formatted text file with one '
                         'catalog match per line:\n')
         cmatches = []
         while inp != 'q':
             try:
-                int(inp[0])
+                int(inp.split()[0])
                 cmatches.append(inp)
                 inp = input()
             except IndexError:
                 inp = input()
             except ValueError:
                 with open(inp, 'r') as f:
-                    text = f.read()
-                    cmatches = [line for line in text.strip().split('\n')]
+                    text = f.readlines()
+                    cmatches = [line.strip('\n') for line in text]
                     break
             if inp == 'q':
                 break
@@ -1488,7 +1510,7 @@ def main():
         catsrc_ids = []
         separations = []
         for cmatch in cmatches:
-            cm = cmatch.split(', ')
+            cm = cmatch.split(' ')
             assoc_ids.append(int(cm[0]))
             catalog = cm[1].lower()
             if catalog not in catalogio.catalog_dict.keys():
@@ -1525,7 +1547,7 @@ def main():
 
     # Process images
     process(conn, stages, opts, dirs, setup['files'],
-            setup['catalogs'], sfparams, qaparams)
+            setup['catalogs'], sfparams, qaparams, setup)
 
     # Update run_config table & close database connection
     nimages, exec_time = print_run_stats(start_time)

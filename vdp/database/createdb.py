@@ -180,6 +180,7 @@ def create(conn, params, safe=False):
                 ass_flag BOOLEAN,
 		nsn INTEGER,
                 tsky REAL,
+                square TEXT,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

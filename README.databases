@@ -6,6 +6,8 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
+mosaics : VCSS mosaics
+
 vcss : VCSS snapshots. Currently 1.1 + 1.2. Sources were not 
        associated or matched to catalogs to speed up processing. 
        Neither snapshots nor sources were beam corrected.
@@ -42,10 +44,6 @@ vlite16 : A staging area for processing images after
           dbclasses.py) before reprocessing into the
 	  corresponding vlite16[a-d] database
 
-hudf : Probably obsolete DB
-
-hudf2 : Probably obsolete DB
-
 hudffinal : The "final" A config VLITE HUDF image that 
 	    combined 3 images from 2018 & 3 from 2019, 
 	    WSCLEANed. DB includes raw
@@ -81,10 +79,6 @@ vdptest : Generic DB for running tests of VDP
 timechop : Long exposure fields reimaged at shorter
 	   timescales. For testing
 
-beamoffset : Obsolete DB for testing. Can be dropped
-
-beamoffset2 : Obsolete DB for testing. Can be dropped
-
 cosmos10 : VLITE10 COSMOS imaged at 10 min 
 	   timescales (?)
 
@@ -101,3 +95,8 @@ deep10injected : deep10 with fake transients injected
 
 deepdaily : Deepfield images from the daily pipeline
 
+cosmospbcor : VLITE16 images in and around the COSMOS field.
+	      For testing 2D beam corrections
+
+cosmosuncor : Like cosmospbcor but raw images. No beam 
+	      corrections applied

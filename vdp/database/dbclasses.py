@@ -212,6 +212,8 @@ class Image(object):
         Number of SN tables in UVOUT. 3 = amp & phase self cal applied to image 
     tsky : float
         Brightness temp of GSM map at image center
+    square : str
+        VCSS Square. 
     """
     # A class variable to count the number of images
     num_images = 0
@@ -270,6 +272,7 @@ class Image(object):
         self.ass_flag = None
         self.nsn = None
         self.tsky = None
+        self.square = None
 
     def process_image(self, image):
         self.filename = image
@@ -476,9 +479,12 @@ class Image(object):
         try:
             if self.obs_date is not None:
                 date = self.obs_date.split('-')
-                # self.mjdtime = float(int(hdr['MJDTIME'])) + hdr['STARTIME'] #day
-                self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
-                    date[2]))).mjd + float(hdr['STARTIME'])  # day
+                try:
+                    self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
+                        date[2]))).mjd + float(hdr['STARTIME'])  # day
+                except:
+                    self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
+                        date[2]))).mjd  # day
                 t = Time(self.mjdtime, format='mjd')
                 self.lst = t.sidereal_time('apparent', VLALON).hour  # hrs
                 if self.obs_ra is not None and self.obs_dec is not None:
@@ -542,6 +548,12 @@ class Image(object):
             else:
                 self.glon = None
                 self.glat = None
+        try:
+            self.square = hdr['SQUARE']
+            if hdr['SQUARE'][-2:]==' A':
+                self.square = hdr['SQUARE'][:-2] #slice off ' A'
+        except KeyError:
+            self.square = None
         try:
             self.az_star = hdr['AZ_STAR']
         except KeyError:
@@ -763,13 +775,19 @@ class Image(object):
 
         # Check primary calibrators
         if self.pri_cals is None:
-            self.error_id = 12
+            if self.filename.endswith('IMSC.fits') : #mosaics don't have
+                pass
+            else:
+                self.error_id = 12
         else:
             pass
 
         # Check CLEAN components
         if self.cc is None:
-            self.error_id = 13
+            if self.filename.endswith('IMSC.fits') : #mosaics don't have
+                pass
+            else:
+                self.error_id = 13
         else:
             pass
 
