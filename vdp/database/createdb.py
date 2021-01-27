@@ -275,6 +275,8 @@ def create(conn, params, safe=False):
                 snr REAL,
                 compactness REAL,
                 clean BOOLEAN,
+                xpix REAL,
+                ypix REAL,
                 assoc_id INTEGER,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)

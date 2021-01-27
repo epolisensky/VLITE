@@ -18,7 +18,7 @@ from datetime import datetime
 from break_handler import BreakHandler
 from database import createdb, dbclasses, dbio
 from errors import ConfigError
-from sourcefinding import runbdsf
+from sourcefinding import runbdsf,beam_tools
 from matching import radioxmatch
 from radiocatalogs import catalogio, radcatdb
 from math import sqrt
@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 
 
-__version__ = '2.5'
+__version__ = '3.0'
 
 
 # Create logger
@@ -140,7 +140,7 @@ def cfgparse(cfgfile):
         boolean ``True`` or ``False``.
     setup : dict
         Keys are the setup parameters (root directory, year, month, day,
-        files, database name, database user, and catalogs) and values
+        files, database name, database user, catalogs, & smear time) and values
         are the user-supplied inputs.
     sfparams : dict
         Keys are the required source finding parameters *mode* and *scale*
@@ -259,6 +259,10 @@ def cfgparse(cfgfile):
         raise ConfigError('Please provide a database name/user.')
     # Force database name to all lowercase
     setup['database name'] = setup['database name'].lower()
+
+    # Check if smear time is giveb
+    if setup['smear time'] is None:
+        setup['smear_time'] = 200. #[s]
 
     # Check list of sky catalogs
     if stages['catalog matching']:
@@ -655,7 +659,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
     return imobj
 
 
-def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
+def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
     """Runs PyBDSF source finding and inserts source 
     fit parameters into database  **detected_source**,
     **detected_island**, and **corrected_flux** tables,
@@ -687,7 +691,11 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
     opts : dict
         User-specified options from the configuration file. Needed
         to decide on applying primary beam correction
-
+    pbdic : dict
+        Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
+        with the primary beams. One for each priband
+    setup : dict
+        Smear time key gives the max time step for beam image calculation
     Returns
     -------
     imobj : ``database.dbclasses.Image`` instance
@@ -764,10 +772,11 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts):
             if opts['beam corrected']:  # images already are
                 logger.info('Image already beam corrected.')
             else:
-                logger.info('Correcting all flux measurements for primary beam '
-                            'response.')
+                logger.info('Calculating beam image and correcting all ' 
+                            'flux measurements for primary beam response.')
+                imobj.set_beam_image(pbdic, setup['smear time'])
                 for src in sources:
-                    src.correct_flux(imobj.pri_freq)
+                    src.correct_flux(imobj,pbdic)
             # Calc SNR, compactness, add to table
             for src in sources:
                 src.calc_snr()
@@ -1088,6 +1097,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
     fin.close()
     nside = hp.get_nside(skymap)
 
+    #Create primary beams dictionary
+    pbdic = beam_tools.Get_Primary_Beams()
+
     # Begin loop through daily directories
     i = 0
     for imgdir in dirs:
@@ -1140,7 +1152,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, sfparams, save,
-                                         qa, qaparams, opts)
+                                         qa, qaparams, opts, pbdic)
                 # Copy PyBDSF warnings from their log to ours
                 with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()
@@ -1151,9 +1163,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                     for warning in warnings:
                         logger.info(warning)
                 # Move PyBDSF output files to PyBDSF directory
-                os.system('mv '+imgdir+'*pybdsf.log '+pybdsfdir+'.')
-                if glob.glob(imgdir+'*pybdsm*'):
-                    os.system('mv '+imgdir+'*pybdsm* '+pybdsfdir+'.')
+                os.system('mv '+imgdir+'/*pybdsf.log '+pybdsfdir+'.')
+                if glob.glob(imgdir+'/*pybdsm*'):
+                    os.system('mv '+imgdir+'/*pybdsm* '+pybdsfdir+'.')
                 if sources is None:
                     # Image failed to process
                     logger.info('sources is none!')

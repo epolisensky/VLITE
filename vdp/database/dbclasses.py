@@ -66,21 +66,6 @@ res_dict = {
     'AnB': {'V10': {'mjd': [56986, 57953.99], 'bmin': [0, 0], 'semester': 'many'}}
 }
 
-# Define beam offset & dictionary for each primary observing frequency.
-# Beams are offset from phase center by amount "offset" in given direction.
-# Angles are in deg, "E" of zenith direction (counter-clkwise looking into dish)
-# *Note P band primary observing images do NOT need offset correction
-offset = 6.5/60  # deg
-offset_dict = {'1.5': -174.1,
-               '3': 11.6,
-               '6': 75.2,
-               '10': 113.7,
-               '15': -42.4,
-               '22': -64.1,
-               '33': -106.9,
-               '45': -85.5
-               }
-
 
 class Image(object):
     """A class to hold information about the FITS image file.
@@ -149,6 +134,8 @@ class Image(object):
     pri_freq : float
         Frequency of the simultaneously acquired primary
         band data (GHz).
+    priband : str
+        String version of pri_freq
     bmaj : float
         Size of the beam major axis FWHM (arcsec).
     bmin : float
@@ -214,6 +201,16 @@ class Image(object):
         Brightness temp of GSM map at image center
     square : str
         VCSS Square. 
+    xref : float
+        X reference pixel. Keyword CRPIX1
+    yref : float
+        y reference pixel. Keyword CRPIX2
+    naxis1 : int
+        Number of x-dimension pixels. Keyword NAXIS1
+    naxis2 : int
+        Number of y-dimension pixels. Keyword NAXIS2
+    bmimg : numpy ndarray
+        primary beam image for the image
     """
     # A class variable to count the number of images
     num_images = 0
@@ -273,6 +270,11 @@ class Image(object):
         self.nsn = None
         self.tsky = None
         self.square = None
+        self.xref = None
+        self.yref = None
+        self.naxis1 = None
+        self.naxis2 = None
+        self.bmimg = None
 
     def process_image(self, image):
         self.filename = image
@@ -317,33 +319,58 @@ class Image(object):
         """
         # start with priband
         try:
-            priband = hdr['PRIBAND']
-            if float(priband[:-3]) > 100:
-                self.pri_freq = float(priband[:-3])/1000  # GHz
+            hdrpriband = hdr['PRIBAND']
+            if float(hdrpriband[:-3]) > 100:
+                self.pri_freq = float(hdrpriband[:-3])/1000  # GHz
+                self.priband = '0.3'
             else:
-                self.pri_freq = float(priband[:-3])  # GHz
+                self.pri_freq = float(hdrpriband[:-3])  # GHz
+                if self.pri_freq > 40: self.priband = '45'
+                elif self.pri_freq > 30: self.priband = '33'
+                elif self.pri_freq > 20: self.priband = '22'
+                elif self.pri_freq > 14: self.priband = '15'
+                elif self.pri_freq > 9: self.priband = '10'
+                elif self.pri_freq > 5: self.priband = '6'
+                elif self.pri_freq > 2: self.priband = '3'
+                elif self.pri_freq > 1: self.priband = '1.5'
+                else: self.priband = None 
         except:
             # VCSS mosaics/snapshots
             if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename:
                 self.pri_freq = 3
+                self.priband = '3'
             else:
                 pri = re.findall('\/([0-9.]+[A-Z])', self.filename)
                 try:
                     if pri[0][-1:] == 'M':
                         self.pri_freq = float(pri[0][:-1]) / 1000.  # GHz
+                        self.priband = '0.3'
                     else:
                         self.pri_freq = float(pri[0][:-1])  # GHz
+                        if self.pri_freq > 40: self.priband = '45'
+                        elif self.pri_freq > 30: self.priband = '33'
+                        elif self.pri_freq > 20: self.priband = '22'
+                        elif self.pri_freq > 14: self.priband = '15'
+                        elif self.pri_freq > 9: self.priband = '10'
+                        elif self.pri_freq > 5: self.priband = '6'
+                        elif self.pri_freq > 2: self.priband = '3'
+                        elif self.pri_freq > 1: self.priband = '1.5'
+                        else: self.priband = None 
                     # project code 13B-266 is at 1.5 GHz
                     if self.pri_freq == 13:
                         self.pri_freq = 1.5
+                        self.priband = '1.5'
                 except IndexError:
                     self.pri_freq = None
+                    self.priband = None
         ###
         try:
-            naxis1 = hdr['NAXIS1']
-            naxis2 = hdr['NAXIS2']
-            self.imsize = str((naxis1, naxis2))  # pixels
+            self.naxis1 = hdr['NAXIS1']
+            self.naxis2 = hdr['NAXIS2']
+            self.imsize = str((self.naxis1, self.naxis2))  # pixels
         except KeyError:
+            self.naxis1 = None
+            self.naxis2 = None
             self.imsize = None
             self.error_id = 1
 
@@ -386,6 +413,16 @@ class Image(object):
         except KeyError:
             self.duration = None
             self.error_id = 1
+        try:
+            self.xref = hdr['CRPIX1']
+        except KeyError:
+            self.xref = None
+            self.error_id = 1
+        try:
+            self.yref = hdr['CRPIX2']
+        except KeyError:
+            self.yref = None
+            self.error_id = 1    
         try:
             self.obj = hdr['OBJECT']
         except KeyError:
@@ -656,6 +693,19 @@ class Image(object):
         # set ass_flag if 'always associated' option enabled
         if alwaysass:
             self.ass_flag = True
+
+    def set_beam_image(self, pbdic, smeartime):
+        """Calculates the primary beam image, offset & smeared, for the image.
+        
+        Parameters
+        ----------
+        pbdic : dictionary
+           Primary beam dictionary
+        smeartime : float
+           max time step for smear calculation
+
+        """
+        self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic, smeartime)
 
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
@@ -1006,6 +1056,10 @@ class DetectedSource(object):
         < 1  : extended
     clean : boolean
         True if source was CLEANed.
+    xpix : float
+        X pixel value of source
+    ypix : float
+        Y pixel value of source
     id : int
         Uniquely identifies the source in the **assoc_source** table.
     res_class : str
@@ -1087,6 +1141,8 @@ class DetectedSource(object):
         self.polar_angle = None
         self.compactness = None
         self.clean = None
+        self.xpix = None
+        self.ypix = None
         # assoc_source attributes
         self.id = None
         self.res_class = None
@@ -1182,21 +1238,36 @@ class DetectedSource(object):
                            [0], pcoordS[0][1]-pcoordI[0][1])  # rad
         self.polar_angle = theta * 180.0/np.pi  # deg
 
-    def correct_flux(self, pri_freq):
-        """Applies a 1-D radial correction to all flux measurements
-        from PyBDSF. The correction factor has been empirically derived
-        from flux comparisons of sources as a function of angular
-        distance from the image center. The scale factor increases
-        farther from the pointing center as the beam power decreases.
+    def calc_pixel_coords(self, imobj):
+        """Calculates a detected source's position in pixels
+        and sets the ``xpix`` & ``ypix`` attributes.
 
         Parameters
         ----------
-        pri_freq : float
-            Primary frequency of the observations in GHz.
+        imobj : ``database.dbclasses.Image`` instance
+            Initialized Image object with attribute values
+            set from header info.
         """
-        # Correct for beam response - only 1D (sym. beam) for now
-        pb_power, pb_err = beam_tools.find_nearest_pbcorr(self.dist_from_center,
-                                                          pri_freq)
+        x,y = beam_tools.EQtoPIX(self.ra, self.dec, imobj.wcsobs)
+        self.xpix = x
+        self.ypix = y
+
+
+    #pri_freq should be replaced with beam image
+    def correct_flux(self, imobj, pbdic):
+        """Uses primary beam image to correct all flux measurements
+        from PyBDSF.
+
+        Parameters
+        ----------
+        imobj : ``database.dbclasses.Image`` instance
+            Object with image attributes
+        """
+        # Correct for beam response
+        # use source pixel coords to get pixel value in beam image
+        pb_power = imobj.bmimg[int(self.ypix),int(self.xpix)]
+        pb_err = pbdic[imobj.priband].error
+        
         # List of attributes to correct
         attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl', 'mean_isl',
                  'resid_rms', 'resid_mean']

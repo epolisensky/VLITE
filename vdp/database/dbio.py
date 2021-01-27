@@ -330,14 +330,15 @@ def add_corrected(conn, src, status=None):
             src_id, isl_id, image_id, total_flux, e_total_flux, peak_flux,
             e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
             isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, 
-            snr, compactness, clean, assoc_id) VALUES (
+            snr, compactness, clean, xpix, ypix, assoc_id) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                     (src.src_id, src.isl_id, src.image_id, src.total_flux,
                      src.e_total_flux, src.peak_flux, src.e_peak_flux,
                      src.total_flux_isl, src.total_flux_islE, src.rms_isl,
                      src.mean_isl, src.resid_rms, src.resid_mean,
                      src.dist_from_center, src.polar_angle, src.snr,
-                     src.compactness, src.clean, src.assoc_id))
+                     src.compactness, src.clean, src.xpix, src.ypix,
+                     src.assoc_id))
     #Or update existing:
     else:
         src_id = status[0]
