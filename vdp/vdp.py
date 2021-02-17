@@ -260,9 +260,10 @@ def cfgparse(cfgfile):
     # Force database name to all lowercase
     setup['database name'] = setup['database name'].lower()
 
-    # Check if smear time is giveb
+    # Check if smear time is given
     if setup['smear time'] is None:
-        setup['smear_time'] = 200. #[s]
+        setup['smear time'] = 900. #[s]
+    #print('smear time =',setup['smear time'])
 
     # Check list of sky catalogs
     if stages['catalog matching']:
@@ -693,7 +694,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
         to decide on applying primary beam correction
     pbdic : dict
         Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
-        with the primary beams. One for each priband
+        with the primary beams
     setup : dict
         Smear time key gives the max time step for beam image calculation
     Returns
@@ -772,12 +773,18 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
             if opts['beam corrected']:  # images already are
                 logger.info('Image already beam corrected.')
             else:
-                logger.info('Calculating beam image and correcting all ' 
+                #set image primary beam flag & update image table
+                imobj.set_pbflag()
+                dbio.update_pbflag(conn, imobj)
+                if imobj.pb_flag: #if flag True, ok to calc primary beam image
+                    logger.info('Calculating beam image and correcting all ' 
                             'flux measurements for primary beam response.')
-                imobj.set_beam_image(pbdic, setup['smear time'])
-                for src in sources:
-                    src.correct_flux(imobj,pbdic)
-            # Calc SNR, compactness, add to table
+                    imobj.set_beam_image(pbdic, setup['smear time'])
+                    for src in sources:
+                        src.correct_flux(imobj,pbdic)
+                else:
+                    logger.info('Image pb_flag False, cannot calculate beam image.')
+            # Calc SNR, compactness, add to table. These don't require beam correction
             for src in sources:
                 src.calc_snr()
                 src.calc_compactness(imobj)
@@ -1152,7 +1159,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, sfparams, save,
-                                         qa, qaparams, opts, pbdic)
+                                         qa, qaparams, opts, pbdic, setup)
                 # Copy PyBDSF warnings from their log to ours
                 with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()
@@ -1403,9 +1410,9 @@ def main():
     parser.add_argument('--add_catalog', action='store_true',
                         help='adds any new sky survey catalogs to a table in '
                         'the database "radcat" schema')
-    parser.add_argument('--update_pbcor', action='store_true',
-                        help='update corrected_flux table with primary '
-                        'beam corrections')
+    #    parser.add_argument('--update_pbcor', action='store_true',
+    #                        help='update corrected_flux table with primary '
+    #                        'beam corrections')
     args = parser.parse_args()
 
     # Start the timer
@@ -1425,8 +1432,10 @@ def main():
     logger.info('#' * (len(logpath) + 10))
 
     # Find existing/create/overwrite database
+    #if any([args.remove_catalog_matches, args.remove_source,
+    #        args.remove_image, args.manually_add_match, args.add_catalog, args.update_pbcor]):
     if any([args.remove_catalog_matches, args.remove_source,
-            args.remove_image, args.manually_add_match, args.add_catalog, args.update_pbcor]):
+            args.remove_image, args.manually_add_match, args.add_catalog]):
         opts['overwrite'] = False
     conn = dbinit(setup['database name'], setup['database user'],
                   opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
@@ -1548,15 +1557,16 @@ def main():
         radcatdb.create(conn)
         conn.close()
         sys.exit(0)
-
+    '''
+    #Needs updating to work with v3.0 beam corrections
     # Option to update corrected_flux table with primary beam corrections
     if args.update_pbcor:
         logger.info('Updating corrected_flux table...')
-        dbio.update_corrected(conn)
+        dbio.update_corrected(conn,setup)
         conn.close()
         logger.info('Done.')
         sys.exit(0)
-
+    '''
     # Process images
     process(conn, stages, opts, dirs, setup['files'],
             setup['catalogs'], sfparams, qaparams, setup)

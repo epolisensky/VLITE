@@ -175,12 +175,16 @@ def create(conn, params, safe=False):
                 az_f REAL,
                 alt_f REAL,
                 parang_f REAL,
-                lst DOUBLE PRECISION,
+                lst_i REAL,
+                lst_f REAL,
                 pri_cals JSON,
                 ass_flag BOOLEAN,
 		nsn INTEGER,
                 tsky REAL,
                 square TEXT,
+                sunsep REAL,
+                pbkey TEXT,
+                pb_flag BOOLEAN,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

@@ -112,14 +112,20 @@ class Image(object):
         Altitude of image pointing center at mjdtime from astropy (degrees).
     parang_i : float
         Parallactic angle of image pointing center at mjdtime from astropy (degrees).
+    hrang_i : float
+        Hour angle at mjdtime (hrs).
     az_f : float
         Azimuth of image pointing center at mjdtime+duration from astropy (degrees).
     alt_f : float
         Altitude of image pointing center at mjdtime+duration from astropy (degrees).
     parang_f : float
         Parallactic angle of image pointing center at mjdtime+duration from astropy (degrees).
-    lst : float
-        Local Sidereal Time of image at start time (hours) 
+    hrang_f : float
+        Hour angle at mjdtime+duration (hrs).
+    lst_i : float
+        Local Sidereal Time of image at mjdtime (hours) 
+    lst_f : float
+        Local Sidereal Time at mjdtime+duration (hours)
     pixel_scale : float
         Spatial conversion from pixel to angular size on the sky
         (arcseconds / pixel.)
@@ -135,7 +141,9 @@ class Image(object):
         Frequency of the simultaneously acquired primary
         band data (GHz).
     priband : str
-        String version of pri_freq
+        String version of pri_freq.
+    pbkey : str
+        Primary beam key for image (depends on priband).
     bmaj : float
         Size of the beam major axis FWHM (arcsec).
     bmin : float
@@ -159,9 +167,9 @@ class Image(object):
     mjdtime : float
         Modified Julian Date (days since 0h Nov 17, 1858).
     tau_time : float
-        Integration time on source in seconds.
+        Integration time on source (seconds).
     duration : float
-        Total time spanned by the observations in seconds.
+        Total time spanned by the observations (seconds).
     nsrc : int
         Number of sources extracted during source finding.
     nclean : int
@@ -211,6 +219,13 @@ class Image(object):
         Number of y-dimension pixels. Keyword NAXIS2
     bmimg : numpy ndarray
         primary beam image for the image
+    vcss : boolean
+        True if image is a VCSS snapshot (used for beam image calculation)
+    sunsep : float
+        Angular separation between the Sun and the image pointing 
+        center at mjdtime (degrees).
+    pb_flag : boolean
+        True if able to calculate primary beam image
     """
     # A class variable to count the number of images
     num_images = 0
@@ -236,7 +251,8 @@ class Image(object):
         self.az_f = None
         self.alt_f = None
         self.parang_f = None
-        self.lst = None
+        self.lst_i = None
+        self.lst_f = None
         self.pixel_scale = None
         self.obj = None
         self.obs_date = None
@@ -275,6 +291,12 @@ class Image(object):
         self.naxis1 = None
         self.naxis2 = None
         self.bmimg = None
+        self.vcss = None
+        self.sunsep = None
+        self.hrang_i = None
+        self.hrang_f = None
+        self.pbkey = None
+        self.pb_flag = None
 
     def process_image(self, image):
         self.filename = image
@@ -317,52 +339,99 @@ class Image(object):
         if the missing header keyword is deemed important enough.        
 
         """
+        # first check if VCSS snapshot
+        self.vcss = False
+        if 'VCSS' in self.filename or 'vcss' in self.filename:
+                if self.filename.endswith('IPln1.fits'):
+                    self.vcss = True # image is a VCSS snapshot not mosaic
+                    
         # start with priband
         try:
             hdrpriband = hdr['PRIBAND']
             if float(hdrpriband[:-3]) > 100:
                 self.pri_freq = float(hdrpriband[:-3])/1000  # GHz
                 self.priband = '0.3'
+                self.pbkey = 'P'
             else:
                 self.pri_freq = float(hdrpriband[:-3])  # GHz
-                if self.pri_freq > 40: self.priband = '45'
-                elif self.pri_freq > 30: self.priband = '33'
-                elif self.pri_freq > 20: self.priband = '22'
-                elif self.pri_freq > 14: self.priband = '15'
-                elif self.pri_freq > 9: self.priband = '10'
-                elif self.pri_freq > 5: self.priband = '6'
-                elif self.pri_freq > 2: self.priband = '3'
-                elif self.pri_freq > 1: self.priband = '1.5'
-                else: self.priband = None 
+                if self.pri_freq > 40:
+                    self.priband = '45'
+                    self.pbkey = 'KQ'
+                elif self.pri_freq > 30:
+                    self.priband = '33'
+                    self.pbkey = 'KQ'
+                elif self.pri_freq > 20:
+                    self.priband = '22'
+                    self.pbkey = 'KQ'
+                elif self.pri_freq > 14:
+                    self.priband = '15'
+                    self.pbkey = 'KQ'
+                elif self.pri_freq > 9:
+                    self.priband = '10'
+                    self.pbkey = 'CX'
+                elif self.pri_freq > 5:
+                    self.priband = '6'
+                    self.pbkey = 'CX'
+                elif self.pri_freq > 2:
+                    self.priband = '3'
+                    self.pbkey = 'S'
+                elif self.pri_freq > 1:
+                    self.priband = '1.5'
+                    self.pbkey = 'L'
+                else:
+                    self.priband = None
+                    self.pbkey = None
         except:
-            # VCSS mosaics/snapshots
+            # VCSS mosaics & snapshots
             if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename:
                 self.pri_freq = 3
                 self.priband = '3'
+                self.pbkey = 'S'
             else:
                 pri = re.findall('\/([0-9.]+[A-Z])', self.filename)
                 try:
                     if pri[0][-1:] == 'M':
                         self.pri_freq = float(pri[0][:-1]) / 1000.  # GHz
                         self.priband = '0.3'
+                        self.pbkey = 'P'
                     else:
                         self.pri_freq = float(pri[0][:-1])  # GHz
-                        if self.pri_freq > 40: self.priband = '45'
-                        elif self.pri_freq > 30: self.priband = '33'
-                        elif self.pri_freq > 20: self.priband = '22'
-                        elif self.pri_freq > 14: self.priband = '15'
-                        elif self.pri_freq > 9: self.priband = '10'
-                        elif self.pri_freq > 5: self.priband = '6'
-                        elif self.pri_freq > 2: self.priband = '3'
-                        elif self.pri_freq > 1: self.priband = '1.5'
-                        else: self.priband = None 
+                        if self.pri_freq > 40:
+                            self.priband = '45'
+                            self.pbkey = 'KQ'
+                        elif self.pri_freq > 30:
+                            self.priband = '33'
+                            self.pbkey = 'KQ'
+                        elif self.pri_freq > 20:
+                            self.priband = '22'
+                            self.pbkey = 'KQ'
+                        elif self.pri_freq > 14:
+                            self.priband = '15'
+                            self.pbkey = 'KQ'
+                        elif self.pri_freq > 9:
+                            self.priband = '10'
+                            self.pbkey = 'CX'
+                        elif self.pri_freq > 5:
+                            self.priband = '6'
+                            self.pbkey = 'CX'
+                        elif self.pri_freq > 2:
+                            self.priband = '3'
+                            self.pbkey = 'S'
+                        elif self.pri_freq > 1:
+                            self.priband = '1.5'
+                            self.pbkey = 'L'
+                        else:
+                            self.priband = None
+                            self.pbkey = None
                     # project code 13B-266 is at 1.5 GHz
                     if self.pri_freq == 13:
                         self.pri_freq = 1.5
                         self.priband = '1.5'
+                        self.pbkey = 'L'
                 except IndexError:
                     self.pri_freq = None
                     self.priband = None
+                    self.pbkey = None
         ###
         try:
             self.naxis1 = hdr['NAXIS1']
@@ -374,7 +443,7 @@ class Image(object):
             self.imsize = None
             self.error_id = 1
 
-        self.wcsobj = wcs.WCS(hdr).celestial
+        self.wcsobj = wcs.WCS(hdr).celestial #keeps only RA, Dec axes
 
         try:
             self.obs_ra = hdr['OBSRA']  # deg
@@ -523,7 +592,7 @@ class Image(object):
                     self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
                         date[2]))).mjd  # day
                 t = Time(self.mjdtime, format='mjd')
-                self.lst = t.sidereal_time('apparent', VLALON).hour  # hrs
+                self.lst_i = t.sidereal_time('apparent', VLALON).hour  # hrs
                 if self.obs_ra is not None and self.obs_dec is not None:
                     coord = SkyCoord(self.obs_ra, self.obs_dec,
                                      unit='deg', frame='fk5')
@@ -531,11 +600,12 @@ class Image(object):
                         AltAz(obstime=t, location=locVLA))
                     self.az_i = altaz.az.deg
                     self.alt_i = altaz.alt.deg
-                    hrang = (15*self.lst) - self.obs_ra  # deg
+                    hrang = (15*self.lst_i) - self.obs_ra  # deg
                     if hrang > 180:
                         hrang -= 360
                     if hrang < -180:
                         hrang += 360
+                    self.hrang_i = hrang/15 # hrs
                     tmp1 = np.sin(hrang*DEG2RAD)
                     tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - \
                         np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
@@ -543,27 +613,29 @@ class Image(object):
                     if self.duration is not None:
                         t_end = Time(self.mjdtime+(self.duration /
                                                    86400.), format='mjd')  # end time
-                        lst_end = t_end.sidereal_time(
+                        self.lst_f = t_end.sidereal_time(
                             'apparent', VLALON).hour  # hrs
                         altaz = coord.transform_to(
                             AltAz(obstime=t_end, location=locVLA))
                         self.az_f = altaz.az.deg
                         self.alt_f = altaz.alt.deg
-                        hrang = (15*lst_end) - self.obs_ra  # deg
+                        hrang = (15*self.lst_f) - self.obs_ra  # deg
                         if hrang > 180:
                             hrang -= 360
                         if hrang < -180:
                             hrang += 360
+                        self.hrang_f = hrang/15 # hrs
                         tmp1 = np.sin(hrang*DEG2RAD)
                         tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - \
                             np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
                         self.parang_f = np.arctan2(tmp1, tmp2)*RAD2DEG
         except KeyError:
             self.mjdtime = None
-            self.lst = None
+            self.lst_i = None
             self.az_i = None
             self.alt_i = None
             self.parang_i = None
+            self.lst_f = None
             self.az_f = None
             self.alt_f = None
             self.parang_f = None
@@ -615,6 +687,20 @@ class Image(object):
             self.pa_end = hdr['PA_END']
         except KeyError:
             self.pa_end = None
+
+    def set_pbflag(self):
+        """Sets pb_flag True if primary beam image can be
+        calculated for this image
+        """
+        self.pb_flag = False
+        if self.tau_time/self.duration > 0.5:
+            dh = (24*self.duration/86164.1) - (self.hrang_f-self.hrang_i)
+            if dh < 1:
+                self.pb_flag = True
+            elif self.obs_dec > 61:
+                self.pb_flag = True
+            print('pb_flag = ',self.pb_flag,'dh = ',dh,'dur = ',24*self.duration/86164.1,'hrang_f,_i = ',self.hrang_f,self.hrang_i)
+        print('pb_flag = ',self.pb_flag)
 
     def set_tsky(self, nside, skymap):
         """Sets the tsky attribute of the Image object, the
@@ -705,7 +791,10 @@ class Image(object):
            max time step for smear calculation
 
         """
-        self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic, smeartime)
+        if self.vcss is True:
+            self.bmimg = beam_tools.Calc_Beam_Image_VCSS(self, pbdic)
+        else:
+            self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic, smeartime)
 
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
@@ -871,6 +960,8 @@ class Image(object):
         min_sep = 999999.99
         for src, loc in bad_sources.items():
             ang_sep = image_center.separation(loc).degree
+            if src == 'Sun':
+                self.sunsep = ang_sep
             while ang_sep < min_sep:
                 min_sep = ang_sep
                 self.nearest_problem = src
@@ -909,6 +1000,7 @@ class Image(object):
             if src.dist_from_center <= 1.5:
                 nsrc_cut += 1
 
+        '''
         # Estimate number of expected sources within central 1.5 degrees
         nsrc_exp = beam_tools.expected_nsrc(self.pri_freq, self.noise)
         # Compute metric for determining if source count is way off
@@ -922,6 +1014,7 @@ class Image(object):
             return
         else:
             pass
+        '''
 
         dbclasses_logger.info('...image passed.')
 
@@ -1091,7 +1184,7 @@ class DetectedSource(object):
     eta_total : float
         Variability significance metric of associated source ave_total
     eta_peak : float
-        Variability significance metric of associated source ave_peak    
+        Variability significance metric of associated source ave_peak
 
     References
     ----------
@@ -1230,12 +1323,13 @@ class DetectedSource(object):
             Initialized Image object with attribute values
             set from header info.
         """
-        world = np.array([[self.ra, self.dec]])
-        pcoordS = imobj.wcsobj.wcs_world2pix([[self.ra, self.dec]], 1)
-        world = np.array([[imobj.obs_ra, imobj.obs_dec]])
-        pcoordI = imobj.wcsobj.wcs_world2pix(world, 1)
-        theta = np.arctan2(pcoordI[0][0]-pcoordS[0]
-                           [0], pcoordS[0][1]-pcoordI[0][1])  # rad
+        #world = np.array([[self.ra, self.dec]])
+        #pcoordS = imobj.wcsobj.wcs_world2pix([[self.ra, self.dec]], 1)
+        #world = np.array([[imobj.obs_ra, imobj.obs_dec]])
+        #pcoordI = imobj.wcsobj.wcs_world2pix(world, 1)
+        #theta = np.arctan2(pcoordI[0][0]-pcoordS[0]
+        #                   [0], pcoordS[0][1]-pcoordI[0][1])  # rad
+        theta = np.arctan2(imobj.xref-self.xpix, self.ypix-imobj.yref)  # rad
         self.polar_angle = theta * 180.0/np.pi  # deg
 
     def calc_pixel_coords(self, imobj):
@@ -1248,12 +1342,9 @@ class DetectedSource(object):
             Initialized Image object with attribute values
             set from header info.
         """
-        x,y = beam_tools.EQtoPIX(self.ra, self.dec, imobj.wcsobs)
-        self.xpix = x
-        self.ypix = y
+        self.xpix, self.ypix = beam_tools.EQtoPIX(self.ra, self.dec, imobj.wcsobj)
 
 
-    #pri_freq should be replaced with beam image
     def correct_flux(self, imobj, pbdic):
         """Uses primary beam image to correct all flux measurements
         from PyBDSF.
@@ -1264,9 +1355,9 @@ class DetectedSource(object):
             Object with image attributes
         """
         # Correct for beam response
-        # use source pixel coords to get pixel value in beam image
+        # Use source pixel coords to get pixel value in beam image
         pb_power = imobj.bmimg[int(self.ypix),int(self.xpix)]
-        pb_err = pbdic[imobj.priband].error
+        pb_err = pbdic[imobj.pbkey].error
         
         # List of attributes to correct
         attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl', 'mean_isl',
@@ -1438,6 +1529,7 @@ def translate(img, out):
         newsrcs[-1].cast(oldsrc)
         newsrcs[-1].image_id = img.id
         newsrcs[-1].calc_center_dist(img)
+        newsrcs[-1].calc_pixel_coords(img)
         newsrcs[-1].calc_polar_angle(img)
 
     return newsrcs

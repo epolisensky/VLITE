@@ -2,7 +2,7 @@
 and expected source counts.
 
 """
-import os
+import math,os,sys,os.path as path
 import numpy as np
 from astropy.io import fits
 from astropy import units as u
@@ -63,15 +63,15 @@ def PIXtoEQ(X, Y, w):
     return ra,dec
 
 
-def Read_Fitted_Beam(priband):
+def Read_Fitted_Beam(pbkey):
     """Reads the fitted beam file which contains
     the correction factor as a function of distance
     from beam center at every arcsecond.
 
     Parameters
     ----------
-    priband : str
-        Primary frequency of the observations in GHz.
+    pbkey : str
+        Primary beam key for primary observing frequency
     
     Returns
     -------
@@ -85,20 +85,23 @@ def Read_Fitted_Beam(priband):
     pb = pribeam()
     #for PBmap v3 beams:
     beamstep= 1. #arcsec
-    nbeam = 16201 #4.5 deg, including end points
+    nbeam = 23401 #6.5 deg, including end points
     phistep = 5. #deg
     nphi  = 19 #includes end points
     #set file name
-    if float(priband) > 14.9:
-        fname='FITBEAM2D_15+22+33+45GHz_0.10.txt'
-    elif float(priband) > 5.9:
-        fname='FITBEAM2D_6+10GHz_0.10.txt'
-    elif float(priband) > 2.9:
-        fname='FITBEAM2D_3GHz_0.15.txt'
+    if pbkey == 'KQ':
+        fname='SMOOTHBEAM2D_15+22+33+45GHz_long.txt'
+    elif pbkey == 'CX':
+        fname='SMOOTHBEAM2D_6+10GHz_long.txt'
+    elif pbkey == 'S':
+        fname='SMOOTHBEAM2D_3GHz_long.txt'
+    elif pbkey == 'L':
+        fname='SMOOTHBEAM2D_1.5GHz_long.txt'
     else:
-        fname='FITBEAM2D_1.5GHz_0.10.txt'
-    print(fname)
-    beamfile=path.join('/home/vpipe/VLITE/vdp/resources',fname)
+        print('ERROR! Invalid pbkey in beam_tools.Read_Fitted_Beam',pbkey)
+        sys.exit(1)
+    #print(pbkey,fname)
+    beamfile = path.join('/home/vpipe/VLITE/vdp/resources',fname)
     f = open(beamfile,'r')
     b = f.readlines()
     f.close() 
@@ -136,6 +139,45 @@ def Read_Fitted_Beam(priband):
     return pb
 
 
+def Read_Perley_Beam():
+    """Returns Perley P band primary beam from EVLA Memo 195 
+    as numpy array. This beam is 1D (symmetric in phi)
+    Currently only returns 344 MHz beam
+    Returns
+    -------
+    pbobj : object
+        Object containing the primary beam
+        correction factor ('power') as a function
+        of distance from the image center 
+        Uncertainty in fitted beam set to 3%
+    """
+    pb = pribeam()
+    beamstep = 1.0 #arcsec
+    nbeam = 23401 #6.5 deg, including end points
+    fname = 'NRAOBEAM_344MHz_long.txt'
+    #print('P',fname)
+    beamfile=path.join('/home/vpipe/VLITE/vdp/resources',fname)
+    f = open(beamfile,'r')
+    b = f.readlines()
+    f.close() 
+    n = len(b)
+    if n != 1:
+        print('ERROR! %d lines in %s, expected %d!' % (n,beamfile,1))
+        sys.exit(1)
+    FitBeam = []
+    d = b[0].split()# split line
+    for j in d:
+        FitBeam.append(float(j))
+    pb.power = np.array(FitBeam)
+    pb.beamstep = beamstep
+    pb.phistep = None #Beam is 1D symmetric for dedicated P band observing
+    pb.beamsteprad = beamstep*DEG2RAD/3600
+    pb.phisteprad = None
+    pb.nbeam = nbeam
+    pb.error = 0.03
+    return pb
+
+'''
 def Get_Perley_Beam(freq=344.): #freq in MHz
     """Returns Perley P band primary beam from EVLA Memo 195 
     as numpy array. This beam is 1D (symmetric in phi)
@@ -174,19 +216,19 @@ def Get_Perley_Beam(freq=344.): #freq in MHz
     pb.nbeam = nbeam
     pb.error = 0.03
     return pb
-
+'''
 
 def Get_Primary_Beams():
     """Returns dictionary with primary beam for each
     primary observing band
     """
-    pribands=['0.3','1.5','3','6','10','15','22','33','45']
-    pbdic={}
-    for priband in pribands:
-        if priband=='0.3':
-            pbdic[priband] = Get_Perley_Beam()
+    pbkeys = ['P','L','S','CX','KQ']
+    pbdic = {}
+    for pbkey in pbkeys:
+        if pbkey == 'P':
+            pbdic[pbkey] = Read_Perley_Beam()
         else:
-            pbdic[priband] = Read_Fitted_Beam(priband)
+            pbdic[pbkey] = Read_Fitted_Beam(pbkey)
     return pbdic
 
 
@@ -205,7 +247,7 @@ def Find_Beam_Center(imobj, parang, dxpix=0, dypix=0):
     #find coords of beam center
     x0 = imobj.xref
     y0 = imobj.yref
-    theta = parang - offset_dict[priband]
+    theta = parang - offset_dict[imobj.priband]
     if theta > 180: theta -= 360
     if theta < -180: theta += 360
     ##beam center is 'offset' deg in direction theta
@@ -242,10 +284,10 @@ def Calc_Beampix_One(cenx, ceny, x, y, pbdic, imobj, parang):
     theta : np.ndarray
         Primary beam values at all pixels
     """
-    pb = pbdic[imobj.priband]
+    pb = pbdic[imobj.pbkey]
     thetapix = np.sqrt(np.power(x-cenx,2)+np.power(y-ceny,2))
     theta    = ((thetapix*imobj.pixel_scale)+(0.5*pb.beamstep))/pb.beamstep #arcsec
-    if imobj.priband=='0.3':
+    if imobj.pbkey == 'P':
         theta = pb.power[np.asarray(theta,dtype=int)]
     else:
         phi = np.arctan2(cenx-x,y-ceny) - parang #radians
@@ -296,7 +338,7 @@ def Calc_Beam_Image(imobj, pbdic, smeartime):
     """
     y,x = np.indices((imobj.naxis2,imobj.naxis1))
     ntime    = int(math.ceil(imobj.duration/smeartime)) + 1
-    deltat = duration/(ntime-1) #[s]
+    deltat = imobj.duration/(ntime-1) #[s]
     deltatday = deltat/86400
 
     #initialize beam image to 0
@@ -312,7 +354,67 @@ def Calc_Beam_Image(imobj, pbdic, smeartime):
         #Calc beam at this time, add to beam image
         bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
     #normalize beam image
-    bmimg /= ntime    
+    bmimg /= ntime
+    return bmimg
+
+
+def Calc_Beam_Image_VCSS(imobj, pbdic):
+    """Calculates primary beam image
+       for VCSS snapshots
+
+    Parameters
+    ----------
+    imobj : object
+        Image object
+    pbdic : dictionary
+        Primary beam dictionary
+
+    Returns
+    -------
+    bmimg : np.ndarray
+        Primary beam image
+    """
+    y,x = np.indices((imobj.naxis2,imobj.naxis1))
+    #initialize beam image to 0
+    bmimg = zeroimg(x,y)
+
+    nbeam = 14
+    delRA=1.5/np.cos(imobj.obs_dec*DEG2RAD)/nbeam #[deg] per time step
+    #is this a double observed image?
+    if imobj.duration > 200:
+        deltat = 2./86400 # [day]
+        start = imobj.mjdtime + 0.5*deltat
+        mjd1 = np.arange(start,start+(nbeam*deltat),deltat)
+        start = imobj.mjdtime + imobj.duration - 27.5*deltat
+        mjd2 = np.arange(start,start+(nbeam*deltat),deltat)
+        mjd = np.concatenate((mjd1, mjd2))
+        start = imobj.obs_ra - (6.5*delRA)
+        ra1 = np.arange(start,start+(nbeam*delRA),delRA)
+        ra = np.concatenate((ra1, ra1))
+        nbeam=len(mjd)
+    else:
+        deltat = imobj.duration/nbeam
+        start = imobj.mjdtime + 0.5*deltat
+        mjd = np.arange(start,start+(nbeam*deltat),deltat)
+        start = imobj.obs_ra - (6.5*delRA)
+        ra = np.arange(start,start+(nbeam*delRA),delRA)
+       
+    #loop over times
+    for i in range(nbeam):
+        xtmp, ytmp = EQtoPIX(ra[i],imobj.obs_dec,imobj.wcsobj)
+        dxpix = xtmp - imobj.xref
+        dypix = ytmp - imobj.yref
+        #Set mjd time
+        #mjdtime0 = imobj.mjdtime + (i*deltatday)
+        #Calc parang
+        parang = Calc_Parang(mjd[i],ra[i],imobj.obs_dec)
+        #Calc beam center. Include offsets to account for RA drift
+        beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang,dxpix,dypix)
+        #Calc beam at this time, add to beam image
+        bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
+    #normalize beam image
+    bmimg /= nbeam
+    
     return bmimg
 
 
@@ -343,6 +445,7 @@ def find_nearest_pbcorr(angle, pri_freq):
     return pbdata['power'][idx],err
 '''
 
+#NEEDS UPDATING
 def expected_nsrc(pri_freq, rms, max_angle=1.5, sigma=5.):
     """Calculates expected number of sources that would
     have been detected within a maximum distance from the

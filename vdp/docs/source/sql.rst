@@ -481,9 +481,16 @@ steps must be completed as the postgres superuser.
 
    .. code-block:: sql
 
-	GRANT SELECT ON ALL TABLES IN SHCEMA public TO PUBLIC;
+	GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC;
 	GRANT USAGE ON SCHEMA radcat TO PUBLIC;
-	GRANT SELECT ON ALL TALBES IN SCHEMA radcat TO PUBLIC;
+	GRANT SELECT ON ALL TABLES IN SCHEMA radcat TO PUBLIC;
 
    PUBLIC is a special role name that is used to grant a privilege to
    every role on the system.
+
+Adding quantile extension
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Tomas Vondra's quantile extension is useful and can be added to a database by running::
+
+     $ psql dbname -c "CREATE EXTENSION quantile"
+

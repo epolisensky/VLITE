@@ -331,7 +331,9 @@ in the table, as well.
   calculated with astropy
 - *parang_f*: parallactic angle of image pointing center at mjdtime+duration (degrees);
   calculated with astropy
-- *lst*: VLA local sidereal time at mjdtime (hrs);
+- *lst_i*: VLA local sidereal time at mjdtime (hrs);
+  calculated with astropy
+- *lst_f*: VLA local sidereal time at mjdtime+duration (hrs);
   calculated with astropy
 - *pixel_scale*: number of arcseconds spanned by each pixel in the
   image (arcsec/pixel); header keyword ``CDELT1`` or ``CDELT2``
@@ -345,6 +347,7 @@ in the table, as well.
   header keyword ``RESTFREQ`` or ``CRVAL3`` or ``CRVAL4``
 - *primary_freq*: frequency of the primary observations (GHz);
   taken from VLITE image filename
+- *pbkey*: Key word of primary beam for image
 - *bmaj*: image beam FWHM major axis (arcsec); header keyword
   ``BMAJ`` or ``CLEANBMJ``
 - *bmin*: image beam FWHM minor axis (arcsec); header keyword
@@ -399,6 +402,10 @@ in the table, as well.
   Three SN tables mean A&P selfcal applied to image
 - *tsky*: 341 MHz brightness temp [K] from the Global Sky Model 
   (de Oliveira-Costa et al. 2008)
+- *sunsep*: angular separation between VLITE image pointing 
+  center and the Sun at mjdtime (degrees)
+- *pbkey*: Primary beam key for image
+- *pb_flag*: True if primary beam calculation for image was possible
 
 .. _run_config:
 

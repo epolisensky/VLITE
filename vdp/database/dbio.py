@@ -136,14 +136,16 @@ def add_image(conn, img, status, delete=False):
         dbio_logger.info('Adding new entry to image table.')
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
-            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, config, cycle, semester, nvis, niter, mjdtime, tau_time, duration, radius, 
+            map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
+            config, cycle, semester, nvis, niter, mjdtime, tau_time, duration, radius, 
             nsrc, nclean, rms_box, stage, error_id, nearest_problem, separation, 
-            glon, glat, lst, az_star, el_star, pa_star, az_end, el_end, pa_end, 
-            az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag, nsn, tsky, square) 
+            glon, glat, lst_i, lst_f, az_star, el_star, pa_star, az_end, el_end, pa_end, 
+            az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag, 
+            nsn, tsky, square, sunsep, pbkey, pb_flag) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s)
+            %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -151,10 +153,10 @@ def add_image(conn, img, status, delete=False):
                 img.noise, img.peak, img.config, img.cycle, img.semester, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
                 img.stage, img.error_id, img.nearest_problem, img.separation,
-                img.glon, img.glat, img.lst, img.az_star, img.el_star, img.pa_star,
+                img.glon, img.glat, img.lst_i, img.lst_f, img.az_star, img.el_star, img.pa_star,
                 img.az_end, img.el_end, img.pa_end, img.az_i, img.az_f, img.alt_i,
                 img.alt_f, img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.nsn,
-                img.tsky, img.square)
+                img.tsky, img.square, img.sunsep, img.pbkey, img.pb_flag)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -168,20 +170,21 @@ def add_image(conn, img, status, delete=False):
             nvis = %s, niter = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
             nsrc = %s, nclean = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
             error_id = %s, nearest_problem = %s, separation = %s, glon = %s, glat = %s,
-            lst = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
+            lst_i = %s, lst_f = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
             el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
             alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s, 
-            nsn = %s, tsky = %s, square = %s WHERE id = %s'''
+            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
                 img.noise, img.peak, img.config, img.cycle, img.semester, img.nvis, img.niter, img.mjdtime,
                 img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
                 img.stage, None, img.error_id, img.nearest_problem,
-                img.separation, img.glon, img.glat, img.lst, img.az_star,
+                img.separation, img.glon, img.glat, img.lst_i, img.lst_f, img.az_star,
                 img.el_star, img.pa_star, img.az_end, img.el_end, img.pa_end,
                 img.az_i, img.az_f, img.alt_i, img.alt_f, img.parang_i,
-                img.parang_f, jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square, img.id)
+                img.parang_f, jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
+                img.sunsep, img.pbkey, img.pb_flag, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -331,7 +334,7 @@ def add_corrected(conn, src, status=None):
             e_peak_flux, isl_total_flux, isl_e_total_flux, isl_rms, isl_mean,
             isl_resid_rms, isl_resid_mean, distance_from_center, polar_angle, 
             snr, compactness, clean, xpix, ypix, assoc_id) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
                     (src.src_id, src.isl_id, src.image_id, src.total_flux,
                      src.e_total_flux, src.peak_flux, src.e_peak_flux,
                      src.total_flux_isl, src.total_flux_islE, src.rms_isl,
@@ -379,7 +382,8 @@ def add_assoc(conn, sources):
     
     for src in sources:
         cur.execute('''INSERT INTO assoc_source (
-            ra, e_ra, dec, e_dec, res_class, ndetect, ave_total, e_ave_total, ave_peak, e_ave_peak) VALUES (
+            ra, e_ra, dec, e_dec, res_class, ndetect, ave_total, e_ave_total, 
+            ave_peak, e_ave_peak) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id''',
                     (src.ra, src.e_ra, src.dec, src.e_dec,
@@ -1082,7 +1086,27 @@ def remove_images(conn, images):
         conn.commit()
     cur.close()
 
-def update_corrected(conn):
+    
+def update_pbflag(conn, imobj):
+    """Updates the pb_flag column in the **image** table.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
+        Image object used to set table column values.
+    """
+    cur = conn.cursor()
+
+    cur.execute('UPDATE image SET pb_flag = %s WHERE id = %s',
+                (imobj.pb_flag, imobj.id))
+
+    conn.commit()
+    cur.close()
+    
+''' NEEDS UPDATING
+def update_corrected(conn,setup):
     """Updates the **corrected_flux** table with primary beam corrections.
     Reads image table, fetches all detected sources for each image,
     corrects source fluxes for primary beam.
@@ -1111,4 +1135,4 @@ def update_corrected(conn):
             add_corrected(conn,src,status=(src.src_id,src.image_id))
 
     conn.commit()
-
+'''
