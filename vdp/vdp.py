@@ -660,7 +660,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
     return imobj
 
 
-def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
+def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic):
     """Runs PyBDSF source finding and inserts source 
     fit parameters into database  **detected_source**,
     **detected_island**, and **corrected_flux** tables,
@@ -695,8 +695,6 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
     pbdic : dict
         Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
         with the primary beams
-    setup : dict
-        Smear time key gives the max time step for beam image calculation
     Returns
     -------
     imobj : ``database.dbclasses.Image`` instance
@@ -773,13 +771,17 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, setup):
             if opts['beam corrected']:  # images already are
                 logger.info('Image already beam corrected.')
             else:
-                #set image primary beam flag & update image table
-                imobj.set_pbflag()
+                #update pb_flag in image table
                 dbio.update_pbflag(conn, imobj)
+                #update ass_flag?
+                if imobj.pb_flag == False and imobj.ass_flag:
+                    if opts['always associate'] == False:
+                        imobj.ass_flag = False
+                        dbio.update_assflag(conn, imobj)
                 if imobj.pb_flag: #if flag True, ok to calc primary beam image
                     logger.info('Calculating beam image and correcting all ' 
                             'flux measurements for primary beam response.')
-                    imobj.set_beam_image(pbdic, setup['smear time'])
+                    imobj.set_beam_image(pbdic)
                     for src in sources:
                         src.correct_flux(imobj,pbdic)
                 else:
@@ -856,8 +858,8 @@ def srcassoc(conn, imobj, sources, save, sfparams):
             # update associated source light curve metrics
             dbio.update_lcmetrics(conn, assoc_matched)
         # Check for null detections
-#        if assoc_unmatched:
-#            nullfind(conn, imobj, sfparams, save, assoc_unmatched)
+        # if assoc_unmatched:
+        #     nullfind(conn, imobj, sfparams, save, assoc_unmatched)
         # Check for VLITE unique (VU) sources that weren't detected in image
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
@@ -1079,7 +1081,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
         and set in ``cfgparse``.
     setup : dict
         Keys are the setup parameters (root directory, year, month, day,
-        files, database name, database user, and catalogs) and values
+        files, database name, database user, smear_time and catalogs) and values
         are the user-supplied inputs.
     """
     global branch
@@ -1135,18 +1137,19 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
             imglist = [f for f in files[i]]
         i += 1
 
-        # Loop through images to initialize
-        imobjlist = []
+        # Make list of objects containing just the image name & mjdtime
+        imgmjdlist=[]
         for img in imglist:
+            print(imgdir+img)
             impath = os.path.join(imgdir, img)
-            # Initialize Image object & set attributes from header
-            imobjlist.append(dbclasses.init_image(impath, alwaysass))
+            imgmjdlist.append(dbclasses.getimgmjd(impath))
 
-        # Sort imobjlist by mjdtime
-        imobjlist.sort(key=lambda x: x.mjdtime or 0)
+        # Sort list by mjdtime
+        imgmjdlist.sort(key=lambda x: x.mjdtime or 0)
 
         # Begin loop through time-sorted images
-        for imobj in imobjlist:
+        for img in imgmjdlist:
+            imobj = dbclasses.init_image(img.filename, alwaysass, setup['smear time'])
             logger.info('_' * (len(imobj.filename) + 10))
             logger.info('Starting {}.'.format(imobj.filename))
             # STAGE 1 -- Add image to database
@@ -1159,7 +1162,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
             # STAGE 2 -- Source finding
             if sf:
                 imobj, sources = srcfind(conn, imobj, sfparams, save,
-                                         qa, qaparams, opts, pbdic, setup)
+                                         qa, qaparams, opts, pbdic)
                 # Copy PyBDSF warnings from their log to ours
                 with open(imobj.filename+'.pybdsf.log', 'r') as f:
                     lines = f.readlines()
@@ -1487,10 +1490,10 @@ def main():
             images = [re.findall('([0-9]{4}-\S+)', img)[0] for img
                       in inp.split(',')]
         except IndexError:
+            print('trying to read ',inp)
             with open(inp, 'r') as f:
                 text = f.read()
-            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img
-                      in text.strip().split('\n')]
+            images = [img for img in text.strip().split('\n')]
         logger.info('Preparing to remove image(s) {} from the database.'.
                     format(images))
         confirm = input('\nAre you sure? ')

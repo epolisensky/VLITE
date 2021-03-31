@@ -185,6 +185,10 @@ def create(conn, params, safe=False):
                 sunsep REAL,
                 pbkey TEXT,
                 pb_flag BOOLEAN,
+                ninterval INTEGER,
+                max_dt REAL,
+                nvisnx INTEGER,
+                nbeam INTEGER,
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

@@ -347,7 +347,6 @@ in the table, as well.
   header keyword ``RESTFREQ`` or ``CRVAL3`` or ``CRVAL4``
 - *primary_freq*: frequency of the primary observations (GHz);
   taken from VLITE image filename
-- *pbkey*: Key word of primary beam for image
 - *bmaj*: image beam FWHM major axis (arcsec); header keyword
   ``BMAJ`` or ``CLEANBMJ``
 - *bmin*: image beam FWHM minor axis (arcsec); header keyword
@@ -406,6 +405,9 @@ in the table, as well.
   center and the Sun at mjdtime (degrees)
 - *pbkey*: Primary beam key for image
 - *pb_flag*: True if primary beam calculation for image was possible
+- *nvisnx*: Number of visibilities in the NX table; before self-cal applied
+- *ntime*: Number of times in NX table
+- *max_dt*: Max time interval in NX table
 
 .. _run_config:
 

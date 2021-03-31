@@ -16,7 +16,7 @@ from astropy import wcs
 import ephem
 from database import pybdsfcat
 from sourcefinding import beam_tools
-from math import sqrt
+from math import sqrt,ceil
 from datetime import datetime
 
 ########################
@@ -47,12 +47,14 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 #  the acceptable range of image bmins for source association
 res_dict = {
     'A': {'1': {'mjd': [58179, 58280], 'bmin': [2.85, 4.27], 'semester': '2018A'},
-          '2': {'mjd': [58697, 58778], 'bmin': [3.26, 4.90], 'semester': '2019A'}},
+          '2': {'mjd': [58697, 58778], 'bmin': [3.26, 4.90], 'semester': '2019A'},
+          '3': {'mjd': [59190, 59274], 'bmin': [3.57, 5.36], 'semester': '2020B'}},
     'BnA': {'1': {'mjd': [58148, 58179], 'bmin': [0, 0], 'semester': ''},
-            '2': {'mjd': [58660, 58697], 'bmin': [0, 0], 'semester': ''}},
+            '2': {'mjd': [58660, 58697], 'bmin': [0, 0], 'semester': ''},
+            '3': {'mjd': [59142, 59190], 'bmin': [0, 0], 'semester': ''}},
     'B': {'1': {'mjd': [57996, 58148], 'bmin': [10.77, 16.16], 'semester': '2017B'},
           '2': {'mjd': [58534.24, 58660], 'bmin': [10.18, 15.28], 'semester': '2019A'},
-          '3': {'mjd': [59026, 99999], 'bmin': [11.65, 17.47], 'semester': '2020A'}},
+          '3': {'mjd': [59026, 59142], 'bmin': [11.27, 16.91], 'semester': '2020A'}},
     'CnB': {'1': {'mjd': [57994, 57996], 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58519, 58534.24], 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59008, 59026], 'bmin': [0, 0], 'semester': ''}},
@@ -62,10 +64,55 @@ res_dict = {
           '3': {'mjd': [58885, 59008], 'bmin': [39.69, 59.54], 'semester': '2020A'}},
     'DnC': {'3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''}},
     'D': {'2': {'mjd': [58360, 58440], 'bmin': [117.58, 176.37], 'semester': '2018A'},
-          '3': {'mjd': [58802, 58876], 'bmin': [133.07, 199.60], 'semester': '2019B'}},
+          '3': {'mjd': [58802, 58876], 'bmin': [133.07, 199.60], 'semester': '2019B'},
+          '4': {'mjd': [59274, 99999], 'bmin': [133., 199.], 'semester': '2021A'}},
     'AnB': {'V10': {'mjd': [56986, 57953.99], 'bmin': [0, 0], 'semester': 'many'}}
 }
 
+class ImgMjd(object):
+    """A class to hold the name & mjd of a FITS image.
+       Used for sorting images by mjd before processing fully.
+    Parameters
+    ----------
+    image : str
+        Directory path to the FITS image file location.
+
+    Attributes
+    ----------
+    filename : str
+        Full directory path for the image file.
+    mjdtime : float
+        Modified Julian Date (days since 0h Nov 17, 1858).
+    """
+    def __init__(self):
+        self.filename = None
+        self.mjdtime = None
+
+    def init_image(self, image):
+        self.filename = image
+        try:
+            hdu = fits.open(self.filename, mode='readonly')
+            hdr = hdu[0].header
+            obs_date = hdr['DATE-OBS']
+            if len(obs_date) > 10:
+                obs_date = hdr['DATE-OBS'][:10]
+            try:
+                if obs_date is not None:
+                    date = obs_date.split('-')
+                    try:
+                        self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
+                            date[2]))).mjd + float(hdr['STARTIME'])  # day
+                    except:
+                        self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
+                            date[2]))).mjd  # day
+            except KeyError:
+                self.mjdtime = None
+            hdu.close()
+        except:
+            dbclasses_logger.error('\nERROR: Problem reading image.')
+
+    
+            
 
 class Image(object):
     """A class to hold information about the FITS image file.
@@ -226,6 +273,20 @@ class Image(object):
         center at mjdtime (degrees).
     pb_flag : boolean
         True if able to calculate primary beam image
+    ninterval : integer
+        Number of time intervals in NX table
+    max_dt : float
+        Max time interval in NX table
+    nvisnx : integer
+        Number of visibilities from NX table. Before self-cal
+    nbeam : integer
+        Number of beams in beam image calculation 
+    pbtimes : list of nbeam floats
+        Times for beam image calculations (days)
+    pbweights : list of nbeam floats
+        Weights to apply to beams calculated at pbtimes
+    startime : float
+        Header keyword STARTIME [days]
     """
     # A class variable to count the number of images
     num_images = 0
@@ -297,6 +358,13 @@ class Image(object):
         self.hrang_f = None
         self.pbkey = None
         self.pb_flag = None
+        self.ninterval = None
+        self.max_dt = None
+        self.nvisnx = None
+        self.nbeam = None
+        self.pbtimes = None
+        self.pbweights = None
+        self.startime = None
 
     def process_image(self, image):
         self.filename = image
@@ -344,6 +412,7 @@ class Image(object):
         if 'VCSS' in self.filename or 'vcss' in self.filename:
                 if self.filename.endswith('IPln1.fits'):
                     self.vcss = True # image is a VCSS snapshot not mosaic
+                    self.pb_flag = True
                     
         # start with priband
         try:
@@ -588,6 +657,7 @@ class Image(object):
                 try:
                     self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
                         date[2]))).mjd + float(hdr['STARTIME'])  # day
+                    self.startime = float(hdr['STARTIME'])
                 except:
                     self.mjdtime = Time(datetime(int(date[0]), int(date[1]), int(
                         date[2]))).mjd  # day
@@ -688,19 +758,24 @@ class Image(object):
         except KeyError:
             self.pa_end = None
 
+    '''
     def set_pbflag(self):
         """Sets pb_flag True if primary beam image can be
         calculated for this image
         """
-        self.pb_flag = False
-        if self.tau_time/self.duration > 0.5:
-            dh = (24*self.duration/86164.1) - (self.hrang_f-self.hrang_i)
-            if dh < 1:
-                self.pb_flag = True
-            elif self.obs_dec > 61:
-                self.pb_flag = True
-            print('pb_flag = ',self.pb_flag,'dh = ',dh,'dur = ',24*self.duration/86164.1,'hrang_f,_i = ',self.hrang_f,self.hrang_i)
+        if self.vcss:
+            self.pb_flag = True
+        else:
+            self.pb_flag = False
+            if self.tau_time/self.duration > 0.5:
+                dh = (24*self.duration/86164.1) - (self.hrang_f-self.hrang_i)
+                if dh < 1:
+                    self.pb_flag = True
+                elif self.obs_dec > 61:
+                    self.pb_flag = True
+                #print('pb_flag = ',self.pb_flag,'dh = ',dh,'dur = ',24*self.duration/86164.1,'hrang_f,_i = ',self.hrang_f,self.hrang_i)
         print('pb_flag = ',self.pb_flag)
+    '''
 
     def set_tsky(self, nside, skymap):
         """Sets the tsky attribute of the Image object, the
@@ -760,6 +835,9 @@ class Image(object):
                     if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
                         self.ass_flag = True
                     break
+        #set for VCSS snapshots
+        if self.vcss:
+            self.ass_flag = True
         # if ass_flag True, check if image within view of a "too-many-artifacts" bad source
         if self.ass_flag:
             bad_sources = {'3C286': SkyCoord(202.784583, 30.509167, unit='deg'),
@@ -780,21 +858,19 @@ class Image(object):
         if alwaysass:
             self.ass_flag = True
 
-    def set_beam_image(self, pbdic, smeartime):
+    def set_beam_image(self, pbdic):
         """Calculates the primary beam image, offset & smeared, for the image.
         
         Parameters
         ----------
         pbdic : dictionary
            Primary beam dictionary
-        smeartime : float
-           max time step for smear calculation
 
         """
         if self.vcss is True:
             self.bmimg = beam_tools.Calc_Beam_Image_VCSS(self, pbdic)
         else:
-            self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic, smeartime)
+            self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic)
 
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding
@@ -1581,14 +1657,18 @@ def translate_null(img, out, coords):
     return newsrcs
 
 
-def set_nsn(img):
-    """Counts number of SN tables in UVOUT file
+def set_fromnx(img, smear_time):
+    """Counts number of SN tables, number of time intervals, 
+    set list of times and weigths for primary beam
+    calculation from NX table in UVOUT file
+    
 
     Parameters
     ----------
     img : ``database.dbclasses.Image`` instance
         Initialized Image object with attribute
         values set from header info.
+    smear_time : Max time step for smearing beam [s]
 
     Returns
     -------
@@ -1597,8 +1677,11 @@ def set_nsn(img):
         nsn updated.
     """
     # Skip for VCSS images
-    if 'VCSS' in img.filename or 'vcss' in img.filename:
+    # (don't need times or weights for beam calc)
+    #if 'VCSS' in img.filename or 'vcss' in img.filename:
+    if img.vcss:
         img.nsn = None
+        img.pb_flag = True
         return img
 
     # Determine dir with uvout file
@@ -1610,7 +1693,9 @@ def set_nsn(img):
     # Check dir
     if not os.path.isdir(uvdir):
         img.nsn = None
+        img.pb_flag = False
         dbclasses_logger.info('Did not find UVFiles dir {}.'.format(uvdir))
+        dbclasses_logger.info('Cannot calc primary beam for this image')
         return img
 
     # Determine name of uvout file
@@ -1625,24 +1710,60 @@ def set_nsn(img):
         uvname = uvname1 + 'uvout'
         if not os.path.isfile(os.path.join(uvdir, uvname)):
             img.nsn = None
+            img.pb_flag = False
             dbclasses_logger.info(
                 'Did not find uvout file, with or w/o .gz {}'.format(uvname))
+            dbclasses_logger.info(
+                'Cannot calc primary beam for this image')
             return img
 
-    # Count number of SN tables
-    cnt = 0
+    # Count number of SN tables & set times, weights from NX table
+    img.nsn = 0
+    img.nbeam = 0
+    img.pb_flag = True
     with fits.open(os.path.join(uvdir, uvname)) as hdu:
         for i in range(1, len(hdu)):
             if hdu[i].header['EXTNAME'] == 'AIPS SN':
-                cnt += 1
-    img.nsn = cnt
-
-    dbclasses_logger.info('{}: nsn= {}'.format(uvname, img.nsn))
-
+                img.nsn += 1
+            if hdu[i].header['EXTNAME'] == 'AIPS NX':
+                img.pbweights = []
+                img.pbtimes = []
+                hdr = hdu[i].header
+                img.ninterval = hdr['NAXIS2']
+                data = hdu[i].data
+                img.max_dt = 86400*np.max(data['TIME INTERVAL']) #s
+                #'TIME' is center time of interval in days since reference time
+                ti = data['TIME']-(data['TIME INTERVAL']/2)-img.startime-(1./86400) #day
+                tf = data['TIME']+(data['TIME INTERVAL']/2)-img.startime+(1./86400) #day
+                dt = tf-ti #day
+                dvis = data['END VIS']-data['START VIS']+1 #includes end pts
+                img.nvisnx = int(np.sum(dvis))
+                #sampling includes end pts
+                for j in range(img.ninterval):
+                    npb = ceil(dt[j]/(smear_time/86400)) + 1
+                    dsmeartime = dt[j]/(npb-1)
+                    for k in range(npb):
+                        img.pbweights.append((dvis[j]/img.nvisnx)/npb)
+                        img.pbtimes.append(ti[j]+(k*dsmeartime)) #day
+                        img.nbeam += 1
+                '''
+                #sampling starts at half step
+                for j in range(img.ninterval):
+                    npb = ceil(dt[j]/(smear_time/86400))
+                    dsmeartime = dt[j]/npb
+                    for k in range(npb):
+                        img.pbweights.append((dvis[j]/img.nvisnx)/npb)
+                        img.pbtimes.append(ti[j]+((k+0.5)*dsmeartime)) #day
+                        img.nbeam += 1
+                '''
+                        
+    print(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights))
+    dbclasses_logger.info('{}: nsn= {}; nbeam= {}; ninterval= {}; max_dt= {}; nvisnx= {}; sumweights= {}'.format(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights)))
+    
     return img
 
 
-def init_image(impath, alwaysass):
+def init_image(impath, alwaysass, smear_time):
     """Initializes an object of the Image class and sets values 
     for its attributes from the fits file header using
     the ``header_attrs`` object method.
@@ -1675,9 +1796,8 @@ def init_image(impath, alwaysass):
     # Set cycle, semester, ass_flag
     imobj.set_cycle(alwaysass)
 
-    # Set nsn
-    #dbclasses_logger.info('calling set_nsn {}'.format(imobj.filename))
-    imobj = set_nsn(imobj)
+    # Set attributes from NX table of uvout
+    imobj = set_fromnx(imobj, smear_time)
 
     # Read primary calibrators from history extension
     pri_cals = []
@@ -1712,4 +1832,15 @@ def init_image(impath, alwaysass):
         imobj.cc = None
 
     hdu.close()
+    return imobj
+
+
+
+def getimgmjd(impath):
+    """Initializes an object of the ImgMjd class and sets values 
+    for its attributes from the fits file header using
+    the ``init_image`` object method.
+    """
+    imobj = ImgMjd()
+    imobj.init_image(impath)
     return imobj

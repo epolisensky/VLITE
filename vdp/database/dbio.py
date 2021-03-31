@@ -141,22 +141,25 @@ def add_image(conn, img, status, delete=False):
             nsrc, nclean, rms_box, stage, error_id, nearest_problem, separation, 
             glon, glat, lst_i, lst_f, az_star, el_star, pa_star, az_end, el_end, pa_end, 
             az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag, 
-            nsn, tsky, square, sunsep, pbkey, pb_flag) 
+            nsn, tsky, square, sunsep, pbkey, pb_flag, max_dt, nvisnx, ninterval, nbeam) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
-                img.noise, img.peak, img.config, img.cycle, img.semester, img.nvis, img.niter, img.mjdtime,
-                img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
-                img.stage, img.error_id, img.nearest_problem, img.separation,
-                img.glon, img.glat, img.lst_i, img.lst_f, img.az_star, img.el_star, img.pa_star,
-                img.az_end, img.el_end, img.pa_end, img.az_i, img.az_f, img.alt_i,
-                img.alt_f, img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.nsn,
-                img.tsky, img.square, img.sunsep, img.pbkey, img.pb_flag)
+                img.noise, img.peak, img.config, img.cycle, img.semester,
+                img.nvis, img.niter, img.mjdtime,
+                img.tau_time, img.duration, img.radius, img.nsrc, img.nclean,
+                img.rms_box, img.stage, img.error_id, img.nearest_problem,
+                img.separation, img.glon, img.glat, img.lst_i, img.lst_f,
+                img.az_star, img.el_star, img.pa_star, img.az_end, img.el_end,
+                img.pa_end, img.az_i, img.az_f, img.alt_i, img.alt_f,
+                img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.nsn,
+                img.tsky, img.square, img.sunsep, img.pbkey, img.pb_flag,
+                img.max_dt, img.nvisnx, img.ninterval, img.nbeam)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -173,18 +176,20 @@ def add_image(conn, img, status, delete=False):
             lst_i = %s, lst_f = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
             el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
             alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s, 
-            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s WHERE id = %s'''
+            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s, ninterval = %s, max_dt = %s, nvisnx = %s, nbeam = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
-                img.noise, img.peak, img.config, img.cycle, img.semester, img.nvis, img.niter, img.mjdtime,
-                img.tau_time, img.duration, img.radius, img.nsrc, img.nclean, img.rms_box,
-                img.stage, None, img.error_id, img.nearest_problem,
-                img.separation, img.glon, img.glat, img.lst_i, img.lst_f, img.az_star,
-                img.el_star, img.pa_star, img.az_end, img.el_end, img.pa_end,
-                img.az_i, img.az_f, img.alt_i, img.alt_f, img.parang_i,
-                img.parang_f, jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
-                img.sunsep, img.pbkey, img.pb_flag, img.id)
+                img.noise, img.peak, img.config, img.cycle, img.semester,
+                img.nvis, img.niter, img.mjdtime, img.tau_time, img.duration,
+                img.radius, img.nsrc, img.nclean, img.rms_box, img.stage, None,
+                img.error_id, img.nearest_problem, img.separation, img.glon,
+                img.glat, img.lst_i, img.lst_f, img.az_star, img.el_star,
+                img.pa_star, img.az_end, img.el_end, img.pa_end, img.az_i,
+                img.az_f, img.alt_i, img.alt_f, img.parang_i, img.parang_f,
+                jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
+                img.sunsep, img.pbkey, img.pb_flag, img.interval, img.max_dt,
+                img.nvisnx, img.nbeam, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -1073,7 +1078,6 @@ def remove_images(conn, images):
     cur = conn.cursor()
 
     for image in images:
-        #print(image)
         cur.execute('SELECT id FROM image WHERE filename LIKE %s',
                     ('%'+image, ))
         try:
@@ -1104,6 +1108,25 @@ def update_pbflag(conn, imobj):
 
     conn.commit()
     cur.close()
+
+def update_assflag(conn, imobj):
+    """Updates the ass_flag column in the **image** table.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
+        Image object used to set table column values.
+    """
+    cur = conn.cursor()
+
+    cur.execute('UPDATE image SET ass_flag = %s WHERE id = %s',
+                (imobj.ass_flag, imobj.id))
+
+    conn.commit()
+    cur.close()
+    
     
 ''' NEEDS UPDATING
 def update_corrected(conn,setup):

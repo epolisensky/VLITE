@@ -6,26 +6,40 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
+NOTE: Do not trust beam corrections in any database except snapshots!
+
 mosaics : VCSS mosaics
 
 vcss : VCSS snapshots. Currently 1.1 + 1.2. Sources were not 
        associated or matched to catalogs to speed up processing. 
        Neither snapshots nor sources were beam corrected.
 
-vlite16d : VLITE D config daily images since July 2017.
+snapshots : VCSS 1.1 + 1.2 snapshots with "0.934" beam corrections.
+       Currently being processed. Sources *are* being associated
+       and matched to catalogs.
 
-vlite16c : VLITE C config daily images since July 2017.
+vlite16d : VLITE D config daily images 07/2017 - 05/2020.
 
-vlite16b : VLITE B config daily images since July 2017.
-           Does not yet include images since June 2020.
+vlite16c : VLITE C config daily images 07/2017 - 05/2020.
 
-vlite16a : VLITE A config daily images since July 2017.
+vlite16b : VLITE B config daily images 07/2017 - 05/2020.
+
+vlite16a : VLITE A config daily images 07/2017 - 05/2020.
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may
 	  not contain all columns from online docs
 
 vlite10c : VLITE10 C config images
+
+vlite16 : A staging area for processing images after
+          config changes. The distribution of beam
+          solid angles needs to be analyzed to set
+          the acceptable range for source association
+          in the resolution dictionary (res_dict in
+          dbclasses.py) before reprocessing into the
+          corresponding vlite16[a-d] database.
+          Currently holds data from 2020-06 to present
 
 ###################################
 # MISCELLANEOUS DATABASES
@@ -35,14 +49,6 @@ vlite10c : VLITE10 C config images
 
 vlite10img : VLITE10 images from 2014-11/25 to 2017-07/19
           Just images, no source finding.
-
-vlite16 : A staging area for processing images after
-	  config changes. The distribution of beam
-	  solid angles needs to be analyzed to set
-	  the acceptable range for source association
-	  in the resolution dictionary (res_dict in
-          dbclasses.py) before reprocessing into the
-	  corresponding vlite16[a-d] database
 
 hudffinal : The "final" A config VLITE HUDF image that 
 	    combined 3 images from 2018 & 3 from 2019, 

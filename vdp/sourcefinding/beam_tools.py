@@ -90,17 +90,16 @@ def Read_Fitted_Beam(pbkey):
     nphi  = 19 #includes end points
     #set file name
     if pbkey == 'KQ':
-        fname='SMOOTHBEAM2D_15+22+33+45GHz_long.txt'
+        fname='SMOOTHBEAM2D_KQ_long.txt'
     elif pbkey == 'CX':
-        fname='SMOOTHBEAM2D_6+10GHz_long.txt'
+        fname='SMOOTHBEAM2D_CX_long.txt'
     elif pbkey == 'S':
-        fname='SMOOTHBEAM2D_3GHz_long.txt'
+        fname='SMOOTHBEAM2D_S_long.txt'
     elif pbkey == 'L':
-        fname='SMOOTHBEAM2D_1.5GHz_long.txt'
+        fname='SMOOTHBEAM2D_L_long.txt'
     else:
         print('ERROR! Invalid pbkey in beam_tools.Read_Fitted_Beam',pbkey)
         sys.exit(1)
-    #print(pbkey,fname)
     beamfile = path.join('/home/vpipe/VLITE/vdp/resources',fname)
     f = open(beamfile,'r')
     b = f.readlines()
@@ -176,47 +175,6 @@ def Read_Perley_Beam():
     pb.nbeam = nbeam
     pb.error = 0.03
     return pb
-
-'''
-def Get_Perley_Beam(freq=344.): #freq in MHz
-    """Returns Perley P band primary beam from EVLA Memo 195 
-    as numpy array. This beam is 1D (symmetric in phi)
-    Currently only returns 344 MHz beam
-    Returns
-    -------
-    pbobj : object
-        Object containing the primary beam
-        correction factor ('power') as a function
-        of distance from the image center 
-        Uncertainty in fitted beam set to 3%
-    """
-    pb = pribeam()
-    beamstep=1.0 #arcsec
-    nbeam = 16201 #4.5 deg, including end points
-    freqGHz=freq*1e-3 #GHz
-    arcsec=np.arange(nbeam)
-    theta=arcsec/3600. #sample pts, angle in deg. Perley fits only to <~ 3deg
-    capr=theta*60. #arcmin
-    r= freqGHz*capr #Perley's "normalized" angle units
-    FitBeam = []
-    ##coeffs at 344 MHz (Table 2 in memo)
-    a0 =  1.0
-    a2 = -0.974e-3
-    a4 =  4.09e-7
-    a6 = -0.76e-10
-    a8 =  0.53e-14
-    for i in range(nbeam):
-        power  = a0+(a2*np.power(r[i],2))+(a4*np.power(r[i],4))+(a6*np.power(r[i],6))+(a8*np.power(r[i],8))
-        FitBeam.append(power)
-    pb.power = np.array(FitBeam)
-    pb.beamstep = beamstep
-    pb.phistep = None #Beam is 1D symmetric for dedicated P band observing
-    pb.beamsteprad = beamstep*DEG2RAD/3600
-    pb.phisteprad = None
-    pb.nbeam = nbeam
-    pb.error = 0.03
-    return pb
-'''
 
 def Get_Primary_Beams():
     """Returns dictionary with primary beam for each
@@ -319,7 +277,7 @@ def Calc_Parang(mjd, ra, dec):
     return parang 
 
 
-def Calc_Beam_Image(imobj, pbdic, smeartime):
+def Calc_Beam_Image(imobj, pbdic):
     """Calculates primary beam image
 
     Parameters
@@ -328,8 +286,6 @@ def Calc_Beam_Image(imobj, pbdic, smeartime):
         Image object
     pbdic : dictionary
         Primary beam dictionary
-    smeartime : float
-        Max time step for smearing beam [s]
 
     Returns
     -------
@@ -337,24 +293,19 @@ def Calc_Beam_Image(imobj, pbdic, smeartime):
         Primary beam image
     """
     y,x = np.indices((imobj.naxis2,imobj.naxis1))
-    ntime    = int(math.ceil(imobj.duration/smeartime)) + 1
-    deltat = imobj.duration/(ntime-1) #[s]
-    deltatday = deltat/86400
-
     #initialize beam image to 0
     bmimg=zeroimg(x,y)
-    #loop over times
-    for i in range(ntime):
+    #loop over nbeams
+    for i in range(imobj.nbeam):
         #Set mjd time
-        mjdtime0 = imobj.mjdtime + (i*deltatday)
+        mjdtime0 = imobj.mjdtime + imobj.pbtimes[i]
         #Calc parang
         parang = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
         #Calc beam center
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang)
-        #Calc beam at this time, add to beam image
-        bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
-    #normalize beam image
-    bmimg /= ntime
+        #Calc beam at this time, apply weight, add to beam image. Weights will normalize
+        bmimg += imobj.pbweights[i]*Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
+
     return bmimg
 
 
@@ -383,29 +334,27 @@ def Calc_Beam_Image_VCSS(imobj, pbdic):
     #is this a double observed image?
     if imobj.duration > 200:
         deltat = 2./86400 # [day]
-        start = imobj.mjdtime + 0.5*deltat
-        mjd1 = np.arange(start,start+(nbeam*deltat),deltat)
-        start = imobj.mjdtime + imobj.duration - 27.5*deltat
-        mjd2 = np.arange(start,start+(nbeam*deltat),deltat)
+        start = imobj.mjdtime + 0.5*deltat #[day]
+        mjd1 = np.arange(start,start+(nbeam*deltat),deltat) #[day]
+        start = imobj.mjdtime + (imobj.duration/86400) - 27.5*deltat #[day]
+        mjd2 = np.arange(start,start+(nbeam*deltat),deltat) #[day]
         mjd = np.concatenate((mjd1, mjd2))
         start = imobj.obs_ra - (6.5*delRA)
         ra1 = np.arange(start,start+(nbeam*delRA),delRA)
         ra = np.concatenate((ra1, ra1))
         nbeam=len(mjd)
     else:
-        deltat = imobj.duration/nbeam
-        start = imobj.mjdtime + 0.5*deltat
+        deltat = (imobj.duration/nbeam)/86400. #[day]
+        start = imobj.mjdtime + 0.5*deltat #[day]
         mjd = np.arange(start,start+(nbeam*deltat),deltat)
         start = imobj.obs_ra - (6.5*delRA)
         ra = np.arange(start,start+(nbeam*delRA),delRA)
-       
+        
     #loop over times
     for i in range(nbeam):
         xtmp, ytmp = EQtoPIX(ra[i],imobj.obs_dec,imobj.wcsobj)
         dxpix = xtmp - imobj.xref
         dypix = ytmp - imobj.yref
-        #Set mjd time
-        #mjdtime0 = imobj.mjdtime + (i*deltatday)
         #Calc parang
         parang = Calc_Parang(mjd[i],ra[i],imobj.obs_dec)
         #Calc beam center. Include offsets to account for RA drift
