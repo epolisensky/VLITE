@@ -188,7 +188,7 @@ def add_image(conn, img, status, delete=False):
                 img.pa_star, img.az_end, img.el_end, img.pa_end, img.az_i,
                 img.az_f, img.alt_i, img.alt_f, img.parang_i, img.parang_f,
                 jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
-                img.sunsep, img.pbkey, img.pb_flag, img.interval, img.max_dt,
+                img.sunsep, img.pbkey, img.pb_flag, img.ninterval, img.max_dt,
                 img.nvisnx, img.nbeam, img.id)
         cur.execute(sql, vals)
         if delete:
