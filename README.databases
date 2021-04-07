@@ -7,6 +7,8 @@ List & description of sql databases
 ####################################
 
 NOTE: Do not trust beam corrections in any database except snapshots!
+Mosaics images already beam corrected so fluxes can be trusted 
+(detected and corrected flux should be same in mosaics)
 
 mosaics : VCSS mosaics
 
