@@ -6,9 +6,9 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
-NOTE: Do not trust beam corrections in any database except snapshots!
-Mosaics images already beam corrected so fluxes can be trusted 
-(detected and corrected flux should be same in mosaics)
+NOTE: Do not trust beam corrections in any database except snapshots
+and mosaics! (Mosaics images already beam corrected so fluxes can be 
+trusted, detected and corrected flux should be equal)
 
 mosaics : VCSS mosaics
 
@@ -60,6 +60,14 @@ hudffinal : The "final" A config VLITE HUDF image that
 hudfdailybc : All daily A config images from normal 
               VLITE imaging pipeline, beam corrected.
 	      Beams calculated with 20 sec step sizes
+
+hudfdaily : All daily A config images from normal
+            VLITE imaging pipeline. VDP-calculated beam 
+	    corrections (end points). Default smear time (900 s)
+
+hudfdaily100 : All daily A config images from normal
+            VLITE imaging pipeline. VDP-calculated beam 
+            corrections (end points). Smear time = 100 s
 
 hudfyearlybc : 2018 & 2019 images used in final image
 	       combined and WSCLEANed. Beam corrected

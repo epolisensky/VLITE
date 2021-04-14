@@ -176,7 +176,8 @@ def add_image(conn, img, status, delete=False):
             lst_i = %s, lst_f = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
             el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
             alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s, 
-            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s, ninterval = %s, max_dt = %s, nvisnx = %s, nbeam = %s WHERE id = %s'''
+            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s, 
+            ninterval = %s, max_dt = %s, nvisnx = %s, nbeam = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,

@@ -406,8 +406,9 @@ in the table, as well.
 - *pbkey*: Primary beam key for image
 - *pb_flag*: True if primary beam calculation for image was possible
 - *nvisnx*: Number of visibilities in the NX table; before self-cal applied
-- *ntime*: Number of times in NX table
-- *max_dt*: Max time interval in NX table
+- *ninterval*: Number of observing intervals in NX table
+- *max_dt*: Max time of observing intervals in NX table
+- *nbeam*: Number of beams in beam image calculation
 
 .. _run_config:
 

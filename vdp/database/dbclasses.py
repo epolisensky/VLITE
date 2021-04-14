@@ -1658,10 +1658,9 @@ def translate_null(img, out, coords):
 
 
 def set_fromnx(img, smear_time):
-    """Counts number of SN tables, number of time intervals, 
-    set list of times and weigths for primary beam
-    calculation from NX table in UVOUT file
-    
+    """Counts number of SN tables, number of observing 
+    intervals; set list of times and weigths for primary 
+    beam calculation from NX table in UVOUT file    
 
     Parameters
     ----------
