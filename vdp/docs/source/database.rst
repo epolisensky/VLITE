@@ -31,6 +31,9 @@ in the same spatial resolution class.
 - *e_dec*: error on the declination weighted average (degrees)
 - *res_class*: spatial resolution class (see :ref:`source_assoc`)
 - *ndetect*: number of images in which the source was detected
+- *ns*: number of PyBDSF code 'S' detections of the source (single component Gaussian and only source in island)
+- *nc*: number of PyBDSF code 'C' detections of the source (single component Gaussian in island with other sources)
+- *nm*: number of PyBDSF code 'M' detections of the source (multi-Gaussian source)
 - *nmatches*: number of matches to other radio catalog sources
 - *ave_total*: weighted average of corrected total flux light curve (mJy)
 - *e_ave_total*: error on the weighted average of corrected total flux light curve (mJy) 
@@ -408,7 +411,9 @@ in the table, as well.
 - *nvisnx*: Number of visibilities in the NX table; before self-cal applied
 - *ninterval*: Number of observing intervals in NX table
 - *max_dt*: Max time of observing intervals in NX table
-- *nbeam*: Number of beams in beam image calculation
+- *nbeam*: Number of beams in primary beam image calculation
+- *pbparangs*: Array of parallactic angles used in primary beam image calculation
+- *pbweights*: Array of weighting factors used in primary beam image calculation
 
 .. _run_config:
 

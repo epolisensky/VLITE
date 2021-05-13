@@ -65,8 +65,8 @@ def PIXtoEQ(X, Y, w):
 
 def Read_Fitted_Beam(pbkey):
     """Reads the fitted beam file which contains
-    the correction factor as a function of distance
-    from beam center at every arcsecond.
+    the primary beam factor as a function of distance
+    from beam center & polar angle at every arcsecond.
 
     Parameters
     ----------
@@ -77,15 +77,15 @@ def Read_Fitted_Beam(pbkey):
     -------
     pbobj : object
         Object containing the primary beam
-        correction factor ('power') as a function
-        of distance from the image center and 
-        angle phi from zenith.
+        factor ('power') as a function
+        of distance from beam center and 
+        angle phi from N.
         Uncertainty in fitted beam set to 3% for PBmap v3 beams
     """
     pb = pribeam()
     #for PBmap v3 beams:
     beamstep= 1. #arcsec
-    nbeam = 23401 #6.5 deg, including end points
+    nbeam = 23401 #"long" files interpolated to 6.5 deg, including end points
     phistep = 5. #deg
     nphi  = 19 #includes end points
     #set file name
@@ -301,6 +301,8 @@ def Calc_Beam_Image(imobj, pbdic):
         mjdtime0 = imobj.mjdtime + imobj.pbtimes[i]
         #Calc parang
         parang = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
+        imobj.pbparangs.append(parang)
+        #print(imobj.pbparangs[-1],imobj.pbweights[i],imobj.pbtimes[i])
         #Calc beam center
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang)
         #Calc beam at this time, apply weight, add to beam image. Weights will normalize
@@ -357,6 +359,9 @@ def Calc_Beam_Image_VCSS(imobj, pbdic):
         dypix = ytmp - imobj.yref
         #Calc parang
         parang = Calc_Parang(mjd[i],ra[i],imobj.obs_dec)
+        imobj.pbparangs.append(parang)
+        imobj.pbweights.append(1.0/nbeam)
+        imobj.pbtimes.append(mjd[i]-imobj.mjdtime) #consistency w/ dailies
         #Calc beam center. Include offsets to account for RA drift
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang,dxpix,dypix)
         #Calc beam at this time, add to beam image

@@ -114,6 +114,9 @@ def create(conn, params, safe=False):
                 e_dec DOUBLE PRECISION,
                 res_class VARCHAR(3),
                 ndetect INTEGER,
+                ns INTEGER,
+                nc INTEGER,
+                nm INTEGER,
                 nmatches INTEGER,
                 ave_total DOUBLE PRECISION,
                 e_ave_total DOUBLE PRECISION,
@@ -189,6 +192,8 @@ def create(conn, params, safe=False):
                 max_dt REAL,
                 nvisnx INTEGER,
                 nbeam INTEGER,
+                pbparangs REAL[],
+                pbweights REAL[],
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

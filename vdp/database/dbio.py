@@ -137,15 +137,16 @@ def add_image(conn, img, status, delete=False):
         sql = '''INSERT INTO image (
             filename, imsize, obs_ra, obs_dec, pixel_scale, object, obs_date, 
             map_date, obs_freq, primary_freq, bmaj, bmin, bpa, noise, peak, 
-            config, cycle, semester, nvis, niter, mjdtime, tau_time, duration, radius, 
-            nsrc, nclean, rms_box, stage, error_id, nearest_problem, separation, 
-            glon, glat, lst_i, lst_f, az_star, el_star, pa_star, az_end, el_end, pa_end, 
-            az_i, az_f, alt_i, alt_f, parang_i, parang_f, pri_cals, ass_flag, 
-            nsn, tsky, square, sunsep, pbkey, pb_flag, max_dt, nvisnx, ninterval, nbeam) 
+            config, cycle, semester, nvis, niter, mjdtime, tau_time, duration, 
+            radius, nsrc, nclean, rms_box, stage, error_id, nearest_problem, 
+            separation, glon, glat, lst_i, lst_f, az_star, el_star, pa_star, 
+            az_end, el_end, pa_end, az_i, az_f, alt_i, alt_f, parang_i, 
+            parang_f, pri_cals, ass_flag, nsn, tsky, square, sunsep, pbkey, 
+            pb_flag, max_dt, nvisnx, ninterval, nbeam, pbparangs, pbweights) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -159,7 +160,8 @@ def add_image(conn, img, status, delete=False):
                 img.pa_end, img.az_i, img.az_f, img.alt_i, img.alt_f,
                 img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.nsn,
                 img.tsky, img.square, img.sunsep, img.pbkey, img.pb_flag,
-                img.max_dt, img.nvisnx, img.ninterval, img.nbeam)
+                img.max_dt, img.nvisnx, img.ninterval, img.nbeam,
+                np.array(img.pbparangs).tolist(), np.array(img.pbweights).tolist())
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -169,15 +171,18 @@ def add_image(conn, img, status, delete=False):
         sql = '''UPDATE image SET filename = %s, imsize = %s, obs_ra = %s,
             obs_dec = %s, pixel_scale = %s, object = %s, obs_date = %s, 
             map_date = %s, obs_freq = %s, primary_freq = %s, bmaj = %s, 
-            bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, cycle = %s, semester = %s, 
-            nvis = %s, niter = %s, mjdtime = %s, tau_time = %s, duration = %s, radius = %s,
-            nsrc = %s, nclean = %s, rms_box = %s, stage = %s, catalogs_checked = %s, 
-            error_id = %s, nearest_problem = %s, separation = %s, glon = %s, glat = %s,
-            lst_i = %s, lst_f = %s, az_star = %s, el_star = %s, pa_star = %s, az_end = %s, 
-            el_end = %s, pa_end = %s, az_i = %s, az_f = %s, alt_i = %s, 
-            alt_f = %s, parang_i = %s, parang_f = %s, pri_cals = %s, ass_flag = %s, 
-            nsn = %s, tsky = %s, square = %s, sunsep = %s, pbkey = %s, pb_flag = %s, 
-            ninterval = %s, max_dt = %s, nvisnx = %s, nbeam = %s WHERE id = %s'''
+            bmin = %s, bpa = %s, noise = %s, peak = %s, config = %s, 
+            cycle = %s, semester = %s, nvis = %s, niter = %s, mjdtime = %s, 
+            tau_time = %s, duration = %s, radius = %s, nsrc = %s, nclean = %s, 
+            rms_box = %s, stage = %s, catalogs_checked = %s, error_id = %s, 
+            nearest_problem = %s, separation = %s, glon = %s, glat = %s, 
+            lst_i = %s, lst_f = %s, az_star = %s, el_star = %s, pa_star = %s, 
+            az_end = %s, el_end = %s, pa_end = %s, az_i = %s, az_f = %s, 
+            alt_i = %s, alt_f = %s, parang_i = %s, parang_f = %s, 
+            pri_cals = %s, ass_flag = %s, nsn = %s, tsky = %s, square = %s, 
+            sunsep = %s, pbkey = %s, pb_flag = %s, ninterval = %s, 
+            max_dt = %s, nvisnx = %s, nbeam = %s, pbparangs = %s, 
+            pbweights = %s  WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
@@ -190,7 +195,7 @@ def add_image(conn, img, status, delete=False):
                 img.az_f, img.alt_i, img.alt_f, img.parang_i, img.parang_f,
                 jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
                 img.sunsep, img.pbkey, img.pb_flag, img.ninterval, img.max_dt,
-                img.nvisnx, img.nbeam, img.id)
+                img.nvisnx, img.nbeam, np.array(img.pbparangs).tolist(), np.array(img.pbweights).tolist(), img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -389,12 +394,13 @@ def add_assoc(conn, sources):
     for src in sources:
         cur.execute('''INSERT INTO assoc_source (
             ra, e_ra, dec, e_dec, res_class, ndetect, ave_total, e_ave_total, 
-            ave_peak, e_ave_peak) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ave_peak, e_ave_peak, ns, nc, nm) VALUES (
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id''',
                     (src.ra, src.e_ra, src.dec, src.e_dec,
                      src.res_class, src.ndetect, src.total_flux,
-                     src.e_total_flux, src.peak_flux, src.e_peak_flux))
+                     src.e_total_flux, src.peak_flux, src.e_peak_flux,
+                     src.ns, src.nc, src.nm))
         src.id = cur.fetchone()[0]
         src.assoc_id = src.id
         cur.execute('''UPDATE detected_source SET assoc_id = %s
@@ -455,6 +461,7 @@ def update_matched_assoc(conn, sources):
     """Updates the RA & Dec of existing sources in the
     **assoc_source** table to the weighted average of all
     detections. Also updates the light curve flux metrics
+    and number of detections
 
     Parameters
     ----------
@@ -470,10 +477,11 @@ def update_matched_assoc(conn, sources):
     for src in sources:
         cur.execute('''UPDATE assoc_source SET ra = %s, e_ra = %s, dec = %s,
             e_dec = %s, ndetect = %s, ave_total = %s, e_ave_total = %s, 
-            ave_peak = %s, e_ave_peak = %s WHERE id = %s''',
+            ave_peak = %s, e_ave_peak = %s, ns = %s, nc = %s, nm = %s 
+            WHERE id = %s''',
                     (src.ra, src.e_ra, src.dec, src.e_dec, src.ndetect,
                      src.ave_total, src.e_ave_total, src.ave_peak,
-                     src.e_ave_peak, src.id))
+                     src.e_ave_peak, src.ns, src.nc, src.nm, src.id))
 
     conn.commit()
     cur.close()
@@ -1127,7 +1135,24 @@ def update_assflag(conn, imobj):
 
     conn.commit()
     cur.close()
-    
+
+def update_pbvalues(conn, imobj):
+    """Updates the pbparangs & pbweights column in the **image** table.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    imobj : ``database.dbclasses.Image`` instance
+        Image object used to set table column values.
+    """
+    cur = conn.cursor()
+
+    cur.execute('UPDATE image SET pbparangs = %s, pbweights = %s WHERE id = %s',
+                (np.array(imobj.pbparangs).tolist(), np.array(imobj.pbweights).tolist(), imobj.id))
+
+    conn.commit()
+    cur.close()
     
 ''' NEEDS UPDATING
 def update_corrected(conn,setup):

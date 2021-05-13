@@ -2,6 +2,8 @@
 Image and DetectedSource objects.
 
 """
+import sys
+sys.path.insert(0,'/home/vpipe/VLITE/vdp')
 import os
 import re
 import logging
@@ -283,6 +285,8 @@ class Image(object):
         Number of beams in beam image calculation 
     pbtimes : list of nbeam floats
         Times for beam image calculations (days)
+    pbparangs : list of nbeam floats
+        Parallactic angles of beam image calculation (deg)
     pbweights : list of nbeam floats
         Weights to apply to beams calculated at pbtimes
     startime : float
@@ -364,6 +368,7 @@ class Image(object):
         self.nbeam = None
         self.pbtimes = None
         self.pbweights = None
+        self.pbparangs = None
         self.startime = None
 
     def process_image(self, image):
@@ -757,25 +762,6 @@ class Image(object):
             self.pa_end = hdr['PA_END']
         except KeyError:
             self.pa_end = None
-
-    '''
-    def set_pbflag(self):
-        """Sets pb_flag True if primary beam image can be
-        calculated for this image
-        """
-        if self.vcss:
-            self.pb_flag = True
-        else:
-            self.pb_flag = False
-            if self.tau_time/self.duration > 0.5:
-                dh = (24*self.duration/86164.1) - (self.hrang_f-self.hrang_i)
-                if dh < 1:
-                    self.pb_flag = True
-                elif self.obs_dec > 61:
-                    self.pb_flag = True
-                #print('pb_flag = ',self.pb_flag,'dh = ',dh,'dur = ',24*self.duration/86164.1,'hrang_f,_i = ',self.hrang_f,self.hrang_i)
-        print('pb_flag = ',self.pb_flag)
-    '''
 
     def set_tsky(self, nside, skymap):
         """Sets the tsky attribute of the Image object, the
@@ -1238,6 +1224,12 @@ class DetectedSource(object):
     ndetect : int
         Number of times this same source has been detected in other
         VLITE images.
+    ns : int
+        Number of 'S' detections of this source
+    nc : int
+        Number of 'C' detections of this source
+    nm : int
+        Number of 'M' detections of this source
     nmatches : int
         Number of catalogs which contain this source.
     detected : bool
@@ -1316,6 +1308,9 @@ class DetectedSource(object):
         self.id = None
         self.res_class = None
         self.ndetect = None
+        self.ns = None
+        self.nc = None
+        self.nm = None
         self.nmatches = None
         self.ave_total = None
         self.e_ave_total = None
@@ -1607,6 +1602,14 @@ def translate(img, out):
         newsrcs[-1].calc_center_dist(img)
         newsrcs[-1].calc_pixel_coords(img)
         newsrcs[-1].calc_polar_angle(img)
+        #initialize to 0
+        newsrcs[-1].ns = 0
+        newsrcs[-1].nc = 0
+        newsrcs[-1].nm = 0
+        if oldsrc.code == 'S': newsrcs[-1].ns = 1
+        elif oldsrc.code == 'C': newsrcs[-1].nc = 1
+        elif oldsrc.code == 'M': newsrcs[-1].nm = 1
+        else: print('ERROR! CODE'+oldsrc.code+'NOT RECOGNIZED!')
 
     return newsrcs
 
@@ -1679,6 +1682,9 @@ def set_fromnx(img, smear_time):
     # (don't need times or weights for beam calc)
     #if 'VCSS' in img.filename or 'vcss' in img.filename:
     if img.vcss:
+        imobj.pbparangs = []
+        imobj.pbweights = []
+        imobj.pbtimes = []
         img.nsn = None
         img.pb_flag = True
         return img
@@ -1727,6 +1733,7 @@ def set_fromnx(img, smear_time):
             if hdu[i].header['EXTNAME'] == 'AIPS NX':
                 img.pbweights = []
                 img.pbtimes = []
+                img.pbparangs = []
                 hdr = hdu[i].header
                 img.ninterval = hdr['NAXIS2']
                 data = hdu[i].data
@@ -1771,6 +1778,8 @@ def init_image(impath, alwaysass, smear_time):
     ----------
     alwaysass : 'always associate' option. If True image sources
               will always be associated
+    smear_time : 'smear time' option. Determines number of beam
+              samples in each observing block
     """
     imobj = Image()
     imobj.process_image(impath)

@@ -782,6 +782,8 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic):
                     logger.info('Calculating beam image and correcting all ' 
                             'flux measurements for primary beam response.')
                     imobj.set_beam_image(pbdic)
+                    #update pribeam image values in image table
+                    dbio.update_pbvalues(conn, imobj)
                     for src in sources:
                         src.correct_flux(imobj,pbdic)
                 else:

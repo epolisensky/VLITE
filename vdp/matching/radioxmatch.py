@@ -152,7 +152,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
 def associate(conn, detected_sources, imobj, search_radius, save):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
-    distance less than half the size of minor axis of
+    distance less than half the size of minor (?) axis of
     the current image's beam.
 
     Parameters
@@ -343,6 +343,10 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                         src.e_peak_flux * src.e_peak_flux)))
                 ###
                 asrc.ndetect += 1
+                #one of these src.nx should be =1 the other two =0:
+                asrc.ns += src.ns
+                asrc.nc += src.nc
+                asrc.nm += src.nm
                 assoc_matched.append(asrc)
             else:
                 # No match -- new source
