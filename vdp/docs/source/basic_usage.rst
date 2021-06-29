@@ -294,7 +294,7 @@ The contents are described in more detail below.
     List of other radio catalogs to use for cross-matching. To use all
     available catalogs, leave as empty list, ``[]``.
     Otherwise, ``[FIRST, TGSS, NVSS, WENSS, VLSSr, etc.]``.
-  *smeartime*
+  *smear time*
     Max time step between primary beam sampling in each continuous 
     time interval (from NX table in UVOUT file). (default: 900 [s])
 
