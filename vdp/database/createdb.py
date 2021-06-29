@@ -27,7 +27,8 @@ def make_error(cur, params):
                    'bmin < {} or > {} pixels'.
                    format(params['min bpix'],params['max bpix']) : 11,
                    'image missing primary calibrators' : 12,
-                   'image missing CLEAN components' : 13}
+                   'image missing CLEAN components' : 13,
+                   'image missing NX table' : 14}
 
     sql = 'INSERT INTO error (id, reason) VALUES (%s, %s);'
     for key, value in sorted(reason_dict.items(), key=lambda x: x[1]):

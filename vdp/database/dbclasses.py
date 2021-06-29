@@ -1431,8 +1431,8 @@ class DetectedSource(object):
         pb_err = pbdic[imobj.pbkey].error
         
         # List of attributes to correct
-        attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl', 'mean_isl',
-                 'resid_rms', 'resid_mean']
+        attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl',
+                 'mean_isl', 'resid_rms', 'resid_mean']
         for attr in attrs:
             corr_val = getattr(self, attr) / pb_power
             setattr(self, attr, corr_val)
@@ -1682,9 +1682,9 @@ def set_fromnx(img, smear_time):
     # (don't need times or weights for beam calc)
     #if 'VCSS' in img.filename or 'vcss' in img.filename:
     if img.vcss:
-        imobj.pbparangs = []
-        imobj.pbweights = []
-        imobj.pbtimes = []
+        img.pbparangs = []
+        img.pbweights = []
+        img.pbtimes = []
         img.nsn = None
         img.pb_flag = True
         return img
@@ -1762,7 +1762,11 @@ def set_fromnx(img, smear_time):
                         img.pbtimes.append(ti[j]+((k+0.5)*dsmeartime)) #day
                         img.nbeam += 1
                 '''
-                        
+    if img.nbeam == 0: #No NX table found
+        img.nbeam = None
+        img.pb_flag = False
+        img.ass_flag = False
+        img.error_id = 14
     print(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights))
     dbclasses_logger.info('{}: nsn= {}; nbeam= {}; ninterval= {}; max_dt= {}; nvisnx= {}; sumweights= {}'.format(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights)))
     

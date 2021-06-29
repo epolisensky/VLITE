@@ -285,7 +285,7 @@ This is a look-up table containing explanations for each possible
 - 11 : image bmin in pixels < *min bpix* or > *max bpix* 
 - 12 : image missing primary calibrators
 - 13 : image missing CLEAN components
-
+- 14 : image missing NX table
 
 
 .. _image:

@@ -143,8 +143,9 @@ def cfgparse(cfgfile):
         files, database name, database user, catalogs, & smear time) and values
         are the user-supplied inputs.
     sfparams : dict
-        Keys are the required source finding parameters *mode* and *scale*
-        and other optional PyBDSF parameters and values are the user inputs.
+        Keys are the required source finding parameters *mode*, *scale*,
+        *borderpad* and other optional PyBDSF parameters and values are 
+        the user inputs.
     qaparams : dict
         Keys are the image quality parameters (min time on source (s),
         max noise (mJy/beam), max beam axis ratio, min problem source
@@ -295,6 +296,8 @@ def cfgparse(cfgfile):
     if sfparams['scale'] < 0 or sfparams['scale'] > 10:
         raise ConfigError('The image radius scale factor must be a number '
                           'between 0 and 10.')
+    if sfparams['borderpad'] is None or sfparams['borderpad'] < 0:
+        sfparams['borderpad'] = 3 #default to 3 pixels
 
     # Check if beam corrected option is set
     if opts['beam corrected'] is None:
@@ -307,7 +310,7 @@ def cfgparse(cfgfile):
     # Set default QA requirements if not specified
     if opts['quality checks']:
         if qaparams['min nvis'] is None:
-            qaparams['min nvis'] = 1000.
+            qaparams['min nvis'] = 1300.
         else:
             try:
                 qaparams['min nvis'] = float(
@@ -733,7 +736,10 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic):
         if imobj.filename.endswith('IPln1.fits'):
             sources = [src for src in sources if
                        src.dist_from_center <= imobj.radius and
-                       src.e_ra > 1e-7 and src.e_dec > 1e-7]
+                       src.e_ra > 1e-7 and src.e_dec > 1e-7 and
+                       src.xpix > sfparams['borderpad'] and src.ypix > sfparams['borderpad'] and
+                       src.xpix < imobj.naxis1 - sfparams['borderpad'] and
+                       src.ypix < imobj.naxis2 - sfparams['borderpad']]
             logger.info(' -- {}/{} sources are inside the circular FOV '
                         'with radius {} degree(s)'.format(
                             len(sources), out.nsrc, imobj.radius))
@@ -1142,7 +1148,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
         # Make list of objects containing just the image name & mjdtime
         imgmjdlist=[]
         for img in imglist:
-            print(imgdir+img)
+            #print(imgdir+img)
             impath = os.path.join(imgdir, img)
             imgmjdlist.append(dbclasses.getimgmjd(impath))
 
@@ -1151,6 +1157,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
 
         # Begin loop through time-sorted images
         for img in imgmjdlist:
+            print(img.filename)
             imobj = dbclasses.init_image(img.filename, alwaysass, setup['smear time'])
             logger.info('_' * (len(imobj.filename) + 10))
             logger.info('Starting {}.'.format(imobj.filename))
