@@ -257,6 +257,10 @@ The contents are described in more detail below.
   *update match*
     Cross-matches the image's detected sources with any currently
     specified radio catalogs for which there are no results yet.
+  *beam corrected*
+    Are the images already primary beam corrected?
+  *always associate*
+    Associates sources in all images regardless of image ass_flag
   
 **setup**
   Parameters defining location of VLITE images and database
@@ -290,6 +294,9 @@ The contents are described in more detail below.
     List of other radio catalogs to use for cross-matching. To use all
     available catalogs, leave as empty list, ``[]``.
     Otherwise, ``[FIRST, TGSS, NVSS, WENSS, VLSSr, etc.]``.
+  *smeartime*
+    Max time step between primary beam sampling in each continuous 
+    time interval (from NX table in UVOUT file). (default: 900 [s])
 
 **pybdsf_params**
   Parameters used in source finding.
@@ -304,6 +311,9 @@ The contents are described in more detail below.
     Required -- number between 0 and 1. Fraction of the image's
     field-of-view to use. The length of the radius describing
     the image's circular field-of-view is multiplied by this number.
+  *borderpad*
+    Required -- sources within this many pixels of the image border 
+    will be rejected. Default value is 3
 
   Below this point, any number of PyBDSF parameters may be
   specified. See `their documentation <http://www.astron.nl/citt/pybdsm/process_image.html#general-reduction-parameters>`_ for descriptions of
@@ -341,3 +351,7 @@ The contents are described in more detail below.
     reliable source fluxes. Image header keyword ``NITER``
     or ``CLEANNIT`` or ``NITER`` in a ``HISTORY`` line. 
     Default is 1000.
+  *min bpix*
+    Minimum size of BMIN in pixels (defualt: 2.8)
+  *max bpix*
+    Maximum size of BMIN in pixels (default: 7)
