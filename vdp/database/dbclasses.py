@@ -519,6 +519,7 @@ class Image(object):
 
         self.wcsobj = wcs.WCS(hdr).celestial #keeps only RA, Dec axes
 
+        '''
         try:
             self.obs_ra = hdr['OBSRA']  # deg
         except KeyError:
@@ -527,19 +528,24 @@ class Image(object):
         if self.obs_ra == 0 or self.obs_ra is None:
             try:
                 self.obs_ra = hdr['CRVAL1']  # deg
-                self.error_id = None
+                #self.error_id = None
+            except KeyError:
+                self.obs_ra = None
+                self.error_id = 1
+        '''
+        try:
+            self.obs_ra = hdr['OBSRA']  # deg
+        except:
+            try:
+                self.obs_ra = hdr['CRVAL1']  # deg
             except KeyError:
                 self.obs_ra = None
                 self.error_id = 1
         try:
             self.obs_dec = hdr['OBSDEC']  # deg
-        except KeyError:
-            self.obs_dec = None
-            self.error_id = 1
-        if self.obs_dec == 0 or self.obs_dec is None:
+        except:
             try:
                 self.obs_dec = hdr['CRVAL2']  # deg
-                self.error_id = None
             except KeyError:
                 self.obs_dec = None
                 self.error_id = 1
@@ -634,6 +640,10 @@ class Image(object):
                 self.peak = None
         try:
             self.config = hdr['CONFIG']
+            if self.config == 'a': self.config = 'A'
+            if self.config == 'b': self.config = 'B'
+            if self.config == 'c': self.config = 'C'
+            if self.config == 'd': self.config = 'D'
         except KeyError:
             self.config = None
         try:
@@ -843,6 +853,9 @@ class Image(object):
         # set ass_flag if 'always associated' option enabled
         if alwaysass:
             self.ass_flag = True
+        # set ass_flag if a 'PER_FIELD' image
+        if 'PER_FIEL' in self.filename:
+            self.ass_flag = False
 
     def set_beam_image(self, pbdic):
         """Calculates the primary beam image, offset & smeared, for the image.
@@ -880,6 +893,7 @@ class Image(object):
         """
         dbclasses_logger.info('Performing preliminary image quality checks...')
 
+        #print('image_qa: error_id = ',self.error_id)
         # Check if image was missing any necessary header keywords
         if self.error_id == 1:
             dbclasses_logger.info('IMAGE FAILED QA: missing necessary header '
@@ -1766,7 +1780,8 @@ def set_fromnx(img, smear_time):
         img.nbeam = None
         img.pb_flag = False
         img.ass_flag = False
-        img.error_id = 14
+        if img.error_id == None: #don't overwrite previously set error
+            img.error_id = 14 
     print(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights))
     dbclasses_logger.info('{}: nsn= {}; nbeam= {}; ninterval= {}; max_dt= {}; nvisnx= {}; sumweights= {}'.format(uvname, img.nsn, img.nbeam, img.ninterval, img.max_dt, img.nvisnx, np.sum(img.pbweights)))
     

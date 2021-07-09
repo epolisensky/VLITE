@@ -1150,6 +1150,9 @@ def update_pbvalues(conn, imobj):
 
     cur.execute('UPDATE image SET pbparangs = %s, pbweights = %s WHERE id = %s',
                 (np.array(imobj.pbparangs).tolist(), np.array(imobj.pbweights).tolist(), imobj.id))
+    if imobj.vcss:
+        cur.execute('UPDATE image SET nbeam = %s WHERE id = %s',
+                    (imobj.nbeam, imobj.id))
 
     conn.commit()
     cur.close()

@@ -575,6 +575,7 @@ def iminit(conn, imobj, save, qa, qaparams, reproc, stages, scale, nside, skymap
         imobj.error_id = None
         pass
 
+    # SHOULD THIS HAPPEN FIRST????
     # Is the image in the database?
     status = dbio.status_check(conn, imobj.filename)
 

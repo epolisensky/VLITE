@@ -338,20 +338,33 @@ def Calc_Beam_Image_VCSS(imobj, pbdic):
         deltat = 2./86400 # [day]
         start = imobj.mjdtime + 0.5*deltat #[day]
         mjd1 = np.arange(start,start+(nbeam*deltat),deltat) #[day]
-        start = imobj.mjdtime + (imobj.duration/86400) - 27.5*deltat #[day]
+        if len(mjd1) > nbeam: mjd1 = mjd1[:nbeam]
+        start = imobj.mjdtime + (imobj.duration/86400) - 13.5*deltat #[day]
         mjd2 = np.arange(start,start+(nbeam*deltat),deltat) #[day]
+        if len(mjd2) > nbeam: mjd2 = mjd2[:nbeam]
         mjd = np.concatenate((mjd1, mjd2))
         start = imobj.obs_ra - (6.5*delRA)
         ra1 = np.arange(start,start+(nbeam*delRA),delRA)
+        if len(ra1) > nbeam: ra1 = ra1[:nbeam]
         ra = np.concatenate((ra1, ra1))
-        nbeam=len(mjd)
+        #double observed = double nbeam
+        nbeam = 28
+        #print('mjd1: ',mjd1)
+        #print('mjd2: ',mjd2)
+        #print('ra1:  ',ra1)
     else:
         deltat = (imobj.duration/nbeam)/86400. #[day]
         start = imobj.mjdtime + 0.5*deltat #[day]
         mjd = np.arange(start,start+(nbeam*deltat),deltat)
+        if len(mjd) > nbeam: mjd = mjd[:nbeam]
         start = imobj.obs_ra - (6.5*delRA)
         ra = np.arange(start,start+(nbeam*delRA),delRA)
-        
+        if len(ra) > nbeam: ra = ra[:nbeam]
+    #update imobj.nbeam
+    imobj.nbeam = nbeam
+    #print('nbeam: ',nbeam,imobj.nbeam,len(mjd),len(ra))
+    #print(ra)
+    
     #loop over times
     for i in range(nbeam):
         xtmp, ytmp = EQtoPIX(ra[i],imobj.obs_dec,imobj.wcsobj)

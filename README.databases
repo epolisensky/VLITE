@@ -6,9 +6,9 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
-NOTE: Do not trust beam corrections in any database except snapshots
-and mosaics! (Mosaics images already beam corrected so fluxes can be 
-trusted, detected and corrected flux should be equal)
+NOTE: Do not trust beam corrections in any database except snapshots, 
+mosaics & newvlite16! (Mosaics images already beam corrected so fluxes 
+can be trusted, detected and corrected flux should be equal)
 
 mosaics : VCSS mosaics using OLD BEAM corrections
 
