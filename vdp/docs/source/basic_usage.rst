@@ -70,6 +70,8 @@ required and optional command line arguments::
                           assoc_source table
     --remove_image        removes the specified image(s) and associated results
                           from the database entirely
+    --unassoc_image       unassociates sources in the specified image(s) and updates
+                          tables accordingly
     --manually_add_match  manually add catalog matching results for VLITE
                           source(s) after follow-up
     --add_catalog         adds any new sky survey catalogs to a table in the
@@ -103,6 +105,13 @@ value of -1.
 containing the filenames of the images to delete from the database.
 All results from the specified images are removed from every
 affected table. The image filenames must contain the full
+directory path starting at least from the year-month directory
+structure.
+
+``--unassoc_image`` prompts the user for a list or text file
+containing the filenames of the images to unassociate their sources.
+Associated source table is updated, stage set to 2 and error_id 
+to -1 for each image. The image filenames must contain the full
 directory path starting at least from the year-month directory
 structure.
 

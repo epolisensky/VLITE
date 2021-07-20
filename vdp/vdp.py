@@ -1417,6 +1417,9 @@ def main():
     parser.add_argument('--remove_image', action='store_true',
                         help='removes the specified image(s) and associated '
                         'results from the database entirely')
+    parser.add_argument('--unassoc_image', action='store_true',
+                        help='unassociates sources in the specified image(s)'
+                        'and updates the database')
     parser.add_argument('--manually_add_match', action='store_true',
                         help='manually add catalog matching results for '
                         'VLITE source(s) after follow-up')
@@ -1448,7 +1451,7 @@ def main():
     #if any([args.remove_catalog_matches, args.remove_source,
     #        args.remove_image, args.manually_add_match, args.add_catalog, args.update_pbcor]):
     if any([args.remove_catalog_matches, args.remove_source,
-            args.remove_image, args.manually_add_match, args.add_catalog]):
+            args.remove_image, args.unassoc_image, args.manually_add_match, args.add_catalog]):
         opts['overwrite'] = False
     conn = dbinit(setup['database name'], setup['database user'],
                   opts['overwrite'], qaparams, safe_override=args.ignore_prompt)
@@ -1510,6 +1513,31 @@ def main():
         if confirm == 'y' or confirm == 'yes':
             logger.info('Deleting image(s) from the database...')
             dbio.remove_images(conn, images)
+        else:
+            logger.info('Doing nothing...')
+        conn.close()
+        sys.exit(0)
+
+    # Option to unassociate images
+    if args.unassoc_image:
+        inp = input('\nPlease enter the image(s) filename(s) starting '
+                        'at least with the year-month directory (i.e. '
+                        '2018-01/15/Images/10GHz.Mrk110.IPln1.fits), or '
+                        'provide a text file with one filename per line:\n')
+        try:
+            images = [re.findall('([0-9]{4}-\S+)', img)[0] for img
+                      in inp.split(',')]
+        except IndexError:
+            print('trying to read ',inp)
+            with open(inp, 'r') as f:
+                text = f.read()
+            images = [img for img in text.strip().split('\n')]
+        logger.info('Preparing to unassociate image(s) {} from the database.'.
+                    format(images))
+        confirm = input('\nAre you sure? ')
+        if confirm == 'y' or confirm == 'yes':
+            logger.info('Unassociating image(s) from the database...')
+            dbio.unassoc_images(conn, images)
         else:
             logger.info('Doing nothing...')
         conn.close()

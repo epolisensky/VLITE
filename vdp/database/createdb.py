@@ -9,7 +9,8 @@ createdb_logger = logging.getLogger('vdp.database.createdb')
 
 def make_error(cur, params):
     """Inserts values into the database error table."""
-    reason_dict = {'image missing necessary header keyword(s)' : 1,
+    reason_dict = {'image manually unassociated, error unknown' : -1,
+                   'image missing necessary header keyword(s)' : 1,
                    'number of visibilities < {}'.
                    format(params['min nvis']) : 2,
                    'sensitivity metric (noise x sqrt(int. time)) <= 0 or > {}'.

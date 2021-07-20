@@ -431,6 +431,7 @@ def update_lcmetrics(conn, sources):
     cur = conn.cursor()
 
     for src in sources:
+        #print('lc ',src.id)
         #fetch lightcurve: corrected fluxes and uncertainities
         cur.execute('''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
         FROM corrected_flux WHERE assoc_id= %s''',(src.id,))
@@ -449,18 +450,74 @@ def update_lcmetrics(conn, sources):
         src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
         src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
         # update
+        #print('  ',(src.v_total, src.v_peak, src.eta_total, src.eta_peak))
         cur.execute('''UPDATE assoc_source SET v_total = %s,
             v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
+            (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
+        conn.commit()
+        
+    cur.close()
+
+'''
+def update_assoc(conn, sources):
+    """Computes and updates the light curve metrics,
+    positions and # detections in the **assoc_source** table
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    sources : list
+        DetectedSource objects extracted from the
+        **assoc_source** table which have been matched
+        to sources detected in the current image.
+    """
+    cur = conn.cursor()
+
+    for src in sources:
+        #update counts
+        cur.execute("SELECT COUNT(1) AS ndetect, SUM(CASE WHEN code='S' THEN 1 ELSE 0 END) AS ns, 
+            SUM(CASE WHEN code='C' THEN 1 ELSE 0 END) AS nc, SUM(CASE WHEN code='M' THEN 1 ELSE 0 END) AS nm 
+            FROM detected_source WHERE assoc_id = %s",(src.id,))
+        row=cur.fetchone()
+        cur.execute("UPDATE assoc_source SET ndetect = %s, ns = %s, nc = %s, nm = %s WHERE id = %s",
+            (row['ndetect'], row['ns'], row['nc'], row['nm'], src.id))
+        conn.commit()
+        
+        #fetch lightcurve: corrected fluxes and uncertainities
+        cur.execute("SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
+        FROM corrected_flux WHERE assoc_id= %s",(src.id,))
+        numrows = int(cur.rowcount)
+        lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
+                        ('e_total','float'),('e_peak','float')], count=numrows)
+        wt = 1./lc['e_total']**2
+        wp = 1./lc['e_peak']**2
+        # calc weighted average and std dev
+        at,st = weighted_avg_and_std(lc['total'], wt)
+        ap,sp = weighted_avg_and_std(lc['peak'], wp)
+        src.ave_peak = ap
+        #src.e_ave_peak = sp
+        src.ave_total = at
+        #src.e_ave_total = st
+        # calc V
+        src.v_total = st/at
+        src.v_peak = sp/ap
+        # calc eta
+        src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
+        src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
+        # update
+        cur.execute("UPDATE assoc_source SET v_total = %s,
+            v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s",
             (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
 
     conn.commit()
     cur.close()
-                
-
+'''
+    
 def update_matched_assoc(conn, sources):
     """Updates the RA & Dec of existing sources in the
     **assoc_source** table to the weighted average of all
-    detections. Also updates the light curve flux metrics
+    detections. Also updates the light curve average fluxes
     and number of detections
 
     Parameters
@@ -818,8 +875,10 @@ def get_associated(conn, sources):
     conn : ``psycopg2.extensions.connect`` instance
         The PostgreSQL database connection object.
     sources : list
-        DetectedSource objects pulled from the
+        TWO OPTIONS:
+        1) DetectedSource objects pulled from the
         **detected_source** table based on 'image_id'.
+        2) List of assoc_source ids 
 
     Returns
     -------
@@ -827,17 +886,17 @@ def get_associated(conn, sources):
         Sources pulled from the **assoc_source** table
         based on matching 'assoc_id' and translated
         from row dictionary objects to 
-        DetectedSource objects.
+        DetectedSource objects
     """   
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     rows = []
     for src in sources:
         try:
-            # sources = list of objects
+            # OPTION 1: sources = list of objects 
             src_id = src.assoc_id
         except AttributeError:
-            # sources = list of assoc_ids
+            # OPTION 2: sources = list of assoc_ids
             src_id = src
         cur.execute('SELECT * FROM assoc_source WHERE id = %s',
                     (src_id, ))
@@ -1097,6 +1156,103 @@ def remove_images(conn, images):
         cur.execute('DELETE FROM image WHERE id = %s',
                     (image_id, ))
         conn.commit()
+    cur.close()
+
+
+def unassoc_images(conn, images):
+    """Unassociates the specified images from the database.
+    Updates image, assoc_source, detected_source, corrected_flux tables.
+
+    Parameters
+    ----------
+    conn : ``psycopg2.extensions.connect`` instance
+        The PostgreSQL database connection object.
+    images : list
+        List of image filenames to be unassociated from
+        the database.
+    """
+    cur = conn.cursor()
+
+    for image in images:
+        #print('image = ',image)
+        cur.execute('SELECT id,stage,filename FROM image WHERE filename LIKE %s',
+                    ('%'+image, ))
+        try:
+            row = cur.fetchone()
+            image_id = row[0]
+            stage = int(row[1])
+            #print(image_id,stage)
+            if stage > 2:
+                #fetch distinct assoc_id's for sources in this image
+                cur.execute("SELECT DISTINCT(assoc_id) FROM detected_source WHERE image_id = %s ORDER BY assoc_id",(image_id,))
+                assid = cur.fetchall()
+                #print('number of assoc srcs =',len(assid))
+                #update 
+                cur.execute("UPDATE image SET stage = 2, error_id = %s WHERE id = %s",(-1,image_id,))
+                cur.execute("UPDATE detected_source SET assoc_id = %s WHERE image_id = %s",(None,image_id))
+                cur.execute("UPDATE corrected_flux SET assoc_id = %s WHERE image_id = %s",(None,image_id))
+                conn.commit()
+                #update values for each assoc_source in assid
+                assoc_srcs = get_associated(conn,assid)
+                #print(len(assoc_srcs))
+                for src in assoc_srcs:
+                    #print('starting ',src.id)
+                    #check if no detections left & delete
+                    cur.execute("SELECT COUNT(1) FROM detected_source WHERE assoc_id = %s",(src.id,))
+                    count=cur.fetchone()
+                    #print(count[0])
+                    if count[0]==0:
+                        #print('deleting ',src.id)
+                        dbio_logger.info('Deleting assoc_source id {}'.format(src.id))
+                        cur.execute('DELETE FROM assoc_source WHERE id = %s',(src.id,))
+                        conn.commit()
+                    else:
+                        #print('updating ',src.id)
+                        dbio_logger.info('Updating assoc_source id {}'.format(src.id))
+                        #update coords, fluxes, # detections
+                        cur.execute("SELECT SUM(d.ra/(d.e_ra*d.e_ra)) AS ratmp, SQRT(1./SUM(1./(d.e_ra*d.e_ra))) AS era, SUM(d.dec/(d.e_dec*d.e_dec)) AS dectmp, SQRT(1./SUM(1./(d.e_dec*d.e_dec))) AS edec, SUM(c.peak_flux/(c.e_peak_flux*c.e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(c.e_peak_flux*c.e_peak_flux))) AS epeakflux, SUM(c.total_flux/(c.e_total_flux*c.e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(c.e_total_flux*c.e_total_flux))) AS etotalflux, COUNT(1) AS ndetect, SUM(CASE WHEN code='S' THEN 1 ELSE 0 END) AS ns, SUM(CASE WHEN code='C' THEN 1 ELSE 0 END) AS nc, SUM(CASE WHEN code='M' THEN 1 ELSE 0 END) AS nm FROM detected_source AS d, corrected_flux AS c WHERE (c.src_id,c.image_id,d.assoc_id) = (d.src_id,d.image_id,%s)",(src.id,))
+                        arow=cur.fetchone()
+                        #print(arow)
+                        newra = arow[1]*arow[1]*arow[0]
+                        newdec = arow[3]*arow[3]*arow[2]
+                        newpeak = arow[5]*arow[5]*arow[4]
+                        newtotal = arow[7]*arow[7]*arow[6]
+                        #print(newra,newdec,newpeak,newtotal,arow[8])
+                        cur.execute("UPDATE assoc_source SET ra = %s, e_ra = %s, dec = %s, e_dec = %s, ave_peak = %s, e_ave_peak = %s, ave_total = %s, e_ave_total = %s, ndetect = %s, ns = %s, nc = %s, nm = %s WHERE id = %s",(newra, arow[1], newdec, arow[3], newpeak, arow[5], newtotal, arow[7], arow[8], arow[9], arow[10], arow[11], src.id))
+                        conn.commit()
+                        #update LC metrics
+                        #print('updating LC metrics...')
+                        #fetch lightcurve: corrected fluxes and uncertainities
+                        cur.execute("SELECT total_flux, peak_flux, e_total_flux, e_peak_flux FROM corrected_flux WHERE assoc_id= %s",(src.id,))
+                        numrows = int(cur.rowcount)
+                        #print(numrows)
+                        if numrows == 1:
+                            #print('not enough pts for metrics')
+                            cur.execute("UPDATE assoc_source SET v_total = %s, v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s",
+                                        (None, None, None, None, src.id))
+                        else:
+                            lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
+                                                                ('e_total','float'),('e_peak','float')], count=numrows)
+                            wt = 1./lc['e_total']**2
+                            wp = 1./lc['e_peak']**2
+                            # calc weighted average and std dev
+                            at,st = weighted_avg_and_std(lc['total'], wt)
+                            ap,sp = weighted_avg_and_std(lc['peak'], wp)
+                            # calc V
+                            src.v_total = st/at
+                            src.v_peak = sp/ap
+                            # calc eta
+                            src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
+                            src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
+                            # update
+                            #print('  ',(src.v_total, src.v_peak, src.eta_total, src.eta_peak))
+                            cur.execute("UPDATE assoc_source SET v_total = %s, v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s",
+                                        (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
+                        conn.commit()
+
+        except TypeError:
+            dbio_logger.info('WARNING: Image {} is not in the database.'.
+                             format(image))
     cur.close()
 
     
