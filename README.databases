@@ -35,6 +35,10 @@ vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may
 	  not contain all columns from online docs
 
+vlite10img : Just VLITE10 images, no source finding. 
+	     This database is more complete than "vlite10"
+	     for some unknown reason
+
 vlite10c : VLITE10 C config images
 
 vlite16 : A staging area for processing images after
@@ -45,6 +49,9 @@ vlite16 : A staging area for processing images after
           dbclasses.py) before reprocessing into the
           corresponding vlite16[a-d] database.
           Currently holds data from 2020-06 to present
+
+staging : When "newvlite16" becomes "vlite16", this
+	  will be the new staging area database
 
 ###################################
 # MISCELLANEOUS DATABASES

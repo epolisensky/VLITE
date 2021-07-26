@@ -50,7 +50,7 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 res_dict = {
     'A': {'1': {'mjd': [58179, 58280], 'bmin': [2.85, 4.27], 'semester': '2018A'},
           '2': {'mjd': [58697, 58778], 'bmin': [3.26, 4.90], 'semester': '2019A'},
-          '3': {'mjd': [59190, 59274], 'bmin': [3.57, 5.36], 'semester': '2020B'}},
+          '3': {'mjd': [59190, 59285], 'bmin': [3.57, 5.36], 'semester': '2020B'}},
     'BnA': {'1': {'mjd': [58148, 58179], 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58660, 58697], 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59142, 59190], 'bmin': [0, 0], 'semester': ''}},
@@ -67,8 +67,10 @@ res_dict = {
     'DnC': {'3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''}},
     'D': {'2': {'mjd': [58360, 58440], 'bmin': [117.58, 176.37], 'semester': '2018A'},
           '3': {'mjd': [58802, 58876], 'bmin': [133.07, 199.60], 'semester': '2019B'},
-          '4': {'mjd': [59274, 99999], 'bmin': [133., 199.], 'semester': '2021A'}},
-    'AnB': {'V10': {'mjd': [56986, 57953.99], 'bmin': [0, 0], 'semester': 'many'}}
+          '4': {'mjd': [59295, 59367], 'bmin': [127.37, 191.05], 'semester': '2021A'}},
+    'AnB': {'V10': {'mjd': [56986, 57953.99], 'bmin': [0, 0], 'semester': 'many'}},
+    'A-D': {'3-4': {'mjd': [59285,59295], 'bmin': [0, 0], 'semester': ''}},
+    'Unk': {'0': {'mjd': [59367, 99999], 'bmin': [0, 0], 'semester': ''}}
 }
 
 class ImgMjd(object):
@@ -638,6 +640,8 @@ class Image(object):
                 self.peak = hdr['DATAMAX'] * 1000.  # mJy/beam
             except KeyError:
                 self.peak = None
+        ###### REPLACE: lookup config in res_dict based on mjdtime in set_cycle()
+        '''
         try:
             self.config = hdr['CONFIG']
             if self.config == 'a': self.config = 'A'
@@ -646,6 +650,7 @@ class Image(object):
             if self.config == 'd': self.config = 'D'
         except KeyError:
             self.config = None
+        '''
         try:
             self.nvis = hdr['NVIS']
         except KeyError:
@@ -817,8 +822,9 @@ class Image(object):
                 self.radius = None
 
     def set_cycle(self, alwaysass):
-        """Sets image cycle, semester, and ass_flag"""
+        """Sets image config, cycle, semester, and ass_flag"""
         self.ass_flag = False
+        '''
         config = self.config
         if config is None:
             self.semester = None
@@ -826,6 +832,16 @@ class Image(object):
         else:
             for cycle in res_dict[config].keys():
                 if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
+                    self.semester = res_dict[config][cycle]['semester']
+                    self.cycle = cycle
+                    if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
+                        self.ass_flag = True
+                    break
+        '''
+        for config in res_dict.keys():
+            for cycle in res_dict[config].keys():
+                if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
+                    self.config = config
                     self.semester = res_dict[config][cycle]['semester']
                     self.cycle = cycle
                     if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
