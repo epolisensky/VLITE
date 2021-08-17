@@ -10,26 +10,14 @@ NOTE: Do not trust beam corrections in any database except snapshots,
 mosaics & newvlite16! (Mosaics images already beam corrected so fluxes 
 can be trusted, detected and corrected flux should be equal)
 
-mosaics : VCSS mosaics using OLD BEAM corrections
+mosaics : VCSS mosaics using OLD BEAM corrections 
 
-vcss : VCSS snapshots. Currently 1.1 + 1.2. Sources were not 
-       associated or matched to catalogs to speed up processing. 
-       Neither snapshots nor sources were beam corrected.
+snapshots : VCSS epoch 1 snapshots with "0.934" beam corrections.
+       Sources are associated and matched to catalogs.
 
-snapshots : VCSS 1.1 + 1.2 snapshots with "0.934" beam corrections.
-       Currently being processed. Sources *are* being associated
-       and matched to catalogs.
-
-newvlite16 : Reprocessing of all vlite16 data with "0.934"
-	beam corrections. In progress. Will be renamed when 
-	completed. C configs were processed first & are
-	complete. Processing now proceeding by CY. 
-
-vlite16d : VLITE D config daily images 07/2017 - 05/2020.
-
-vlite16b : VLITE B config daily images 07/2017 - 05/2020.
-
-vlite16a : VLITE A config daily images 07/2017 - 05/2020.
+vlite16 : Reprocessing of vlite16 data with "0.934"
+	beam corrections. Complete from 2017-07/20
+	to 2021-06/08
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may
@@ -41,32 +29,19 @@ vlite10img : Just VLITE10 images, no source finding.
 
 vlite10c : VLITE10 C config images
 
-vlite16 : A staging area for processing images after
+staging : A staging area for processing images after
           config changes. The distribution of beam
           solid angles needs to be analyzed to set
           the acceptable range for source association
           in the resolution dictionary (res_dict in
-          dbclasses.py) before reprocessing into the
-          corresponding vlite16[a-d] database.
-          Currently holds data from 2020-06 to present
+          dbclasses.py) before reprocessing into vlite16.
 
-staging : When "newvlite16" becomes "vlite16", this
-	  will be the new staging area database
 
 ###################################
 # MISCELLANEOUS DATABASES
 # includes testing and special 
 #   projects
 ###################################
-
-oldvlite16c : VLITE C config daily images 07/2017 - 05/2020 
-        with old beam corrections.
-        NOW USE newvlite16 FOR C CONFIG (select assoc_sources
-        where res_class ='C')
-	This database will be deleted eventually
-
-vlite10img : VLITE10 images from 2014-11/25 to 2017-07/19
-          Just images, no source finding.
 
 hudffinal : The "final" A config VLITE HUDF image that 
 	    combined 3 images from 2018 & 3 from 2019, 

@@ -65,7 +65,8 @@ res_dict = {
           '2': {'mjd': [58441, 58519], 'bmin': [32.20, 48.30], 'semester': '2018B'},
           '3': {'mjd': [58885, 59008], 'bmin': [39.69, 59.54], 'semester': '2020A'}},
     'DnC': {'2': {'mjd': [58437, 58441], 'bmin': [0, 0], 'semester': ''},
-            '3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''}},
+            '3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''},
+            '4': {'mjd': [59367, 59374], 'bmin': [0, 0], 'semester': ''}},
     'D': {'2': {'mjd': [58360, 58437], 'bmin': [117.58, 176.37], 'semester': '2018A'},
           '3': {'mjd': [58802, 58876], 'bmin': [133.07, 199.60], 'semester': '2019B'},
           '4': {'mjd': [59295, 59367], 'bmin': [127.37, 191.05], 'semester': '2021A'}},
@@ -73,7 +74,7 @@ res_dict = {
     'A-D': {'1-2': {'mjd': [58280, 58360], 'bmin': [0, 0], 'semester': ''},
             '2-3': {'mjd': [58778, 58802], 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bmin': [0, 0], 'semester': ''}},
-    'Unk': {'0': {'mjd': [59367, 99999], 'bmin': [0, 0], 'semester': ''}}
+    'Unk': {'0': {'mjd': [59374, 99999], 'bmin': [0, 0], 'semester': ''}}
 }
 
 class ImgMjd(object):
@@ -524,33 +525,19 @@ class Image(object):
 
         self.wcsobj = wcs.WCS(hdr).celestial #keeps only RA, Dec axes
 
-        '''
         try:
-            self.obs_ra = hdr['OBSRA']  # deg
-        except KeyError:
-            self.obs_ra = None
-            self.error_id = 1
-        if self.obs_ra == 0 or self.obs_ra is None:
-            try:
-                self.obs_ra = hdr['CRVAL1']  # deg
-                #self.error_id = None
-            except KeyError:
-                self.obs_ra = None
-                self.error_id = 1
-        '''
-        try:
-            self.obs_ra = hdr['OBSRA']  # deg
+            self.obs_ra = hdr['CRVAL1']  # deg
         except:
             try:
-                self.obs_ra = hdr['CRVAL1']  # deg
+                self.obs_ra = hdr['OBSRA']  # deg
             except KeyError:
                 self.obs_ra = None
                 self.error_id = 1
         try:
-            self.obs_dec = hdr['OBSDEC']  # deg
+            self.obs_dec = hdr['CRVAL2']  # deg
         except:
             try:
-                self.obs_dec = hdr['CRVAL2']  # deg
+                self.obs_dec = hdr['OBSDEC']  # deg
             except KeyError:
                 self.obs_dec = None
                 self.error_id = 1

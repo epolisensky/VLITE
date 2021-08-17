@@ -1,12 +1,1 @@
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1910567+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-10/01/Images/3GHz.0415134+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1904465+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1858364+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1852262+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1846161+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-11/13/Images/3GHz.1840059+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-09/24/Images/3GHz.1938364+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-09/24/Images/3GHz.1932262+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-09/24/Images/3GHz.1926161+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-09/24/Images/3GHz.1920059+0057.IPln1.fits
-/roadraid/vpipe/processed/vcss/2017-10/16/Images/3GHz.0110567+0035.IPln1.fits
+/roadraid/vpipe/Amaris2021/Glimpse01.vlitea.fits
