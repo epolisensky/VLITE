@@ -6,14 +6,14 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
-NOTE: Do not trust beam corrections in any database except snapshots, 
-mosaics & newvlite16! (Mosaics images already beam corrected so fluxes 
-can be trusted, detected and corrected flux should be equal)
-
 mosaics : VCSS mosaics using OLD BEAM corrections 
 
 snapshots : VCSS epoch 1 snapshots with "0.934" beam corrections.
        Sources are associated and matched to catalogs.
+
+snapshots20 : VCSS epoch 2 snapshots with "0.934" beam corrections
+       and 20 arcsec beams. Sources are associated and matched to 
+       catalogs.
 
 vlite16 : Reprocessing of vlite16 data with "0.934"
 	beam corrections. Complete from 2017-07/20
@@ -21,13 +21,16 @@ vlite16 : Reprocessing of vlite16 data with "0.934"
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may
-	  not contain all columns from online docs
+	  not contain all columns from online docs. 
+	  DO NOT TRUST BEAM CORRECTIONS IN THIS
+	  DATABASE
 
 vlite10img : Just VLITE10 images, no source finding. 
 	     This database is more complete than "vlite10"
 	     for some unknown reason
 
-vlite10c : VLITE10 C config images
+vlite10c : VLITE10 C config images. DO NOT TRUST BEAM
+	   CORRECTIONS
 
 staging : A staging area for processing images after
           config changes. The distribution of beam
@@ -49,25 +52,25 @@ hudffinal : The "final" A config VLITE HUDF image that
 	    residual images after iteratively subracting sources,
 	    and "yearly" images combining the 3 images from
 	    2018 & 2019 separately + WSCLEANed + convolved to 
-	    "final" image's beam. NOTE: DO NOT USE ASSOC_SOURCE
-	    TABLE FLUXES & LIGHT CURVE METRICS
+	    "final" image's beam. Primary beam images calculated
+	    and applied separately (nvis weighted). Associated
+	    sources were also updated
 
 hudfdaily : All daily A config images from normal
             VLITE imaging pipeline. VDP-calculated beam 
-	    corrections (end points). Default smear time (900 s)
+	    corrections. Default smear time (900 s)
 
 hudfdaily100 : All daily A config images from normal
             VLITE imaging pipeline. VDP-calculated beam 
-            corrections (end points). Smear time = 100 s
+            corrections. Smear time = 100 s
 
 hudfdaily20 : All daily A config images from normal
             VLITE imaging pipeline. VDP-calculated beam
-            corrections (end points). Smear time = 20 s
+            corrections. Smear time = 20 s
 
 hudf4min : Images from the final reimaged at 4 min 
-	   timescales. NOTE: fluxes & light curve metrics 
-	   in assoc_source table need updating using fluxes 
-	   from corrected_flux. DO NOT USE THESE AS IS!
+	   timescales. Beam images calculated & applied
+	   separately. Associated sources also updated.
 
 hudfb : Simona's WSCLEANed B config HUDF image.  
 	Beam corrected WITH OLD BEAM. Needs updating

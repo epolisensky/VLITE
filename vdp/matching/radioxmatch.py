@@ -55,7 +55,7 @@ def filter_res(rows, res_class):
     rows : list
         psycopg2 row dictionary objects extracted
         from the database.
-    res : float
+    res_class : float
         Spatial resolution of the current image in arcseconds.
 
     Returns
@@ -152,7 +152,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
 def associate(conn, detected_sources, imobj, search_radius, save):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
-    distance less than half the size of minor (?) axis of
+    distance less than half the size of major (?) axis of
     the current image's beam.
 
     Parameters
@@ -193,7 +193,10 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         Any of these non-detections with no radio catalog matches
         ('nmatches' = 0) are recorded in the **vlite_unique** table.
     """
-    res_class = imobj.config
+    if imobj.vcss:
+        res_class = 'VCSS'
+    else:
+        res_class = imobj.config
     
     # Extract all previously detected sources in the same FOV
     assoc_rows = cone_search(conn, 'assoc_source', imobj.obs_ra,
@@ -366,7 +369,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
     return detected_matched, detected_unmatched, assoc_matched, assoc_unmatched
 
 
-def filter_catalogs(conn, catalogs, config):
+def filter_catalogs(conn, catalogs, imobj):
     """Selects only radio catalogs with a spatial resolution that
     lies in similar range as the current image's resolution.
     The A & B configuration equivalent resolution ranges are
@@ -378,8 +381,9 @@ def filter_catalogs(conn, catalogs, config):
         The PostgreSQL database connection object.
     catalogs : list
         List of catalog names to check.
-    config : str
-        Current image array config, determines spatial resolution range
+    imobj : ``database.dbclasses.Image`` instance
+        Image object whose attributes are used for setting
+        spatial resolution range
 
     Returns
     -------
@@ -387,17 +391,19 @@ def filter_catalogs(conn, catalogs, config):
         Names of catalogs which have resolutions adequate
         to proceed with the positional cross-matching.
     """
-    if config == 'A':
+    if imobj.vcss:
+        use_range = (15.,30.) #VCSS snapshots, regardless of config
+    elif imobj.config == 'A':
         use_range = (0.,26.) #to include TGSS & LOTSS
-    elif config == 'B':
+    elif imobj.config == 'B':
         use_range = (15.,30.)
-    elif config == 'C':
+    elif imobj.config == 'C':
         use_range = (39.,80.)
-    elif config == 'D':
+    elif imobj.config == 'D':
         use_range = (99.,9999.)
     else:
         match_logger.info('Filter_catalogs received config = {} but '
-                          'only A, B, C, or D are allowed...'.format(config))
+                          'only A, B, C, or D are allowed...'.format(imobj.config))
         use_range = (0,0)
     ###############################
 

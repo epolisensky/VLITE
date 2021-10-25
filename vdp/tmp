@@ -1,0 +1,1 @@
+SELECT a.id AS assoc_id, bb.*, 3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep FROM assoc_source AS a, LATERAL ( SELECT b.* FROM radcat.{} AS b WHERE a.id IN %s AND q3c_join(a.ra, a.dec, b.ra, b.dec, %s) ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb

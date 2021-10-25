@@ -114,7 +114,7 @@ def create(conn, params, safe=False):
                 e_ra DOUBLE PRECISION,
                 dec DOUBLE PRECISION,
                 e_dec DOUBLE PRECISION,
-                res_class VARCHAR(3),
+                res_class VARCHAR(4),
                 ndetect INTEGER,
                 ns INTEGER,
                 nc INTEGER,

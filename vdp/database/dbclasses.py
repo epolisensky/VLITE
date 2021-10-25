@@ -56,14 +56,17 @@ res_dict = {
             '3': {'mjd': [59142, 59190], 'bmin': [0, 0], 'semester': ''}},
     'B': {'1': {'mjd': [57996, 58148], 'bmin': [10.77, 16.16], 'semester': '2017B'},
           '2': {'mjd': [58534.24, 58660], 'bmin': [10.18, 15.28], 'semester': '2019A'},
-          '3': {'mjd': [59026, 59142], 'bmin': [11.27, 16.91], 'semester': '2020A'}},
+          '3': {'mjd': [59026, 59142], 'bmin': [11.27, 16.91], 'semester': '2020A'},
+          '4': {'mjd': [59479, 59999], 'bmin': [10.41, 15.61], 'semester': '2021B'}},
     'CnB': {'1': {'mjd': [57994, 57996], 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58519, 58534.24], 'bmin': [0, 0], 'semester': ''},
-            '3': {'mjd': [59008, 59026], 'bmin': [0, 0], 'semester': ''}},
+            '3': {'mjd': [59008, 59026], 'bmin': [0, 0], 'semester': ''},
+            '4': {'mjd': [59471, 59479], 'bmin': [0, 0], 'semester': ''}},
     'C': {'V10': {'mjd': [56986, 57953.99], 'bmin': [32.2, 65.91], 'semester': 'many'},
           '1': {'mjd': [57954, 57994], 'bmin': [43.94, 65.91], 'semester': '2017A'},
           '2': {'mjd': [58441, 58519], 'bmin': [32.20, 48.30], 'semester': '2018B'},
-          '3': {'mjd': [58885, 59008], 'bmin': [39.69, 59.54], 'semester': '2020A'}},
+          '3': {'mjd': [58885, 59008], 'bmin': [39.69, 59.54], 'semester': '2020A'},
+          '4': {'mjd': [59419, 59471], 'bmin': [33.29, 49.93], 'semester': '2021A'}},
     'DnC': {'2': {'mjd': [58437, 58441], 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59367, 59374], 'bmin': [0, 0], 'semester': ''}},
@@ -74,7 +77,7 @@ res_dict = {
     'A-D': {'1-2': {'mjd': [58280, 58360], 'bmin': [0, 0], 'semester': ''},
             '2-3': {'mjd': [58778, 58802], 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bmin': [0, 0], 'semester': ''}},
-    'Unk': {'0': {'mjd': [59374, 99999], 'bmin': [0, 0], 'semester': ''}}
+    'Unk': {'0': {'mjd': [59999, 99999], 'bmin': [0, 0], 'semester': ''}}
 }
 
 class ImgMjd(object):
@@ -295,6 +298,8 @@ class Image(object):
         Parallactic angles of beam image calculation (deg)
     pbweights : list of nbeam floats
         Weights to apply to beams calculated at pbtimes
+    smeartime : float
+        From setup, smear time of pri beam image calculation (s)
     startime : float
         Header keyword STARTIME [days]
     """
@@ -375,6 +380,7 @@ class Image(object):
         self.pbtimes = None
         self.pbweights = None
         self.pbparangs = None
+        self.smeartime = None
         self.startime = None
 
     def process_image(self, image):
@@ -424,7 +430,7 @@ class Image(object):
                 if self.filename.endswith('IPln1.fits'):
                     self.vcss = True # image is a VCSS snapshot not mosaic
                     self.pb_flag = True
-                    
+        
         # start with priband
         try:
             hdrpriband = hdr['PRIBAND']
@@ -1700,8 +1706,8 @@ def set_fromnx(img, smear_time):
     """
     # Skip for VCSS images
     # (don't need times or weights for beam calc)
-    #if 'VCSS' in img.filename or 'vcss' in img.filename:
     if img.vcss:
+        img.smeartime = 2.0
         img.pbparangs = []
         img.pbweights = []
         img.pbtimes = []
@@ -1709,6 +1715,8 @@ def set_fromnx(img, smear_time):
         img.pb_flag = True
         return img
 
+    img.smeartime = smear_time
+    
     # Determine dir with uvout file
     a = img.filename.split('/')
     uvdir = ''
