@@ -100,7 +100,7 @@ def Read_Fitted_Beam(pbkey):
     else:
         print('ERROR! Invalid pbkey in beam_tools.Read_Fitted_Beam',pbkey)
         sys.exit(1)
-    beamfile = path.join('/home/vpipe/VLITE/vdp/resources',fname)
+    beamfile = path.join('/home/vpipe/VLITE/VLITE/vdp/resources',fname)
     f = open(beamfile,'r')
     b = f.readlines()
     f.close() 
@@ -155,7 +155,7 @@ def Read_Perley_Beam():
     nbeam = 23401 #6.5 deg, including end points
     fname = 'NRAOBEAM_344MHz_long.txt'
     #print('P',fname)
-    beamfile=path.join('/home/vpipe/VLITE/vdp/resources',fname)
+    beamfile=path.join('/home/vpipe/VLITE/VLITE/vdp/resources',fname)
     f = open(beamfile,'r')
     b = f.readlines()
     f.close() 

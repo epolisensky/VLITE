@@ -3,7 +3,7 @@ Image and DetectedSource objects.
 
 """
 import sys
-sys.path.insert(0,'/home/vpipe/VLITE/vdp')
+sys.path.insert(0,'/home/vpipe/VLITE/VLITE/vdp')
 import os
 import re
 import logging

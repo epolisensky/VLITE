@@ -37,7 +37,7 @@ catio_logger = logging.getLogger('vdp.radiocatalogs.catalogio')
 
 
 # Define path to the sky catalog data
-catalogdir = '/home/vpipe/VLITE/vdp/resources/RadioCatalogs'
+catalogdir = '/home/vpipe/VLITE/VLITE/vdp/resources/RadioCatalogs'
 
 # If adding a new catalog, don't forget to add it to this dictionary!
 # Note: catalog name must be lowercase, cannot lead with a number, and
