@@ -50,7 +50,8 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 res_dict = {
     'A': {'1': {'mjd': [58179, 58280], 'bmin': [2.85, 4.27], 'semester': '2018A'},
           '2': {'mjd': [58697, 58778], 'bmin': [3.26, 4.90], 'semester': '2019A'},
-          '3': {'mjd': [59190, 59285], 'bmin': [3.57, 5.36], 'semester': '2020B'}},
+          '3': {'mjd': [59190, 59285], 'bmin': [3.57, 5.36], 'semester': '2020B'},
+          '4': {'mjd': [99999, 99999], 'bmin': [0.00, 0.00], 'semester': '2022A'}},
     'BnA': {'1': {'mjd': [58148, 58179], 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58660, 58697], 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59142, 59190], 'bmin': [0, 0], 'semester': ''}},
@@ -78,6 +79,27 @@ res_dict = {
             '2-3': {'mjd': [58778, 58802], 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bmin': [0, 0], 'semester': ''}},
     'Unk': {'0': {'mjd': [59999, 99999], 'bmin': [0, 0], 'semester': ''}}
+}
+
+compactness_dict = {
+    'A' : {'1' : {'a0': 1.031822, 'a1': 4.274405e-03, 'c0': 9.869077, 'c1': -1.670031},
+           '2' : {'a0': 1.018140, 'a1': 2.699981e-03, 'c0': 6.620082, 'c1': -1.542459},
+           '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.503045, 'c1': -1.562968}},
+    'B' : {'1' : {'a0': 1.021807, 'a1': 1.285446e-03, 'c0': 6.660220, 'c1': -1.624589},
+           '2' : {'a0': 1.024552, 'a1': 1.934734e-03, 'c0': 5.512317, 'c1': -1.567072},
+           '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613}},
+    'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.384203, 'c1': -1.541476},
+           '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.596905, 'c1': -1.366059},
+           '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219}},
+    'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.702012, 'c1': -1.681850},
+           '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.085506, 'c1': -1.397051},
+           '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422}},
+    'VCSS' : {'1.1' : {'a0': 1.011306, 'a1': 7.558691e-04, 'c0': 2.920139, 'c1': -1.499045},
+              '1.2' : {'a0': 1.007941, 'a1': 6.682657e-04, 'c0': 3.970741, 'c1': -1.529810},
+              '2.1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
+              '2.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
+              '3.1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
+              '3.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0}}
 }
 
 class ImgMjd(object):
@@ -279,6 +301,8 @@ class Image(object):
         primary beam image for the image
     vcss : boolean
         True if image is a VCSS snapshot (used for beam image calculation)
+    mosaic : boolean
+        True if image is a VCSS mosaic
     sunsep : float
         Angular separation between the Sun and the image pointing 
         center at mjdtime (degrees).
@@ -298,6 +322,8 @@ class Image(object):
         Parallactic angles of beam image calculation (deg)
     pbweights : list of nbeam floats
         Weights to apply to beams calculated at pbtimes
+    pbza : list of nbeam floats
+        Zenith angles of beam image calculation (deg)
     smeartime : float
         From setup, smear time of pri beam image calculation (s)
     startime : float
@@ -368,6 +394,7 @@ class Image(object):
         self.naxis2 = None
         self.bmimg = None
         self.vcss = None
+        self.mosaic = None
         self.sunsep = None
         self.hrang_i = None
         self.hrang_f = None
@@ -380,6 +407,7 @@ class Image(object):
         self.pbtimes = None
         self.pbweights = None
         self.pbparangs = None
+        self.pbza = None
         self.smeartime = None
         self.startime = None
 
@@ -430,6 +458,12 @@ class Image(object):
                 if self.filename.endswith('IPln1.fits'):
                     self.vcss = True # image is a VCSS snapshot not mosaic
                     self.pb_flag = True
+
+        # check if VCSS mosaic
+        self.mosaic = False
+        if self.filename.endswith('IMSC.fits'):
+            self.mosaic = True # image is a VCSS mosaic
+            self.pb_flag = False
         
         # start with priband
         try:
@@ -469,7 +503,8 @@ class Image(object):
                     self.pbkey = None
         except:
             # VCSS mosaics & snapshots
-            if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename:
+            #if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename:
+            if self.mosaic or self.vcss:
                 self.pri_freq = 3
                 self.priband = '3'
                 self.pbkey = 'S'
@@ -843,9 +878,14 @@ class Image(object):
                     if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
                         self.ass_flag = True
                     break
+
         #set for VCSS snapshots
         if self.vcss:
-            self.ass_flag = True
+            if self.noise > 30:
+                self.ass_flag = False
+            else:
+                self.ass_flag = True
+                
         # if ass_flag True, check if image within view of a "too-many-artifacts" bad source
         if self.ass_flag:
             bad_sources = {'3C286': SkyCoord(202.784583, 30.509167, unit='deg'),
@@ -1245,8 +1285,6 @@ class DetectedSource(object):
         Uniquely identifies the source in the **assoc_source** table.
     res_class : str
         Resolution class of the image in which the source was found.
-        'A': res <= 15", 'B': 15" < res <= 35", 'C': 35" < res <= 60",
-        'D': res > 60".
     ndetect : int
         Number of times this same source has been detected in other
         VLITE images.
@@ -1513,34 +1551,37 @@ class DetectedSource(object):
             Initialized Image object with attribute values
             set from header info.
         """
-        if imobj.config == 'A' or imobj.config == 'BnA':
-            a0 = 1.054294
-            a1 = 4.497675e-3
-            c0 = 18.277850
-            c1 = -1.917682
-        elif imobj.config == 'B' or imobj.config == 'CnB':
-            a0 = 1.028851
-            a1 = 2.17631e-3
-            c0 = 10.493944
-            c1 = -1.804784
-        elif imobj.config == 'C' or imobj.config == 'DnC':
-            a0 = 1.007876
-            a1 = 1.761468e-3
-            c0 = 12.600512
-            c1 = -2.002195
-        elif imobj.config == 'D':  # need to determine D config values
-            a0 = 1.0
-            a1 = 0.
-            c0 = 0.
-            c1 = 0.
-        else:  # unknown config
-            a0 = 1.0
-            a1 = 0.
-            c0 = 0.
-            c1 = 0.
-        cfit = a0+sqrt(a1 + c0*pow(self.snr, c1))
-        ratio = self.total_flux/self.peak_flux
-        self.compactness = cfit/ratio
+        self.compactness = None
+        flag = False
+        if imobj.mosaic:
+            pass
+        elif imobj.vcss:
+            config = 'VCSS'
+            if imobj.mjdtime > 58000 and imobj.mjdtime < 58200:
+                cycle = '1.1'
+                flag = True
+            elif imobj.mjdtime > 58500 and imobj.mjdtime < 58700:
+                cycle = '1.2'
+                flag = True
+            else:
+                pass
+        else:
+            for cfg in compactness_dict.keys():
+                if cfg == imobj.config:
+                    for cyc in compactness_dict[imobj.config].keys():
+                        if cyc == imobj.cycle:
+                            config = imobj.config
+                            cycle = imobj.cycle
+                            flag = True
+                            break
+        if flag:
+            a0 = compactness_dict[config][cycle]['a0']
+            a1 = compactness_dict[config][cycle]['a1']
+            c0 = compactness_dict[config][cycle]['c0']
+            c1 = compactness_dict[config][cycle]['c1']
+            cfit = a0+sqrt(a1 + c0*pow(self.snr, c1))
+            ratio = self.total_flux/self.peak_flux
+            self.compactness = cfit/ratio
 
 
 def dict2attr(obj, dictionary):
@@ -1710,9 +1751,22 @@ def set_fromnx(img, smear_time):
         img.smeartime = 2.0
         img.pbparangs = []
         img.pbweights = []
+        img.pbza = []
         img.pbtimes = []
         img.nsn = None
         img.pb_flag = True
+        return img
+
+    # Skip for VCSS mosaics
+    # (don't need times or weights for beam calc)
+    if img.mosaic:
+        img.smeartime = None
+        img.pbparangs = []
+        img.pbweights = []
+        img.pbza = []
+        img.pbtimes = []
+        img.nsn = None
+        img.pb_flag = False
         return img
 
     img.smeartime = smear_time
@@ -1762,6 +1816,7 @@ def set_fromnx(img, smear_time):
                 img.pbweights = []
                 img.pbtimes = []
                 img.pbparangs = []
+                img.pbza = []
                 hdr = hdu[i].header
                 img.ninterval = hdr['NAXIS2']
                 data = hdu[i].data

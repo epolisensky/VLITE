@@ -86,6 +86,7 @@ def create(conn, params, safe=False):
         sql = (
             '''
             CREATE EXTENSION IF NOT EXISTS q3c;
+            CREATE EXTENSION IF NOT EXISTS quantile;
 
             CREATE TABLE run_config (
                 id SERIAL NOT NULL,
@@ -196,6 +197,7 @@ def create(conn, params, safe=False):
                 nbeam INTEGER,
                 pbparangs REAL[],
                 pbweights REAL[],
+                pbza REAL[],
                 PRIMARY KEY (id),
                 FOREIGN KEY (error_id) 
                   REFERENCES error (id) 

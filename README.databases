@@ -6,12 +6,12 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
-mosaics : VCSS mosaics using OLD BEAM corrections 
+mosaics : VCSS epoch 1 mosaics using OLD BEAM corrections 
 
 snapshots : VCSS epoch 1 snapshots with "0.934" beam corrections.
        Sources are associated and matched to catalogs.
 
-snapshots20 : VCSS epoch 2 snapshots with "0.934" beam corrections
+newsnapshots20 : VCSS epoch 2 snapshots with "0.934" beam corrections
        and 20 arcsec beams. Sources are associated and matched to 
        catalogs.
 
@@ -38,7 +38,8 @@ staging : A staging area for processing images after
           the acceptable range for source association
           in the resolution dictionary (res_dict in
           dbclasses.py) before reprocessing into vlite16.
-
+	  Sources are beam corrected but NOT associated
+	  or matched to catalogs.
 
 ###################################
 # MISCELLANEOUS DATABASES

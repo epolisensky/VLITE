@@ -8,5 +8,5 @@ vdp/resources/RadioCatalogs/nrl_nvss_psql.txt
 vdp/resources/RadioCatalogs/nvss_psql.txt
 
 # ignore directories
-config_files
-resources/RadioCatalogs
+vdp/config_files
+vdp/resources/RadioCatalogs

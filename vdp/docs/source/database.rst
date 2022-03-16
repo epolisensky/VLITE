@@ -414,6 +414,7 @@ in the table, as well.
 - *nbeam*: Number of beams in primary beam image calculation
 - *pbparangs*: Array of parallactic angles used in primary beam image calculation
 - *pbweights*: Array of weighting factors used in primary beam image calculation
+- *pbza*: Array of zenith angles at times of primary beam image calculation
 
 .. _run_config:
 

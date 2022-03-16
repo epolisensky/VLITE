@@ -11,7 +11,7 @@ class TimeoutError(Exception):
     """Exception raised when function runs too long."""
     pass
 
-def timeout(seconds=300, error_message='Function call timed out.'):
+def timeout(seconds=600, error_message='Function call timed out.'):
     """Creates a decorator which can be used to timeout any
     long-running function.
 
@@ -20,7 +20,7 @@ def timeout(seconds=300, error_message='Function call timed out.'):
     seconds : float, optional
         Number of seconds a function is permitted to run
         before a TimeoutError exception is raised. Default
-        is 300 seconds (5 minutes).
+        is 600 seconds (10 minutes).
     error_message : str, optional
         Error message to be printed when the TimeoutError
         exception is raised.

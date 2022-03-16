@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 from astropy.io import fits
 
-__version__ = '3.1'
+__version__ = '3.2'
 
 
 # Create logger
@@ -927,6 +927,11 @@ def srcassoc(conn, imobj, sources, save, sfparams):
         # if assoc_unmatched:
         #     nullfind(conn, imobj, sfparams, save, assoc_unmatched)
         # Check for VLITE unique (VU) sources that weren't detected in image
+        # **************************************************
+        # Nov-2021: Removing this part of the code. Rebuilding VCSS
+        #   snapshot assoc_source tables messes up VU table. VU table
+        #   not used anyway
+        '''
         for asrc in assoc_unmatched:
             if asrc.nmatches == 0:
                 asrc.detected = False
@@ -937,7 +942,8 @@ def srcassoc(conn, imobj, sources, save, sfparams):
             if asrc.nmatches == 0:
                 asrc.detected = True
                 dbio.add_vlite_unique(conn, asrc, imobj.id)
-
+        '''
+        # **************************************************
         # Update stage in image table
         imobj.stage = 3
         dbio.update_stage(conn, imobj)
@@ -1031,11 +1037,17 @@ def catmatch(conn, imobj, sources, catalogs, save):
     if save:
         # Update assoc_source nmatches
         dbio.update_assoc_nmatches(conn, sources)
+        # **************************************************
+        # Nov-2021: Removing this part of the code. Rebuilding VCSS
+        #   snapshot assoc_source tables messes up VU table. VU table
+        #   not used anyway
+        '''
         # Check for new VLITE unique (VU) sources from this image
         for src in sources:
             if src.nmatches == 0:
                 src = vlite_unique(conn, src, imobj.id, imobj.radius)
-
+        '''
+        # **************************************************
         # Update stage
         imobj.stage = 4
         dbio.update_stage(conn, imobj)

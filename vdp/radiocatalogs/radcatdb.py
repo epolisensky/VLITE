@@ -137,7 +137,11 @@ def add_table(tblname, conn):
     elif tblname == 'atlas':
         sources = catalogio.read_atlas()
     elif tblname == 'lotssdr1':
-        sources = catalogio.read_lotssdr1()    
+        sources = catalogio.read_lotssdr1()
+    elif tblname == 'racs':
+        sources = catalogio.read_racs()
+    elif tblname == 'psr':
+        sources = catalogio.read_psr()
     else:
         radcatdb_logger.error('ERROR: No function to read catalog {}.'.
                               format(tblname))

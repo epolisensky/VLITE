@@ -52,7 +52,8 @@ catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
                 'sumss' : {'id' : 15}, 'tgss' : {'id' : 16},
                 'txs' : {'id' : 17}, 'vlssr' : {'id' : 18},
                 'wenss': {'id' : 19}, 'atlas': {'id' : 20},
-                'lotssdr1' : {'id' : 21}}
+                'lotssdr1' : {'id' : 21}, 'racs' : {'id' : 22},
+                'psr' : {'id' : 23}}
 
 
 def dms2deg(d, m, s):
@@ -1695,3 +1696,151 @@ def read_lotssdr1(return_sources=False):
     catio_logger.info(' -- wrote {} LoTSS DR1 sources to lotssdr1_psql.txt'.format(
         len(sources)))
     return sources
+
+
+def read_racs(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the Rapid ASKAP Continuum Survey: RACS, catalog and writes
+    them into a file in the same directory called racs_psql.txt
+    if the file does not already exist.
+
+    Telescope/frequency: ASKAP 887.5 MHz
+
+    Spatial resolution: 25''
+
+    """
+    catalog_dict['racs']['telescope'] = 'ASKAP'
+    catalog_dict['racs']['frequency'] = 887.5
+    catalog_dict['racs']['resolution'] = 25.0
+    catalog_dict['racs']['reference'] = 'Hale et al. (2021)'
+    
+    psqlf = os.path.join(catalogdir, 'racs_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
+
+    #fname = os.path.join(catalogdir, 'lotssdr1.dat')
+    fname = '/data3/vpipe/vlite-emil/data/RACS/AS110_Derived_Catalogue_racs_dr1_sources_galacticcut_v2021_08_v01_4551.csv'
+    sources = []
+    fread = open(fname, 'r')
+    #read header
+    line = fread.readline()
+    while 1:
+        line = fread.readline()
+        if not line: break
+        line = line.split(',')
+        sources.append(CatalogSource())
+        sources[-1].id = int(line[0])
+        tmp = line[2].split()
+        sources[-1].name = tmp[0]+'_'+tmp[1]
+        sources[-1].ra = float(line[8]) # deg
+        sources[-1].e_ra = float(line[10])/3600 # deg 
+        sources[-1].dec = float(line[9]) # deg
+        sources[-1].e_dec = float(line[11])/3600 # deg 
+        sources[-1].total_flux = float(line[12]) # mJy
+        sources[-1].e_total_flux = float(line[14]) # mJy
+        sources[-1].peak_flux = float(line[15]) # mJy/bm
+        sources[-1].e_peak_flux = float(line[16]) # mJy/bm
+        sources[-1].maj   = float(line[17]) # arcsec
+        sources[-1].e_maj = float(line[18]) # arcsec
+        sources[-1].min   = float(line[19]) # arcsec
+        sources[-1].e_min = float(line[20]) # arcsec
+        sources[-1].pa    = float(line[21]) # deg
+        sources[-1].e_pa  = float(line[22]) # deg        
+        sources[-1].rms = float(line[31]) # mJy/bm
+        sources[-1].field = line[4]
+        sources[-1].catalog_id = catalog_dict['racs']['id']
+        sources[-1].pt_like = False
+        frat = sources[-1].total_flux / sources[-1].peak_flux
+        snr  = sources[-1].peak_flux / sources[-1].rms
+        if frat < (1.025 +0.69*pow(snr,-0.62)):
+            sources[-1].pt_like = True
+    fread.close()
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i %s\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id, src.pt_like))
+    catio_logger.info(' -- wrote {} RACS sources to racs_psql.txt'.format(
+        len(sources)))
+    return sources
+
+
+def read_psr(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the ATNF pulsar catalog and writes them into a file in the same 
+    directory called psr_psql.txt if the file does not already exist.
+
+    Telescope/frequency: Many, set to: ATNF. Will include 1400 MHz fluxes,
+      if given
+
+    Spatial resolution: No fixed resolution, set to: 0''
+
+    """
+    catalog_dict['psr']['telescope'] = 'ATNF'
+    catalog_dict['psr']['frequency'] = 1400.
+    catalog_dict['psr']['resolution'] = 0.
+    catalog_dict['psr']['reference'] = 'version 1.65'
+    
+    psqlf = os.path.join(catalogdir, 'psr_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        pass
+
+    fname = os.path.join(catalogdir, 'psrcat_short.txt')
+    sources = []
+    fread = open(fname, 'r')
+    #read headers
+    line = fread.readline()
+    line = fread.readline()
+    line = fread.readline()
+    line = fread.readline()
+    cnt=1
+    while 1:
+        line = fread.readline()
+        if not line: break
+        line = line.split()
+        sources.append(CatalogSource())
+        sources[-1].id = cnt
+        cnt += 1
+        sources[-1].name = line[0]
+        sources[-1].ra = float(line[1]) # deg
+        sources[-1].e_ra = float(line[2]) # deg 
+        sources[-1].dec = float(line[3]) # deg
+        sources[-1].e_dec = float(line[4]) # deg
+        try:
+            sources[-1].total_flux = float(line[5]) # mJy
+            try:
+                sources[-1].e_total_flux = float(line[6]) # mJy
+            except:
+                sources[-1].e_total_flux = None
+        except:
+             sources[-1].total_flux = None
+             sources[-1].e_total_flux = None
+        sources[-1].catalog_id = catalog_dict['psr']['id']
+    fread.close()
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i %s\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id, src.pt_like))
+    catio_logger.info(' -- wrote {} ATNF pulsars sources to psr_psql.txt'.format(
+        len(sources)))
+    return sources
+

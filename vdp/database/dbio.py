@@ -142,11 +142,12 @@ def add_image(conn, img, status, delete=False):
             separation, glon, glat, lst_i, lst_f, az_star, el_star, pa_star, 
             az_end, el_end, pa_end, az_i, az_f, alt_i, alt_f, parang_i, 
             parang_f, pri_cals, ass_flag, nsn, tsky, square, sunsep, pbkey, 
-            pb_flag, max_dt, nvisnx, ninterval, nbeam, pbparangs, pbweights) 
+            pb_flag, max_dt, nvisnx, ninterval, nbeam, pbparangs, pbweights, 
+            pbza)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -161,7 +162,9 @@ def add_image(conn, img, status, delete=False):
                 img.parang_i, img.parang_f, jpri_cals, img.ass_flag, img.nsn,
                 img.tsky, img.square, img.sunsep, img.pbkey, img.pb_flag,
                 img.max_dt, img.nvisnx, img.ninterval, img.nbeam,
-                np.array(img.pbparangs).tolist(), np.array(img.pbweights).tolist())
+                np.array(img.pbparangs).tolist(),
+                np.array(img.pbweights).tolist(),
+                np.array(img.pbza).tolist())
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -182,7 +185,7 @@ def add_image(conn, img, status, delete=False):
             pri_cals = %s, ass_flag = %s, nsn = %s, tsky = %s, square = %s, 
             sunsep = %s, pbkey = %s, pb_flag = %s, ninterval = %s, 
             max_dt = %s, nvisnx = %s, nbeam = %s, pbparangs = %s, 
-            pbweights = %s  WHERE id = %s'''
+            pbweights = %s, pbza = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
@@ -195,7 +198,9 @@ def add_image(conn, img, status, delete=False):
                 img.az_f, img.alt_i, img.alt_f, img.parang_i, img.parang_f,
                 jpri_cals, img.ass_flag, img.nsn, img.tsky, img.square,
                 img.sunsep, img.pbkey, img.pb_flag, img.ninterval, img.max_dt,
-                img.nvisnx, img.nbeam, np.array(img.pbparangs).tolist(), np.array(img.pbweights).tolist(), img.id)
+                img.nvisnx, img.nbeam, np.array(img.pbparangs).tolist(),
+                np.array(img.pbweights).tolist(),
+                np.array(img.pbza).tolist(),img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources
@@ -1186,7 +1191,6 @@ def unassoc_images(conn, images):
                 #fetch distinct assoc_id's for sources in this image
                 cur.execute("SELECT DISTINCT(assoc_id) FROM detected_source WHERE image_id = %s ORDER BY assoc_id",(image_id,))
                 assid = cur.fetchall()
-                #print('number of assoc srcs =',len(assid))
                 #update 
                 cur.execute("UPDATE image SET stage = 2, error_id = %s WHERE id = %s",(-1,image_id,))
                 cur.execute("UPDATE detected_source SET assoc_id = %s WHERE image_id = %s",(None,image_id))
@@ -1194,25 +1198,19 @@ def unassoc_images(conn, images):
                 conn.commit()
                 #update values for each assoc_source in assid
                 assoc_srcs = get_associated(conn,assid)
-                #print(len(assoc_srcs))
                 for src in assoc_srcs:
-                    #print('starting ',src.id)
                     #check if no detections left & delete
                     cur.execute("SELECT COUNT(1) FROM detected_source WHERE assoc_id = %s",(src.id,))
                     count=cur.fetchone()
-                    #print(count[0])
                     if count[0]==0:
-                        #print('deleting ',src.id)
                         dbio_logger.info('Deleting assoc_source id {}'.format(src.id))
                         cur.execute('DELETE FROM assoc_source WHERE id = %s',(src.id,))
                         conn.commit()
                     else:
-                        #print('updating ',src.id)
                         dbio_logger.info('Updating assoc_source id {}'.format(src.id))
                         #update coords, fluxes, # detections
                         cur.execute("SELECT SUM(d.ra/(d.e_ra*d.e_ra)) AS ratmp, SQRT(1./SUM(1./(d.e_ra*d.e_ra))) AS era, SUM(d.dec/(d.e_dec*d.e_dec)) AS dectmp, SQRT(1./SUM(1./(d.e_dec*d.e_dec))) AS edec, SUM(c.peak_flux/(c.e_peak_flux*c.e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(c.e_peak_flux*c.e_peak_flux))) AS epeakflux, SUM(c.total_flux/(c.e_total_flux*c.e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(c.e_total_flux*c.e_total_flux))) AS etotalflux, COUNT(1) AS ndetect, SUM(CASE WHEN d.code='S' THEN 1 ELSE 0 END) AS ns, SUM(CASE WHEN d.code='C' THEN 1 ELSE 0 END) AS nc, SUM(CASE WHEN d.code='M' THEN 1 ELSE 0 END) AS nm FROM detected_source AS d, corrected_flux AS c WHERE (c.src_id,c.image_id,d.assoc_id) = (d.src_id,d.image_id,%s)",(src.id,))
                         arow=cur.fetchone()
-                        #print(arow)
                         newra = arow[1]*arow[1]*arow[0]
                         newdec = arow[3]*arow[3]*arow[2]
                         newpeak = arow[5]*arow[5]*arow[4]
@@ -1304,8 +1302,8 @@ def update_pbvalues(conn, imobj):
     """
     cur = conn.cursor()
 
-    cur.execute('UPDATE image SET pbparangs = %s, pbweights = %s WHERE id = %s',
-                (np.array(imobj.pbparangs).tolist(), np.array(imobj.pbweights).tolist(), imobj.id))
+    cur.execute('UPDATE image SET pbparangs = %s, pbweights = %s, pbza = %s WHERE id = %s',
+                (np.array(imobj.pbparangs).tolist(), np.array(imobj.pbweights).tolist(), np.array(imobj.pbza).tolist(), imobj.id))
     if imobj.vcss:
         cur.execute('UPDATE image SET nbeam = %s WHERE id = %s',
                     (imobj.nbeam, imobj.id))

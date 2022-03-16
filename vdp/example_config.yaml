@@ -1,46 +1,51 @@
-# vdp configuration file
+# vdp for VLITE-16 
 
 stages:
                               # processing steps; yes | no  or  True | False
   source finding: yes         # extract sources from image?
-  source association: yes     # associate sources with previous detections?
-  catalog matching: yes       # cross-match with sky survey catalogs?
+  source association: no     # associate sources with previous detections?
+  catalog matching: no       # cross-match with sky survey catalogs?
 
 options:
                               # processing options; yes | no or True | False
   save to database: yes       # save results to database?
   quality checks: yes         # run image & source count quality checks?
-  overwrite: no               # overwrite database if exists?
-  reprocess: no               # redo selected stages even if done previously?
-  redo match: no              # redo cross-matching with all sky catalogs?
-  update match: no            # update cross-matching with new sky catalogs?
-
+  overwrite: no              # overwrite database if exists?
+  reprocess: yes              # redo selected stages even if done previously?
+  redo match: no             # redo cross-matching with all sky catalogs?
+  update match: no           # update cross-matching with new sky catalogs?
+  beam corrected: no          # are the images already beam corrected?
+  always associate: no        # always associate sources regardless of img ass_flag?
+  save beam image: no        # save primary beam image as fits file in "Beams" subdir?
+  
 setup:
-  root directory: /path/to/data/
-  year: 2018
-  month: 05
-  day: ['17']                 # list of days to process; entries must be strings; [] = all
+  root directory: /nfsshare/vpipe/processed/
+  year: 2022
+  month: 01
+  day: ['27','28','29','30','31']           # list of days to process; [] = all
   image directory:            # blank defaults to Images/
   # list files to process - put different days in separate lists; [[]] = all
   files: [[]]
-  database name: vlite16
+  database name: staging
   database user: vpipe
   catalogs: []                # [] = all
+  smear time:                 # max timestep PB calculation (default 900 sec)	
 
 pybdsf_params:
   mode: default               # default | minimize_islands
-  scale: 1.0                  # fraction (0-1) of image size (radius) to use
+  scale: 1.                   # fraction (0-1) of image size (radius) to use
+  borderpad:                  # cuts srcs w/in this many pixels of image border (default 3)
   # Specify all PyBDSF parameters here
   thresh: hard
-  #rms_box: !!python/tuple [100, 30]
   adaptive_rms_box: True
-  #rms_box_bright: !!python/tuple [20, 10]
   adaptive_thresh: 10.
 
 image_qa_params:
   # used when quality checks: yes/True; leave blank for defaults
-  min nvis:                        # (default 1000)
+  min nvis: 1300                   # (default 1000)
   max sensitivity metric:          # (default 3000 mJy/bm s^1/2)
   max beam axis ratio:             # (default 4)
   max source count metric:         # (default 10)
   min niter:                       # (default 1000)
+  min bpix:                        # (default 2.8)
+  max bpix:                        # (default 7)

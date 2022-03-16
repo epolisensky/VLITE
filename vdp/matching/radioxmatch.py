@@ -193,7 +193,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         Any of these non-detections with no radio catalog matches
         ('nmatches' = 0) are recorded in the **vlite_unique** table.
     """
-    if imobj.vcss:
+    if imobj.vcss or imobj.mosaic:
         res_class = 'VCSS'
     else:
         res_class = imobj.config
@@ -391,8 +391,8 @@ def filter_catalogs(conn, catalogs, imobj):
         Names of catalogs which have resolutions adequate
         to proceed with the positional cross-matching.
     """
-    if imobj.vcss:
-        use_range = (15.,30.) #VCSS snapshots, regardless of config
+    if imobj.vcss or imobj.mosaic:
+        use_range = (15.,30.) #VCSS snapshots & mosaics, regardless of config
     elif imobj.config == 'A':
         use_range = (0.,26.) #to include TGSS & LOTSS
     elif imobj.config == 'B':
