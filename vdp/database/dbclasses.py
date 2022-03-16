@@ -909,19 +909,20 @@ class Image(object):
         if 'PER_FIEL' in self.filename:
             self.ass_flag = False
 
-    def set_beam_image(self, pbdic):
+    def set_beam_image(self, pbdic, nobeamimage=False):
         """Calculates the primary beam image, offset & smeared, for the image.
         
         Parameters
         ----------
         pbdic : dictionary
            Primary beam dictionary
-
+        nobeamimage : boolean
+           Set True to skip beam image calculation (just parangs, zenith angles, weights)
         """
         if self.vcss is True:
-            self.bmimg = beam_tools.Calc_Beam_Image_VCSS(self, pbdic)
+            self.bmimg = beam_tools.Calc_Beam_Image_VCSS(self, pbdic, nobeamimage)
         else:
-            self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic)
+            self.bmimg = beam_tools.Calc_Beam_Image(self, pbdic, nobeamimage)
 
     def image_qa(self, params):
         """Performs quality checks on the image pre-source finding

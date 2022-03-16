@@ -274,10 +274,12 @@ def Calc_Parang(mjd, ra, dec):
     tmp1 = np.sin(hrang*DEG2RAD)
     tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(dec*DEG2RAD) - np.sin(dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
     parang = np.arctan2(tmp1,tmp2)*RAD2DEG # [deg]
-    return parang 
+    coord = SkyCoord(ra,dec,unit='deg',frame='fk5')
+    za = coord.transform_to(AltAz(obstime=t,location=locVLA)).zen.deg
+    return parang,za
 
 
-def Calc_Beam_Image(imobj, pbdic):
+def Calc_Beam_Image(imobj, pbdic, nobeamimage=False):
     """Calculates primary beam image
 
     Parameters
@@ -300,18 +302,22 @@ def Calc_Beam_Image(imobj, pbdic):
         #Set mjd time
         mjdtime0 = imobj.mjdtime + imobj.pbtimes[i]
         #Calc parang
-        parang = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
+        parang,za = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
         imobj.pbparangs.append(parang)
+        imobj.pbza.append(za)
         #print(imobj.pbparangs[-1],imobj.pbweights[i],imobj.pbtimes[i])
         #Calc beam center
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang)
-        #Calc beam at this time, apply weight, add to beam image. Weights will normalize
-        bmimg += imobj.pbweights[i]*Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
+        if nobeamimage:
+            pass
+        else:
+            #Calc beam at this time, apply weight, add to beam image. Weights will normalize
+            bmimg += imobj.pbweights[i]*Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
 
     return bmimg
 
 
-def Calc_Beam_Image_VCSS(imobj, pbdic):
+def Calc_Beam_Image_VCSS(imobj, pbdic, nobeamimage=False):
     """Calculates primary beam image
        for VCSS snapshots
 
@@ -371,14 +377,18 @@ def Calc_Beam_Image_VCSS(imobj, pbdic):
         dxpix = xtmp - imobj.xref
         dypix = ytmp - imobj.yref
         #Calc parang
-        parang = Calc_Parang(mjd[i],ra[i],imobj.obs_dec)
+        parang,za = Calc_Parang(mjd[i],ra[i],imobj.obs_dec)
         imobj.pbparangs.append(parang)
+        imobj.pbza.append(za)
         imobj.pbweights.append(1.0/nbeam)
         imobj.pbtimes.append(mjd[i]-imobj.mjdtime) #consistency w/ dailies
         #Calc beam center. Include offsets to account for RA drift
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang,dxpix,dypix)
-        #Calc beam at this time, add to beam image
-        bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
+        if nobeamimage:
+            pass
+        else:
+            #Calc beam at this time, add to beam image
+            bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
     #normalize beam image
     bmimg /= nbeam
     
