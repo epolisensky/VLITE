@@ -57,6 +57,10 @@ hudffinal : The "final" A config VLITE HUDF image that
 	    and applied separately (nvis weighted). Associated
 	    sources were also updated
 
+hudfneg :   The final + 2018 & 2019 yearly images from hudffinal
+            but negated (pixels multiplied by -1). Useful
+            for false detection rate analysis
+
 hudfdaily : All daily A config images from normal
             VLITE imaging pipeline. VDP-calculated beam 
 	    corrections. Default smear time (900 s)
@@ -74,8 +78,9 @@ hudf4min : Images from the final reimaged at 4 min
 	   separately. Associated sources also updated.
 
 hudfb : Simona's WSCLEANed B config HUDF image.  
-	Beam corrected WITH OLD BEAM. Needs updating
-	before using fluxes
+	Beam corrected with '0934' beam. Includes
+	original image with beam corrections applied to source 
+	fluxes and source finding run on beam corrected image.
 
 vcsstest : For various testing of VCSS snapshots
 

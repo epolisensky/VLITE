@@ -117,6 +117,8 @@ uncertainties for every flux measurement error, typically 3%.
 - *assoc_id*: references the *id* column of the **assoc_source**;
   rows with the same *assoc_id* value are associated detections
   of the same source in different images
+- *nn_src_id*: src_id of nearest neighbor with same image_id
+- *nn_dist*: distance to nearest neighbor (arcsec)
 
 .. _detected_island:
 

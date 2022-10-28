@@ -25,7 +25,7 @@ from datetime import datetime
 # temporarily needed while USNO sites are down for modernization
 #  expected completeion 30 Apr 2020
 from astropy.utils import iers
-iers.conf.iers_auto_url = u'ftp://cddis.gsfc.nasa.gov/pub/products/iers/finals2000A.all'
+#iers.conf.iers_auto_url = u'ftp://cddis.gsfc.nasa.gov/pub/products/iers/finals2000A.all'
 ########################
 
 RAD2DEG = 180.0/np.pi
@@ -46,58 +46,75 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 
 # Define resolution dictionary
 # Contains array configs, mjd ranges of the cycles, NRAO semesters and
+#  beam solid angle normalization,
 #  the acceptable range of image bmins for source association
 res_dict = {
-    'A': {'1': {'mjd': [58179, 58280], 'bmin': [2.85, 4.27], 'semester': '2018A'},
-          '2': {'mjd': [58697, 58778], 'bmin': [3.26, 4.90], 'semester': '2019A'},
-          '3': {'mjd': [59190, 59285], 'bmin': [3.57, 5.36], 'semester': '2020B'},
-          '4': {'mjd': [99999, 99999], 'bmin': [0.00, 0.00], 'semester': '2022A'}},
-    'BnA': {'1': {'mjd': [58148, 58179], 'bmin': [0, 0], 'semester': ''},
-            '2': {'mjd': [58660, 58697], 'bmin': [0, 0], 'semester': ''},
-            '3': {'mjd': [59142, 59190], 'bmin': [0, 0], 'semester': ''}},
-    'B': {'1': {'mjd': [57996, 58148], 'bmin': [10.77, 16.16], 'semester': '2017B'},
-          '2': {'mjd': [58534.24, 58660], 'bmin': [10.18, 15.28], 'semester': '2019A'},
-          '3': {'mjd': [59026, 59142], 'bmin': [11.27, 16.91], 'semester': '2020A'},
-          '4': {'mjd': [59479, 59999], 'bmin': [10.41, 15.61], 'semester': '2021B'}},
-    'CnB': {'1': {'mjd': [57994, 57996], 'bmin': [0, 0], 'semester': ''},
-            '2': {'mjd': [58519, 58534.24], 'bmin': [0, 0], 'semester': ''},
-            '3': {'mjd': [59008, 59026], 'bmin': [0, 0], 'semester': ''},
-            '4': {'mjd': [59471, 59479], 'bmin': [0, 0], 'semester': ''}},
-    'C': {'V10': {'mjd': [56986, 57953.99], 'bmin': [32.2, 65.91], 'semester': 'many'},
-          '1': {'mjd': [57954, 57994], 'bmin': [43.94, 65.91], 'semester': '2017A'},
-          '2': {'mjd': [58441, 58519], 'bmin': [32.20, 48.30], 'semester': '2018B'},
-          '3': {'mjd': [58885, 59008], 'bmin': [39.69, 59.54], 'semester': '2020A'},
-          '4': {'mjd': [59419, 59471], 'bmin': [33.29, 49.93], 'semester': '2021A'}},
-    'DnC': {'2': {'mjd': [58437, 58441], 'bmin': [0, 0], 'semester': ''},
-            '3': {'mjd': [58876, 58885], 'bmin': [0, 0], 'semester': ''},
-            '4': {'mjd': [59367, 59374], 'bmin': [0, 0], 'semester': ''}},
-    'D': {'2': {'mjd': [58360, 58437], 'bmin': [117.58, 176.37], 'semester': '2018A'},
-          '3': {'mjd': [58802, 58876], 'bmin': [133.07, 199.60], 'semester': '2019B'},
-          '4': {'mjd': [59295, 59367], 'bmin': [127.37, 191.05], 'semester': '2021A'}},
-    'AnB': {'V10': {'mjd': [56986, 57953.99], 'bmin': [0, 0], 'semester': 'many'}},
-    'A-D': {'1-2': {'mjd': [58280, 58360], 'bmin': [0, 0], 'semester': ''},
-            '2-3': {'mjd': [58778, 58802], 'bmin': [0, 0], 'semester': ''},
-            '3-4': {'mjd': [59285, 59295], 'bmin': [0, 0], 'semester': ''}},
-    'Unk': {'0': {'mjd': [59999, 99999], 'bmin': [0, 0], 'semester': ''}}
+    'A': {'1': {'mjd': [58179, 58280], 'bsanorm': 13.892750, 'bmin': [2.85, 4.27], 'semester': '2018A'},
+          '2': {'mjd': [58697, 58778], 'bsanorm': 18.526056, 'bmin': [3.26, 4.90], 'semester': '2019A'},
+          '3': {'mjd': [59190, 59285], 'bsanorm': 19.693765, 'bmin': [3.57, 5.36], 'semester': '2020B'},
+          '4': {'mjd': [59648.1, 59766], 'bsanorm': 16.536189, 'bmin': [3.13, 4.70], 'semester': '2022A'},
+          '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2023A'}},
+    'BnA': {'1': {'mjd': [58148, 58179], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '2': {'mjd': [58660, 58697], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '3': {'mjd': [59142, 59190], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '4': {'mjd': [59610.4, 59648.1], 'bsanorm': -1, 'bmin': [0,0], 'semester': ''},
+            '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+    'B': {'1': {'mjd': [57997, 58148], 'bsanorm': 203.477612, 'bmin': [10.77, 16.16], 'semester': '2017B'},
+          '2': {'mjd': [58541, 58660], 'bsanorm': 155.607613, 'bmin': [10.18, 15.28], 'semester': '2019A'},
+          '3': {'mjd': [59026, 59142], 'bsanorm': 231.048076, 'bmin': [11.27, 16.91], 'semester': '2020A'},
+          '4': {'mjd': [59475.4, 59610.4], 'bsanorm': 211.639557, 'bmin': [10.33, 15.50], 'semester': '2021B'},
+          '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2023A'}},
+    'CnB': {'1': {'mjd': [57994, 57997], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '2': {'mjd': [58519, 58541], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '3': {'mjd': [59008, 59026], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '4': {'mjd': [59471, 59475.4], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+    'C': {'V10': {'mjd': [56986, 57953.99], 'bsanorm': -1, 'bmin': [32.2, 65.91], 'semester': 'many'},
+          '1': {'mjd': [57954, 57994], 'bsanorm': 2686.817993, 'bmin': [43.94, 65.91], 'semester': '2017A'},
+          '2': {'mjd': [58441, 58519], 'bsanorm': 1744.137879, 'bmin': [32.20, 48.30], 'semester': '2018B'},
+          '3': {'mjd': [58885, 59008], 'bsanorm': 2393.579216, 'bmin': [39.69, 59.54], 'semester': '2020A'},
+          '4': {'mjd': [59419, 59471], 'bsanorm': 1730.897165, 'bmin': [33.29, 49.93], 'semester': '2021A'},
+          '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2022B'}},
+    'DnC': {'2': {'mjd': [58437, 58441], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '3': {'mjd': [58876, 58885], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '4': {'mjd': [59367, 59374], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+    'D': {'2': {'mjd': [58360, 58437], 'bsanorm': 20271.136987, 'bmin': [117.58, 176.37], 'semester': '2018A'},
+          '3': {'mjd': [58802, 58876], 'bsanorm': 24069.990270, 'bmin': [133.07, 199.60], 'semester': '2019B'},
+          '4': {'mjd': [59295, 59367], 'bsanorm': 22982.854365, 'bmin': [127.37, 191.05], 'semester': '2021A'},
+          '5': {'mjd': [59785, 59813], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'}},
+    'AnB': {'V10': {'mjd': [56986, 57953.99], 'bsanorm': -1, 'bmin': [0, 0], 'semester': 'many'}},
+    'A-D': {'1-2': {'mjd': [58280, 58360], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '2-3': {'mjd': [58778, 58802], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '3-4': {'mjd': [59285, 59295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '4-5': {'mjd': [59766, 59785], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
+    'Unk': {'0': {'mjd': [59813, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}}
 }
 
 compactness_dict = {
     'A' : {'1' : {'a0': 1.031822, 'a1': 4.274405e-03, 'c0': 9.869077, 'c1': -1.670031},
            '2' : {'a0': 1.018140, 'a1': 2.699981e-03, 'c0': 6.620082, 'c1': -1.542459},
-           '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.503045, 'c1': -1.562968}},
+           '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.503045, 'c1': -1.562968},
+           '4' : {'a0': 1.037511, 'a1': 5.213945e-03, 'c0': 10.94359, 'c1': -1.688772},
+           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
     'B' : {'1' : {'a0': 1.021807, 'a1': 1.285446e-03, 'c0': 6.660220, 'c1': -1.624589},
            '2' : {'a0': 1.024552, 'a1': 1.934734e-03, 'c0': 5.512317, 'c1': -1.567072},
-           '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613}},
+           '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613},
+           '4' : {'a0': 1.000302, 'a1': 4.042864e-04, 'c0': 3.675372, 'c1': -1.363325},
+           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
     'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.384203, 'c1': -1.541476},
            '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.596905, 'c1': -1.366059},
-           '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219}},
+           '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219},
+           '4' : {'a0': 1.021208, 'a1': 1.597061e-03, 'c0': 2.635157, 'c1': -1.504554},
+           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
     'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.702012, 'c1': -1.681850},
            '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.085506, 'c1': -1.397051},
-           '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422}},
+           '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422},
+           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
     'VCSS' : {'1.1' : {'a0': 1.011306, 'a1': 7.558691e-04, 'c0': 2.920139, 'c1': -1.499045},
               '1.2' : {'a0': 1.007941, 'a1': 6.682657e-04, 'c0': 3.970741, 'c1': -1.529810},
-              '2.1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
-              '2.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
+              '2.1' : {'a0': 1.022806, 'a1': 7.585378e-04, 'c0': 8.208039, 'c1': -1.833907},
+              '2.2' : {'a0': 1.019820, 'a1': 1.005684e-03, 'c0': 2.693203, 'c1': -1.634663},
               '3.1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
               '3.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0}}
 }
@@ -503,7 +520,6 @@ class Image(object):
                     self.pbkey = None
         except:
             # VCSS mosaics & snapshots
-            #if self.filename.endswith('IMSC.fits') or 'VCSS' in self.filename:
             if self.mosaic or self.vcss:
                 self.pri_freq = 3
                 self.priband = '3'
@@ -671,17 +687,6 @@ class Image(object):
                 self.peak = hdr['DATAMAX'] * 1000.  # mJy/beam
             except KeyError:
                 self.peak = None
-        ###### REPLACE: lookup config in res_dict based on mjdtime in set_cycle()
-        '''
-        try:
-            self.config = hdr['CONFIG']
-            if self.config == 'a': self.config = 'A'
-            if self.config == 'b': self.config = 'B'
-            if self.config == 'c': self.config = 'C'
-            if self.config == 'd': self.config = 'D'
-        except KeyError:
-            self.config = None
-        '''
         try:
             self.nvis = hdr['NVIS']
         except KeyError:
@@ -855,28 +860,16 @@ class Image(object):
     def set_cycle(self, alwaysass):
         """Sets image config, cycle, semester, and ass_flag"""
         self.ass_flag = False
-        '''
-        config = self.config
-        if config is None:
-            self.semester = None
-            self.cycle = None
-        else:
-            for cycle in res_dict[config].keys():
-                if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
-                    self.semester = res_dict[config][cycle]['semester']
-                    self.cycle = cycle
-                    if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
-                        self.ass_flag = True
-                    break
-        '''
         for config in res_dict.keys():
             for cycle in res_dict[config].keys():
                 if self.mjdtime <= res_dict[config][cycle]['mjd'][1] and self.mjdtime > res_dict[config][cycle]['mjd'][0]:
                     self.config = config
                     self.semester = res_dict[config][cycle]['semester']
                     self.cycle = cycle
-                    if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
-                        self.ass_flag = True
+                    #deprecated. now checked after beam image calculation
+                    #to be deleted:
+                    #if self.bmin <= res_dict[config][cycle]['bmin'][1] and self.bmin >= res_dict[config][cycle]['bmin'][0]:
+                    #    self.ass_flag = True
                     break
 
         #set for VCSS snapshots
@@ -905,7 +898,7 @@ class Image(object):
         # set ass_flag if 'always associated' option enabled
         if alwaysass:
             self.ass_flag = True
-        # set ass_flag if a 'PER_FIELD' image
+        # unset ass_flag if a 'PER_FIELD' image
         if 'PER_FIEL' in self.filename:
             self.ass_flag = False
 
@@ -1318,6 +1311,10 @@ class DetectedSource(object):
         Variability significance metric of associated source ave_total
     eta_peak : float
         Variability significance metric of associated source ave_peak
+    nn_src_id : int
+        src_id of nearest neighbor in image
+    nn_dist : float
+        Distance to nearest neighbor (arcsec)
 
     References
     ----------
@@ -1369,6 +1366,8 @@ class DetectedSource(object):
         self.clean = None
         self.xpix = None
         self.ypix = None
+        self.nn_src_id = None
+        self.nn_dist = None
         # assoc_source attributes
         self.id = None
         self.res_class = None
@@ -1459,12 +1458,6 @@ class DetectedSource(object):
             Initialized Image object with attribute values
             set from header info.
         """
-        #world = np.array([[self.ra, self.dec]])
-        #pcoordS = imobj.wcsobj.wcs_world2pix([[self.ra, self.dec]], 1)
-        #world = np.array([[imobj.obs_ra, imobj.obs_dec]])
-        #pcoordI = imobj.wcsobj.wcs_world2pix(world, 1)
-        #theta = np.arctan2(pcoordI[0][0]-pcoordS[0]
-        #                   [0], pcoordS[0][1]-pcoordI[0][1])  # rad
         theta = np.arctan2(imobj.xref-self.xpix, self.ypix-imobj.yref)  # rad
         self.polar_angle = theta * 180.0/np.pi  # deg
 
@@ -1563,6 +1556,12 @@ class DetectedSource(object):
                 flag = True
             elif imobj.mjdtime > 58500 and imobj.mjdtime < 58700:
                 cycle = '1.2'
+                flag = True
+            elif imobj.mjdtime > 59040 and imobj.mjdtime < 59160:
+                cycle = '2.1'
+                flag = True
+            elif imobj.mjdtime > 59400 and imobj.mjdtime < 59700:
+                cycle = '2.2'
                 flag = True
             else:
                 pass

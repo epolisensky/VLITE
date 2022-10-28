@@ -305,7 +305,6 @@ def Calc_Beam_Image(imobj, pbdic, nobeamimage=False):
         parang,za = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
         imobj.pbparangs.append(parang)
         imobj.pbza.append(za)
-        #print(imobj.pbparangs[-1],imobj.pbweights[i],imobj.pbtimes[i])
         #Calc beam center
         beam_center,xbeam,ybeam = Find_Beam_Center(imobj,parang)
         if nobeamimage:

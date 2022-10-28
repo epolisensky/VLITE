@@ -295,6 +295,8 @@ def create(conn, params, safe=False):
                 xpix REAL,
                 ypix REAL,
                 assoc_id INTEGER,
+                nn_src_id INTEGER,
+                nn_dist REAL,
                 PRIMARY KEY (src_id, image_id),
                 FOREIGN KEY (src_id, image_id)
                   REFERENCES detected_source (src_id, image_id)

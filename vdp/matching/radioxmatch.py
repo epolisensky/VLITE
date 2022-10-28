@@ -1,8 +1,6 @@
 """radioxmatch.py contains all the machinery for cross-matching
 radio point sources.
 
-Adapted from EP's VSLOW.py.
-
 """
 import re
 import numpy as np
@@ -13,7 +11,7 @@ from psycopg2 import sql
 from radiocatalogs import catalogio
 from database import dbclasses, dbio
 from matching import matchfuncs
-
+from sklearn.neighbors import BallTree
 
 # create logger
 match_logger = logging.getLogger('vdp.matching.radioxmatch')
@@ -152,7 +150,7 @@ def cone_search(conn, table, center_ra, center_dec, radius, schema='public'):
 def associate(conn, detected_sources, imobj, search_radius, save):
     """Associates new sources with old sources if the center
     positions of the two sources are separated by an angular
-    distance less than half the size of major (?) axis of
+    distance less than the full size of the major axis of
     the current image's beam.
 
     Parameters
@@ -197,7 +195,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         res_class = 'VCSS'
     else:
         res_class = imobj.config
-    
+
     # Extract all previously detected sources in the same FOV
     assoc_rows = cone_search(conn, 'assoc_source', imobj.obs_ra,
                              imobj.obs_dec, search_radius)
@@ -209,6 +207,19 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         filtered_assoc_rows = filter_res(assoc_rows, res_class)
     else:
         filtered_assoc_rows = []
+
+
+    #for dsrc in detected_sources:
+    dra=[]
+    ddec=[]
+    for i in range(len(detected_sources)):
+        dra.append(detected_sources[i].ra)
+        ddec.append(detected_sources[i].dec)
+        #print(' ',detected_sources[i].src_id,detected_sources[i].ra,detected_sources[i].dec)
+    #    print('  ',dsrc.src_id,dsrc.ra,dsrc.dec)
+    #print(' ',detected_sources['src_id'],detected_sources['ra'],detected_sources['dec'])
+    dra=np.array(dra)
+    ddec=np.array(ddec)
 
     if not filtered_assoc_rows:
         # No previous sources found in that sky region at that resolution
@@ -223,13 +234,19 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         # Translate row dictionaries to DetectedSource objects
         assoc_sources = []
         assoc_ids = []
+        ara = []
+        adec = []
         for asrc in filtered_assoc_rows:
+            ara.append(asrc['ra'])
+            adec.append(asrc['dec'])
             assoc_ids.append(asrc['id'])
             assoc_sources.append(dbclasses.DetectedSource())
             dbclasses.dict2attr(assoc_sources[-1], asrc)
         match_logger.info('Attempting to match {} sources from this image to '
                           '{} sources previously detected in VLITE images...'.
                           format(len(detected_sources), len(assoc_sources)))
+        ara=np.array(ara)
+        adec=np.array(adec)
 
         detected_matched = []
         detected_unmatched = []
@@ -264,7 +281,7 @@ def associate(conn, detected_sources, imobj, search_radius, save):
                 SELECT b.* FROM assoc_source AS b WHERE b.id IN %s
                 ORDER BY q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1)
                 AS bb'''
-            values = (0.5*imobj.bmaj, tuple(assoc_ids))
+            values = (imobj.bmaj, tuple(assoc_ids))
             cur.execute(sql, values)
             rows = cur.fetchall()
             cur.execute('DROP TABLE temp_source')
@@ -280,16 +297,14 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         # Save association results for database
         else:
             # Find nearest neighbor & "match" if within half a beam
-            sql = '''SELECT a.src_id, bb.id AS assoc_id,
-                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) AS sep,
-                3600*q3c_dist(a.ra, a.dec, bb.ra, bb.dec) < %s AS match
-                FROM detected_source AS a, LATERAL (
-                SELECT b.* FROM assoc_source AS b
-                WHERE a.image_id = %s AND b.id IN %s ORDER BY
-                q3c_dist(a.ra, a.dec, b.ra, b.dec) ASC LIMIT 1) AS bb'''
-            values = (0.5*imobj.bmaj, imobj.id, tuple(assoc_ids))
-            cur.execute(sql, values)
-            rows = cur.fetchall()
+            # Make BallTree with assoc sources
+            #tree = BallTree(np.column_stack((np.radians(assoc_sources['dec']), np.radians(assoc_sources['ra']))), leaf_size=20, metric='haversine')
+            #returned is the nearest assoc neighbor for each image detected source
+            #dist,ind = tree.query(np.column_stack((np.radians(detected_sources['dec']), np.radians(detected_sources['ra']))), k=1)
+            tree = BallTree(np.column_stack((np.radians(adec), np.radians(ara))), leaf_size=20, metric='haversine')
+            #returned is the nearest assoc neighbor for each image detected source
+            dist,ind = tree.query(np.column_stack((np.radians(ddec), np.radians(dra))), k=1)
+            
 
         cur.close()
 
@@ -299,11 +314,14 @@ def associate(conn, detected_sources, imobj, search_radius, save):
         
         # Create dictionary of src_id keys & associated values
         rowdict = {}
-        for row in rows:
-            rowdict[row['src_id']] = [row['assoc_id'], row['sep'], row['match']]
-            if row['match']:
-                matched_assoc_id.append(row['assoc_id'])
-
+        for i in range(len(ind)):
+            sep = 3600*np.degrees(dist[i][0]) #arcsec
+            match=False
+            if sep < imobj.bmaj:
+                match=True
+                matched_assoc_id.append(assoc_sources[ind[i][0]].id)
+            rowdict[detected_sources[i].src_id] = [assoc_sources[ind[i][0]].id,sep,match]
+                
         # Find the unmatched associated sources
         for asrc in assoc_sources:
             if asrc.id not in matched_assoc_id:
@@ -636,3 +654,43 @@ def check_clean(conn, sources, imobj):
                           format(ncln,imobj.nsrc))
          
     return imobj, sources
+
+
+
+def nearestneigh(sources):
+    """Calculates nearest image source for all sources in image
+    Parameters
+    ----------
+    sources : list
+        List of DetectedSource objects (sources in image)
+
+    Returns
+    -------
+    sources : list
+        List of ``database.dbclasses.DetectedSource`` objects
+        updated nn_dist & nn_src_id
+    """
+    #if no neighbors then return
+    if len(sources) < 2:
+        return sources
+    
+    sra = []
+    sdec = []
+    for src in sources:
+        sra.append(src.ra)
+        sdec.append(src.dec)
+    sra=np.array(sra)
+    sdec=np.array(sdec)
+    # Make Ball Tree out of image sources with haversine distance as the metric
+    tree = BallTree(np.column_stack((np.radians(sdec), np.radians(sra))), leaf_size=20, metric='haversine')
+
+    # Return nearest 2 neighbors for each image src, 2 because 1st is the source itself
+    # dist is in radians!
+    dist,ind = tree.query(np.column_stack((np.radians(sdec), np.radians(sra))), k=2)
+
+    for i in range(len(ind)):
+        sources[i].nn_src_id = sources[ind[i][1]].src_id
+        sources[i].nn_dist   = 3600*np.degrees(dist[i][1]) #arcsec
+        #print('nearest neighbors: ',sources[i].src_id,sources[i].nn_src_id,sources[i].nn_dist)
+
+    return sources

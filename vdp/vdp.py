@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 from astropy.io import fits
 
-__version__ = '3.2'
+__version__ = '3.3'
 
 
 # Create logger
@@ -264,7 +264,6 @@ def cfgparse(cfgfile):
     # Check if smear time is given
     if setup['smear time'] is None:
         setup['smear time'] = 900. #[s]
-    #print('smear time =',setup['smear time'])
 
     # Check list of sky catalogs
     if stages['catalog matching']:
@@ -701,7 +700,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, beamsdir):
         User-specified options from the configuration file. Needed
         to decide on applying primary beam correction
     pbdic : dict
-        Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
+ass        Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
         with the primary beams
     beamsdir : str
         Directory of .../Beams/ dir for primary beam images
@@ -739,7 +738,7 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, beamsdir):
         # Drop sources outside the (scaled) image FOV (radius)
         # Why did PyBDSF give sources with 0 positional errors?
         #  Filter these out. How common is this? Are we losing real source
-        #  detections?
+        #  detections? Was this only older PyBDSF versions?
         if imobj.filename.endswith('IPln1.fits'):
             sources = [src for src in sources if
                        src.dist_from_center <= imobj.radius and
@@ -773,6 +772,11 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, beamsdir):
     if sources is not None:
         logger.info('Checking which sources were CLEANed.')
         imobj, sources = radioxmatch.check_clean(conn, sources, imobj)
+
+    # Determine nearest neighbors
+    if sources is not None:
+        logger.info('Calculating nearest neighbors.')
+        sources = radioxmatch.nearestneigh(sources)
 
     if save:
         # Add source fit parameters to database tables
@@ -825,8 +829,25 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, beamsdir):
                         hdrbm['TAU_TIME'] = imobj.tau_time
                         hdrbm['DURATION'] = imobj.duration
                         hdrbm['HISTORY'] = 'Max beam pixel = %e' % np.max(imobj.bmimg)
-                        hdrbm['HISTORY'] = 'nbeam = %d' % imobj.nbeam
                         hdrbm['HISTORY'] = 'smear time = %s sec' % str(imobj.smeartime)
+                        hdrbm['HISTORY'] = 'nbeam = %d' % imobj.nbeam
+                        pbp = '[' + str(imobj.pbparangs[0])
+                        pbw = '[' + str(imobj.pbweights[0])
+                        pbz = '[' + str(imobj.pbza[0])
+                        for ind in range(1,imobj.nbeam):
+                            pbp += (',' + str(imobj.pbparangs[ind]))
+                            pbw += (',' + str(imobj.pbweights[ind]))
+                            pbz += (',' + str(imobj.pbza[ind]))
+                        pbp += ']'
+                        pbw += ']'
+                        pbz += ']'
+                        hdrbm['HISTORY'] = 'pbparangs = %s' % pbp
+                        hdrbm['HISTORY'] = 'pbweights = %s' % pbw
+                        hdrbm['HISTORY'] = 'pbza = %s' % pbz
+                        if imobj.ninterval is not None:
+                            hdrbm['HISTORY'] = 'ninterval = %d' % imobj.ninterval
+                        if imobj.max_dt is not None:
+                            hdrbm['HISTORY'] = 'max_dt = %s' % str(imobj.max_dt)
                         hdrbm['HISTORY'] = 'Generated with vdp.py version %s ' % __version__
                         if imobj.vcss:
                             hdrbm['HISTORY'] = 'This is a VCSS snapshot primary beam image.'
@@ -844,6 +865,19 @@ def srcfind(conn, imobj, sfparams, save, qa, qaparams, opts, pbdic, beamsdir):
                     dbio.update_pbvalues(conn, imobj)
                     for src in sources:
                         src.correct_flux(imobj,pbdic)
+                    # Check if beam solid angle good for association
+                    # Don't check VCSS
+                    if not imobj.vcss:
+                        aveza = np.sum(np.array(imobj.pbza)*np.array(imobj.pbweights))
+                        bsa = 1.1331*imobj.bmin*imobj.bmaj*np.cos(np.radians(aveza)) \
+                            / dbclasses.res_dict[imobj.config][imobj.cycle]['bsanorm']
+                        if bsa < 0.78 or bsa > 1.75:
+                            if not opts['always associate']:
+                                imobj.ass_flag = False
+                                dbio.update_assflag(conn, imobj)
+                        else:
+                            imobj.ass_flag = True
+                            dbio.update_assflag(conn, imobj)
                 else:
                     logger.info('Image pb_flag False, cannot calculate beam image.')
             # Calc SNR, compactness, add to table. These don't require beam correction
