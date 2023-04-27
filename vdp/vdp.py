@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 from astropy.io import fits
 
-__version__ = '3.3'
+__version__ = '3.4'
 
 
 # Create logger

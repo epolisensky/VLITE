@@ -359,7 +359,10 @@ def create(conn, params, safe=False):
                   (dec/(e_dec*e_dec))-(OLD.dec/(OLD.e_dec*OLD.e_dec))),
                 e_dec = SQRT(1./(
                   (1./(e_dec*e_dec))-(1./(OLD.e_dec*OLD.e_dec)))),
-                ndetect = ndetect - 1
+                ndetect = ndetect - 1,
+                ns = CASE WHEN OLD.code = 'S' THEN ns - 1 ELSE ns END, 
+                nc = CASE WHEN OLD.code = 'C' THEN nc - 1 ELSE nc END, 
+                nm = CASE WHEN OLD.code = 'M' THEN nm - 1 ELSE nm END
               WHERE id = OLD.assoc_id;
             RETURN NEW;
             END;

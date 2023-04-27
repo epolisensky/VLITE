@@ -8,16 +8,16 @@ List & description of sql databases
 
 mosaics : VCSS epoch 1 mosaics using OLD BEAM corrections 
 
-snapshots : VCSS epoch 1 snapshots with "0.934" beam corrections.
-       Sources are associated and matched to catalogs.
+snapshots1 : VCSS epoch 1 snapshots with "0.934" beam corrections.
+       Sources are associated and matched to catalogs. This is 
+       procesing completed Jan 2023.
 
-newsnapshots20 : VCSS epoch 2 snapshots with "0.934" beam corrections
+snapshots2 : VCSS epoch 2 snapshots with "0.934" beam corrections
        and 20 arcsec beams. Sources are associated and matched to 
        catalogs.
 
-vlite16 : Reprocessing of vlite16 data with "0.934"
-	beam corrections. Complete from 2017-07/20
-	to 2021-06/08
+vlite16 : VLITE16 data with "0.934"
+	beam corrections. Starts from 2017-07/20
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may
@@ -32,14 +32,6 @@ vlite10img : Just VLITE10 images, no source finding.
 vlite10c : VLITE10 C config images. DO NOT TRUST BEAM
 	   CORRECTIONS
 
-staging : A staging area for processing images after
-          config changes. The distribution of beam
-          solid angles needs to be analyzed to set
-          the acceptable range for source association
-          in the resolution dictionary (res_dict in
-          dbclasses.py) before reprocessing into vlite16.
-	  Sources are beam corrected but NOT associated
-	  or matched to catalogs.
 
 ###################################
 # MISCELLANEOUS DATABASES
@@ -61,9 +53,15 @@ hudfneg :   The final + 2018 & 2019 yearly images from hudffinal
             but negated (pixels multiplied by -1). Useful
             for false detection rate analysis
 
+oldhudfdaily : All daily A config images from normal
+            VLITE imaging pipeline (except 2018-06/03) + BnA 
+            2018-02/22. VDP-calculated beam corrections. 
+            Default smear time (900 s)
+
 hudfdaily : All daily A config images from normal
-            VLITE imaging pipeline. VDP-calculated beam 
-	    corrections. Default smear time (900 s)
+            VLITE imaging pipeline EXCLUDING 2018-02/22 & INCLUDING
+            2018-06/03 (the day Wendy recovered). VDP-calculated 
+            beam corrections. Default smear time (900 s)
 
 hudfdaily100 : All daily A config images from normal
             VLITE imaging pipeline. VDP-calculated beam 

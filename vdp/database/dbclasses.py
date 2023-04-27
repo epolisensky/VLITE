@@ -49,46 +49,63 @@ dbclasses_logger = logging.getLogger('vdp.database.dbclasses')
 #  beam solid angle normalization,
 #  the acceptable range of image bmins for source association
 res_dict = {
-    'A': {'1': {'mjd': [58179, 58280], 'bsanorm': 13.892750, 'bmin': [2.85, 4.27], 'semester': '2018A'},
+    'A': {'V10_1': {'mjd': [57182, 57212], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '1': {'mjd': [58179, 58280], 'bsanorm': 13.892750, 'bmin': [2.85, 4.27], 'semester': '2018A'},
           '2': {'mjd': [58697, 58778], 'bsanorm': 18.526056, 'bmin': [3.26, 4.90], 'semester': '2019A'},
           '3': {'mjd': [59190, 59285], 'bsanorm': 19.693765, 'bmin': [3.57, 5.36], 'semester': '2020B'},
           '4': {'mjd': [59648.1, 59766], 'bsanorm': 16.536189, 'bmin': [3.13, 4.70], 'semester': '2022A'},
           '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2023A'}},
-    'BnA': {'1': {'mjd': [58148, 58179], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+    'BnA': {'V10_1': {'mjd': [57154, 57182], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            'V10_2': {'mjd': [57639, 57668], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '1': {'mjd': [58148, 58179], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58660, 58697], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59142, 59190], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59610.4, 59648.1], 'bsanorm': -1, 'bmin': [0,0], 'semester': ''},
             '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
-    'B': {'1': {'mjd': [57997, 58148], 'bsanorm': 203.477612, 'bmin': [10.77, 16.16], 'semester': '2017B'},
+    'B': {'V10_1': {'mjd': [57050, 57154], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          'V10_2': {'mjd': [57528, 57639], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '1': {'mjd': [57997, 58148], 'bsanorm': 203.477612, 'bmin': [10.77, 16.16], 'semester': '2017B'},
           '2': {'mjd': [58541, 58660], 'bsanorm': 155.607613, 'bmin': [10.18, 15.28], 'semester': '2019A'},
           '3': {'mjd': [59026, 59142], 'bsanorm': 231.048076, 'bmin': [11.27, 16.91], 'semester': '2020A'},
           '4': {'mjd': [59475.4, 59610.4], 'bsanorm': 211.639557, 'bmin': [10.33, 15.50], 'semester': '2021B'},
-          '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2023A'}},
-    'CnB': {'1': {'mjd': [57994, 57997], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '5.1': {'mjd': [59957, 59993], 'bsanorm': 175.283348, 'bmin': [-1,-1], 'semester': '2023A'},
+          '5.2': {'mjd': [59993, 99998], 'bsanorm': 209.598754, 'bmin': [-1,-1], 'semester': '2023A'}},
+    'CnB': {'V10_1': {'mjd': [57029, 57050], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            'V10_2': {'mjd': [57526, 57528], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '1': {'mjd': [57994, 57997], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58519, 58541], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59008, 59026], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59471, 59475.4], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
-    'C': {'V10': {'mjd': [56986, 57953.99], 'bsanorm': -1, 'bmin': [32.2, 65.91], 'semester': 'many'},
+            '5': {'mjd': [59948, 59957], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+    'C': {'V10_1': {'mjd': [56986, 57029], 'bsanorm': -1, 'bmin': [32.2, 65.91], 'semester': ''},
+          'V10_2': {'mjd': [57423.6, 57526], 'bsanorm': -1, 'bmin': [32.2, 65.91], 'semester': ''},
+          'V10_3': {'mjd': [57898, 57954], 'bsanorm': -1, 'bmin': [32.2, 65.91], 'semester': ''},
           '1': {'mjd': [57954, 57994], 'bsanorm': 2686.817993, 'bmin': [43.94, 65.91], 'semester': '2017A'},
           '2': {'mjd': [58441, 58519], 'bsanorm': 1744.137879, 'bmin': [32.20, 48.30], 'semester': '2018B'},
           '3': {'mjd': [58885, 59008], 'bsanorm': 2393.579216, 'bmin': [39.69, 59.54], 'semester': '2020A'},
           '4': {'mjd': [59419, 59471], 'bsanorm': 1730.897165, 'bmin': [33.29, 49.93], 'semester': '2021A'},
-          '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2022B'}},
-    'DnC': {'2': {'mjd': [58437, 58441], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '5': {'mjd': [59853, 59948], 'bsanorm': 2131.092858, 'bmin': [-1,-1], 'semester': '2022B'}},
+    'DnC': {'V10_2': {'mjd': [57393, 57423.6], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            'V10_3': {'mjd': [57890, 57898], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '2': {'mjd': [58437, 58441], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [58876, 58885], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59367, 59374], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
-    'D': {'2': {'mjd': [58360, 58437], 'bsanorm': 20271.136987, 'bmin': [117.58, 176.37], 'semester': '2018A'},
+            '5': {'mjd': [59848, 59853], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+    'D': {'V10_2': {'mjd': [57308, 57393], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          'V10_3': {'mjd': [57794, 57890], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '2': {'mjd': [58360, 58437], 'bsanorm': 20271.136987, 'bmin': [117.58, 176.37], 'semester': '2018A'},
           '3': {'mjd': [58802, 58876], 'bsanorm': 24069.990270, 'bmin': [133.07, 199.60], 'semester': '2019B'},
           '4': {'mjd': [59295, 59367], 'bsanorm': 22982.854365, 'bmin': [127.37, 191.05], 'semester': '2021A'},
-          '5': {'mjd': [59785, 59813], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'}},
-    'AnB': {'V10': {'mjd': [56986, 57953.99], 'bsanorm': -1, 'bmin': [0, 0], 'semester': 'many'}},
-    'A-D': {'1-2': {'mjd': [58280, 58360], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+          '5': {'mjd': [59785, 59848], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'}},
+    'B+': {'V10_1': {'mjd': [57212, 57295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+           'V10_2': {'mjd': [57668, 57778], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
+    'A-D': {'V10_1-2': {'mjd': [57295, 57308], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            'V10_2-3': {'mjd': [57778, 57794], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '1-2': {'mjd': [58280, 58360], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2-3': {'mjd': [58778, 58802], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4-5': {'mjd': [59766, 59785], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
-    'Unk': {'0': {'mjd': [59813, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}}
+    'Unk': {'0': {'mjd': [99998, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}}
 }
 
 compactness_dict = {
@@ -101,16 +118,17 @@ compactness_dict = {
            '2' : {'a0': 1.024552, 'a1': 1.934734e-03, 'c0': 5.512317, 'c1': -1.567072},
            '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613},
            '4' : {'a0': 1.000302, 'a1': 4.042864e-04, 'c0': 3.675372, 'c1': -1.363325},
-           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
+           '5.1' : {'a0': 1.005104, 'a1': 7.590107e-04, 'c0': 3.287098, 'c1': 1.340908},
+           '5.2' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
     'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.384203, 'c1': -1.541476},
            '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.596905, 'c1': -1.366059},
            '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219},
            '4' : {'a0': 1.021208, 'a1': 1.597061e-03, 'c0': 2.635157, 'c1': -1.504554},
-           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
+           '5' : {'a0': 1.022591, 'a1': 1.728112e-03, 'c0': 2.628672, 'c1': -1.554690}},
     'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.702012, 'c1': -1.681850},
            '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.085506, 'c1': -1.397051},
            '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422},
-           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
+           '5' : {'a0': 1.028406, 'a1': 3.053088e-03, 'c0': 4.026483, 'c1': -1.731318}},
     'VCSS' : {'1.1' : {'a0': 1.011306, 'a1': 7.558691e-04, 'c0': 2.920139, 'c1': -1.499045},
               '1.2' : {'a0': 1.007941, 'a1': 6.682657e-04, 'c0': 3.970741, 'c1': -1.529810},
               '2.1' : {'a0': 1.022806, 'a1': 7.585378e-04, 'c0': 8.208039, 'c1': -1.833907},
@@ -1804,6 +1822,7 @@ def set_fromnx(img, smear_time):
                 'Cannot calc primary beam for this image')
             return img
 
+    #print(uvname)
     # Count number of SN tables & set times, weights from NX table
     img.nsn = 0
     img.nbeam = 0
@@ -1836,7 +1855,7 @@ def set_fromnx(img, smear_time):
                         img.pbtimes.append(ti[j]+(k*dsmeartime)) #day
                         img.nbeam += 1
                 '''
-                #sampling starts at half step
+                #sampling starts at half step - including end points is better
                 for j in range(img.ninterval):
                     npb = ceil(dt[j]/(smear_time/86400))
                     dsmeartime = dt[j]/npb

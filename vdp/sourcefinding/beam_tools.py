@@ -316,7 +316,8 @@ def Calc_Beam_Image(imobj, pbdic, nobeamimage=False):
     return bmimg
 
 
-def Calc_Beam_Image_VCSS(imobj, pbdic, nobeamimage=False):
+#def Calc_Beam_Image_VCSS(imobj, pbdic, nobeamimage=False):
+def Calc_Beam_Image_VCSS(imobj, pbdic, returncoords=False, nobeamimage=False):   
     """Calculates primary beam image
        for VCSS snapshots
 
@@ -335,6 +336,10 @@ def Calc_Beam_Image_VCSS(imobj, pbdic, nobeamimage=False):
     y,x = np.indices((imobj.naxis2,imobj.naxis1))
     #initialize beam image to 0
     bmimg = zeroimg(x,y)
+
+    if returncoords:
+        xbeamarr=[]
+        ybeamarr=[]
 
     nbeam = 14
     delRA=1.5/np.cos(imobj.obs_dec*DEG2RAD)/nbeam #[deg] per time step
@@ -388,10 +393,16 @@ def Calc_Beam_Image_VCSS(imobj, pbdic, nobeamimage=False):
         else:
             #Calc beam at this time, add to beam image
             bmimg += Calc_Beampix_One(xbeam,ybeam,x,y,pbdic,imobj,parang*DEG2RAD)
+        if returncoords:
+            xbeamarr.append(xbeam)
+            ybeamarr.append(ybeam)
     #normalize beam image
     bmimg /= nbeam
-    
-    return bmimg
+
+    if returncoords:
+        return bmimg,xbeamarr,ybeamarr
+    else:
+        return bmimg
 
 
 '''

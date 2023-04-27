@@ -420,7 +420,7 @@ def add_assoc(conn, sources):
     
     return sources
 
-def update_lcmetrics(conn, sources):
+def update_lcmetrics(conn, sources, flag=False):
     """Computes and updates the light curve metrics
     in the **assoc_source** table
 
@@ -432,35 +432,45 @@ def update_lcmetrics(conn, sources):
         DetectedSource objects extracted from the
         **assoc_source** table which have been matched
         to sources detected in the current image.
+    flag : boolean
+        If True, updates ave_peak, ave_total, e_ave_peak, e_ave_total
     """
     cur = conn.cursor()
-
     for src in sources:
-        #print('lc ',src.id)
-        #fetch lightcurve: corrected fluxes and uncertainities
-        cur.execute('''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux 
-        FROM corrected_flux WHERE assoc_id= %s''',(src.id,))
+        #fetch corrected fluxes and uncertainities
+        cur.execute("SELECT SUM(peak_flux/(e_peak_flux*e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(e_peak_flux*e_peak_flux))) AS epeakflux, SUM(total_flux/(e_total_flux*e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(e_total_flux*e_total_flux))) AS etotalflux FROM corrected_flux WHERE assoc_id = %s",(src.id,))
+        arow=cur.fetchone()
+        newpeak = arow[1]*arow[1]*arow[0]
+        newtotal = arow[3]*arow[3]*arow[2]
+        if flag:
+            cur.execute("UPDATE assoc_source SET ave_peak = %s, e_ave_peak = %s, ave_total = %s, e_ave_total = %s WHERE id = %s",(newpeak, arow[1], newtotal, arow[3], src.id))
+        #fetch light curve
+        cur.execute('''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux FROM corrected_flux WHERE assoc_id= %s''',(src.id,))
         numrows = int(cur.rowcount)
-        lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
-                        ('e_total','float'),('e_peak','float')], count=numrows)
-        wt = 1./lc['e_total']**2
-        wp = 1./lc['e_peak']**2
-        # calc weighted average and std dev
-        at,st = weighted_avg_and_std(lc['total'], wt)
-        ap,sp = weighted_avg_and_std(lc['peak'], wp)
-        # calc V
-        src.v_total = st/at
-        src.v_peak = sp/ap
-        # calc eta
-        src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
-        src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
-        # update
-        #print('  ',(src.v_total, src.v_peak, src.eta_total, src.eta_peak))
-        cur.execute('''UPDATE assoc_source SET v_total = %s,
-            v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
-            (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
-        conn.commit()
-        
+        #if only 1 detection then can't set metrics
+        if numrows == 1:
+            cur.execute("UPDATE assoc_source SET v_total = %s, v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s",(None, None, None, None, src.id))
+            #print('*',src.id,at,newtotal,ap,newpeak,' ',st,arow[3],sp,arow[1],' ',numrows)
+        else:
+            lc = np.fromiter(cur.fetchall(), dtype=[('total','float'),('peak','float'),
+                            ('e_total','float'),('e_peak','float')], count=numrows)
+            wt = 1./lc['e_total']**2
+            wp = 1./lc['e_peak']**2
+            # calc weighted average and std dev
+            at,st = weighted_avg_and_std(lc['total'], wt)
+            ap,sp = weighted_avg_and_std(lc['peak'], wp)
+            # calc V
+            src.v_total = st/at
+            src.v_peak = sp/ap
+            # calc eta
+            src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
+            src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
+            # update
+            cur.execute('''UPDATE assoc_source SET v_total = %s,
+                v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
+                (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
+            conn.commit()
+            #print(' ',src.id,at,newtotal,ap,newpeak,' ',st,arow[3],sp,arow[1],' ',numrows)
     cur.close()
 
 '''
@@ -1151,16 +1161,22 @@ def remove_images(conn, images):
     cur = conn.cursor()
 
     for image in images:
-        cur.execute('SELECT id FROM image WHERE filename LIKE %s',
-                    ('%'+image, ))
+        cur.execute('SELECT id FROM image WHERE filename LIKE %s',('%'+image, ))
         try:
             image_id = cur.fetchone()[0]
         except TypeError:
             dbio_logger.info('WARNING: Image {} is not in the database.'.
                              format(image))
-        cur.execute('DELETE FROM image WHERE id = %s',
-                    (image_id, ))
+        #fetch assoc_id's for sources w/ ndetect >= 2 in this image
+        cur.execute("SELECT a.id FROM assoc_source AS a, detected_source AS d WHERE a.id=d.assoc_id AND d.image_id = %s AND a.ndetect > 1 ORDER BY a.id",(image_id,))
+        assid = cur.fetchall()
+        #get assoc_source objects
+        asrcs=get_associated(conn, assid)
+        #delete image
+        cur.execute('DELETE FROM image WHERE id = %s',(image_id, ))
         conn.commit()
+        #update fluxes, LC metrics for assoc_sources
+        update_lcmetrics(conn,asrcs,True)
     cur.close()
 
 
