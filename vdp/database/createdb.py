@@ -128,7 +128,7 @@ def create(conn, params, safe=False):
                 v_total DOUBLE PRECISION,
                 v_peak DOUBLE PRECISION,
                 eta_total DOUBLE PRECISION,
-                eta_peak DOUBLE PRECISION,  
+                eta_peak DOUBLE PRECISION,
                 PRIMARY KEY (id)
             )
             WITH (fillfactor=90);

@@ -29,7 +29,7 @@ except ImportError:
     from yaml import Loader
 from astropy.io import fits
 
-__version__ = '3.4'
+__version__ = '3.4.1'
 
 
 # Create logger
@@ -926,6 +926,14 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     logger.info('***************************')
     logger.info('STAGE 3: SOURCE ASSOCIATION')
     logger.info('***************************')
+
+    # If no sources just return
+    if len(sources)==0:
+        logger.info('No sources to associate!')
+        # Update stage in image table
+        imobj.stage = 3
+        dbio.update_stage(conn, imobj)
+        return sources, imobj
 
     # Limit cone search radius to image FOV or 3 deg for VLITE
     #  (because beam corrections only reliable to 3 deg)

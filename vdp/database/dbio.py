@@ -433,17 +433,25 @@ def update_lcmetrics(conn, sources, flag=False):
         **assoc_source** table which have been matched
         to sources detected in the current image.
     flag : boolean
-        If True, updates ave_peak, ave_total, e_ave_peak, e_ave_total
+        If True, updates ave_peak, ave_total, e_ave_peak, e_ave_total,
+        ns, nc, nm
     """
     cur = conn.cursor()
     for src in sources:
-        #fetch corrected fluxes and uncertainities
-        cur.execute("SELECT SUM(peak_flux/(e_peak_flux*e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(e_peak_flux*e_peak_flux))) AS epeakflux, SUM(total_flux/(e_total_flux*e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(e_total_flux*e_total_flux))) AS etotalflux FROM corrected_flux WHERE assoc_id = %s",(src.id,))
-        arow=cur.fetchone()
+        print('updating assoc_source id = ',src.id,' ndetect = ',src.ndetect)
+        #fetch corrected fluxes and uncertainities, ns, nc, nm
+        #cur.execute("SELECT SUM(peak_flux/(e_peak_flux*e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(e_peak_flux*e_peak_flux))) AS epeakflux, SUM(total_flux/(e_total_flux*e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(e_total_flux*e_total_flux))) AS etotalflux FROM corrected_flux WHERE assoc_id = %s",(src.id,))
+        cur.execute("SELECT SUM(c.peak_flux/(c.e_peak_flux*c.e_peak_flux)) AS peaktmp, SQRT(1./SUM(1./(c.e_peak_flux*c.e_peak_flux))) AS epeakflux, SUM(c.total_flux/(c.e_total_flux*c.e_total_flux)) AS totaltmp, SQRT(1./SUM(1./(c.e_total_flux*c.e_total_flux))) AS etotalflux, SUM(CASE WHEN d.code='S' THEN 1 ELSE 0 END) AS ns, SUM(CASE WHEN d.code='C' THEN 1 ELSE 0 END) AS nc, SUM(CASE WHEN d.code='M' THEN 1 ELSE 0 END) AS nm FROM detected_source AS d, corrected_flux AS c WHERE (c.src_id,c.image_id,d.assoc_id) = (d.src_id,d.image_id,%s)",(src.id,))
+        numrows = int(cur.rowcount)
+        if numrows==0:
+            print('ERROR! Fetched no fluxes! assoc_id = ',src.id)
+            sys.exit(0)
+        arow = cur.fetchone()
         newpeak = arow[1]*arow[1]*arow[0]
         newtotal = arow[3]*arow[3]*arow[2]
         if flag:
-            cur.execute("UPDATE assoc_source SET ave_peak = %s, e_ave_peak = %s, ave_total = %s, e_ave_total = %s WHERE id = %s",(newpeak, arow[1], newtotal, arow[3], src.id))
+            cur.execute("UPDATE assoc_source SET ave_peak = %s, e_ave_peak = %s, ave_total = %s, e_ave_total = %s, ns = %s, nc = %s, nm = %s WHERE id = %s",(newpeak, arow[1], newtotal, arow[3], arow[4], arow[5], arow[6], src.id))
+            conn.commit()
         #fetch light curve
         cur.execute('''SELECT total_flux, peak_flux, e_total_flux, e_peak_flux FROM corrected_flux WHERE assoc_id= %s''',(src.id,))
         numrows = int(cur.rowcount)
@@ -466,11 +474,10 @@ def update_lcmetrics(conn, sources, flag=False):
             src.eta_total = np.sum(wt*(lc['total']-at)**2)/(numrows-1)
             src.eta_peak  = np.sum(wp*(lc['peak']-ap)**2)/(numrows-1)
             # update
-            cur.execute('''UPDATE assoc_source SET v_total = %s,
-                v_peak = %s, eta_total = %s, eta_peak = %s WHERE id = %s''',
+            cur.execute('''UPDATE assoc_source SET v_total = %s, v_peak = %s, eta_total = %s, 
+                 eta_peak = %s WHERE id = %s''',
                 (src.v_total, src.v_peak, src.eta_total, src.eta_peak, src.id))
-            conn.commit()
-            #print(' ',src.id,at,newtotal,ap,newpeak,' ',st,arow[3],sp,arow[1],' ',numrows)
+        conn.commit()
     cur.close()
 
 '''
@@ -1173,6 +1180,7 @@ def remove_images(conn, images):
         #get assoc_source objects
         asrcs=get_associated(conn, assid)
         #delete image
+        print('deleting image ',image)
         cur.execute('DELETE FROM image WHERE id = %s',(image_id, ))
         conn.commit()
         #update fluxes, LC metrics for assoc_sources
