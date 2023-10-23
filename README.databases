@@ -6,18 +6,23 @@ List & description of sql databases
 #      care about if you're not Emil
 ####################################
 
+meta : Database of META files. It contains only 1 table, also
+       named "meta"
+
 mosaics : VCSS epoch 1 mosaics using OLD BEAM corrections 
 
-snapshots1 : VCSS epoch 1 snapshots with "0.934" beam corrections.
-       Sources are associated and matched to catalogs. This is 
-       procesing completed Jan 2023.
+snapshots1 : VCSS epoch 1 snapshots with "0.934" beam corrections
+             and natural restoring beams. This includes 
+             processing completed Jan 2023.
 
 snapshots2 : VCSS epoch 2 snapshots with "0.934" beam corrections
-       and 20 arcsec beams. Sources are associated and matched to 
-       catalogs.
+             and round restoring beams 20 arcsec across
 
-vlite16 : VLITE16 data with "0.934"
-	beam corrections. Starts from 2017-07/20
+snapshots3 : VCSS epoch 3 snapshots with "0.934" beam corrections
+             and round restoring beams 20 arcsec across
+
+vlite16 : VLITE16 data with "0.934" beam corrections. 
+          Starts from 2017-07/20
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
           Processed with older VDP version, tables may

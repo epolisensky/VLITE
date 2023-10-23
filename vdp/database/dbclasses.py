@@ -54,7 +54,7 @@ res_dict = {
           '2': {'mjd': [58697, 58778], 'bsanorm': 18.526056, 'bmin': [3.26, 4.90], 'semester': '2019A'},
           '3': {'mjd': [59190, 59285], 'bsanorm': 19.693765, 'bmin': [3.57, 5.36], 'semester': '2020B'},
           '4': {'mjd': [59648.1, 59766], 'bsanorm': 16.536189, 'bmin': [3.13, 4.70], 'semester': '2022A'},
-          '5': {'mjd': [60129, 99999], 'bsanorm': 16.096211, 'bmin': [-1,-1], 'semester': '2023A'}},
+          '5': {'mjd': [60129, 60220], 'bsanorm': 16.096211, 'bmin': [-1,-1], 'semester': '2023A'}},
     'BnA': {'V10_1': {'mjd': [57154, 57182], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             'V10_2': {'mjd': [57639, 57668], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '1': {'mjd': [58148, 58179], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
@@ -96,7 +96,8 @@ res_dict = {
           '2': {'mjd': [58360, 58437], 'bsanorm': 20271.136987, 'bmin': [117.58, 176.37], 'semester': '2018A'},
           '3': {'mjd': [58802, 58876], 'bsanorm': 24069.990270, 'bmin': [133.07, 199.60], 'semester': '2019B'},
           '4': {'mjd': [59295, 59367], 'bsanorm': 22982.854365, 'bmin': [127.37, 191.05], 'semester': '2021A'},
-          '5': {'mjd': [59785, 59848], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'}},
+          '5': {'mjd': [59785, 59848], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'},
+          '6': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
     'B+': {'V10_1': {'mjd': [57212, 57295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
            'V10_2': {'mjd': [57668, 57778], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
     'A-D': {'V10_1-2': {'mjd': [57295, 57308], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
@@ -104,7 +105,8 @@ res_dict = {
             '1-2': {'mjd': [58280, 58360], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2-3': {'mjd': [58778, 58802], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '4-5': {'mjd': [59766, 59785], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
+            '4-5': {'mjd': [59766, 59785], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '5-6': {'mjd': [60220, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
     'Unk': {'0': {'mjd': [99998, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}}
 }
 
@@ -113,22 +115,26 @@ compactness_dict = {
            '2' : {'a0': 1.018140, 'a1': 2.699981e-03, 'c0': 6.620082, 'c1': -1.542459},
            '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.503045, 'c1': -1.562968},
            '4' : {'a0': 1.037511, 'a1': 5.213945e-03, 'c0': 10.94359, 'c1': -1.688772},
-           '5' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': 0}},
+           '5' : {'a0': 1.057989, 'a1': 9.898536e-03, 'c0': 11.16176, 'c1': -1.774644},
+           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0}},
     'B' : {'1' : {'a0': 1.021807, 'a1': 1.285446e-03, 'c0': 6.660220, 'c1': -1.624589},
            '2' : {'a0': 1.024552, 'a1': 1.934734e-03, 'c0': 5.512317, 'c1': -1.567072},
            '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613},
            '4' : {'a0': 1.000302, 'a1': 4.042864e-04, 'c0': 3.675372, 'c1': -1.363325},
            '5.1' : {'a0': 1.005104, 'a1': 7.590107e-04, 'c0': 3.287098, 'c1': 1.340908},
-           '5.2' : {'a0': 1.010506, 'a1': 9.914954e-04, 'c0': 3.463105, 'c1': 1.392764}},
+           '5.2' : {'a0': 1.010506, 'a1': 9.914954e-04, 'c0': 3.463105, 'c1': 1.392764},
+           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0}},
     'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.384203, 'c1': -1.541476},
            '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.596905, 'c1': -1.366059},
            '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219},
            '4' : {'a0': 1.021208, 'a1': 1.597061e-03, 'c0': 2.635157, 'c1': -1.504554},
-           '5' : {'a0': 1.022591, 'a1': 1.728112e-03, 'c0': 2.628672, 'c1': -1.554690}},
+           '5' : {'a0': 1.022591, 'a1': 1.728112e-03, 'c0': 2.628672, 'c1': -1.554690},
+           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0}},
     'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.702012, 'c1': -1.681850},
            '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.085506, 'c1': -1.397051},
            '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422},
-           '5' : {'a0': 1.028406, 'a1': 3.053088e-03, 'c0': 4.026483, 'c1': -1.731318}},
+           '5' : {'a0': 1.028406, 'a1': 3.053088e-03, 'c0': 4.026483, 'c1': -1.731318},
+           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0}},
     'VCSS' : {'1.1' : {'a0': 1.011306, 'a1': 7.558691e-04, 'c0': 2.920139, 'c1': -1.499045},
               '1.2' : {'a0': 1.007941, 'a1': 6.682657e-04, 'c0': 3.970741, 'c1': -1.529810},
               '2.1' : {'a0': 1.022806, 'a1': 7.585378e-04, 'c0': 8.208039, 'c1': -1.833907},
@@ -1508,17 +1514,18 @@ class DetectedSource(object):
         
         # List of attributes to correct
         attrs = ['total_flux', 'peak_flux', 'total_flux_isl', 'rms_isl',
-                 'mean_isl', 'resid_rms', 'resid_mean']
+                 'mean_isl', 'resid_rms', 'resid_mean', 'e_total_flux',
+                 'e_peak_flux', 'total_flux_islE']
         for attr in attrs:
             corr_val = getattr(self, attr) / pb_power
             setattr(self, attr, corr_val)
         # Add systematic uncertainty to all flux errors
-        self.e_total_flux = np.sqrt(
-            (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
-        self.e_peak_flux = np.sqrt(
-            (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
-        self.total_flux_islE = np.sqrt(
-            (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
+        #self.e_total_flux = np.sqrt(
+        #    (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
+        #self.e_peak_flux = np.sqrt(
+        #    (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
+        #self.total_flux_islE = np.sqrt(
+        #    (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
 
     def calc_snr(self):
         # Compute S/N of source detection
@@ -1538,17 +1545,17 @@ class DetectedSource(object):
         pb_power, pb_err = beam_tools.find_nearest_pbcorr(self.dist_from_center,
                                                           pri_freq)
         # List of attributes to correct
-        attrs = ['total_flux', 'peak_flux']
+        attrs = ['total_flux', 'peak_flux', 'e_total_flux', 'e_peak_flux']
         for attr in attrs:
             corr_val = getattr(self, attr) / pb_power
             setattr(self, attr, corr_val)
         # Compute S/N of source detection
         #self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
         # Add systematic uncertainty to all flux errors
-        self.e_total_flux = np.sqrt(
-            (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
-        self.e_peak_flux = np.sqrt(
-            (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
+        #self.e_total_flux = np.sqrt(
+        #    (self.total_flux * pb_err)**2. + self.e_total_flux**2.)
+        #self.e_peak_flux = np.sqrt(
+        #    (self.peak_flux * pb_err)**2. + self.e_peak_flux**2.)
         # self.total_flux_islE = np.sqrt(
         #    (self.total_flux_isl * pb_err)**2. + self.total_flux_islE**2.)
 

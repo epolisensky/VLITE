@@ -154,6 +154,9 @@ def cfgparse(cfgfile):
     dirs : list
         List of strings specifying paths to daily image directories
         to be processed during the run.
+    catflag : boolean
+        Set True if user supplied catalogs for matching. Will match to all catalogs
+        regardless of resolution.
     """
     with open(cfgfile, 'r') as stream:
         data = load(stream, Loader=Loader)
@@ -266,13 +269,16 @@ def cfgparse(cfgfile):
         setup['smear time'] = 900. #[s]
 
     # Check list of sky catalogs
+    catflag = False
     if stages['catalog matching']:
         # all available catalogs
         catalog_opts = sorted(catalogio.catalog_dict.keys())
         # If catalogs = [], use all of them
         if len(setup['catalogs']) < 1:
             setup['catalogs'] = catalog_opts
+            catflag = False
         else:
+            catflag = True
             # Make sure requested catalogs exist
             try:
                 for cat in setup['catalogs']:
@@ -367,7 +373,7 @@ def cfgparse(cfgfile):
             except ValueError:
                 raise ConfigError('max bpix must be a number.')
 
-    return stages, opts, setup, sfparams, qaparams, dirs
+    return stages, opts, setup, sfparams, qaparams, dirs, catflag
 
 
 def dbinit(dbname, user, overwrite, qaparams, safe_override=False):
@@ -993,7 +999,7 @@ def srcassoc(conn, imobj, sources, save, sfparams):
     return detected_unmatched, imobj
 
 
-def catmatch(conn, imobj, sources, catalogs, save):
+def catmatch(conn, imobj, sources, catalogs, save, catflag):
     """Performs positional cross-matching of VLITE 
     detected sources to other radio sky survey catalogs.
     This function represents the fourth and final stage
@@ -1018,6 +1024,9 @@ def catmatch(conn, imobj, sources, catalogs, save):
         inserted into the **vlite_unique** table. If ``False``,
         results are printed to the terminal and no changes are
         made to the database.
+    catflag : bool
+        If True, match sources to user-given catalogs
+        regardless of resolution.
     """
     # STAGE 4 -- Sky catalog cross-matching
     logger.info('*********************************')
@@ -1025,9 +1034,12 @@ def catmatch(conn, imobj, sources, catalogs, save):
     logger.info('*********************************')
 
     catalogs = [catalog.lower() for catalog in catalogs]
-    # Filter catalogs by resolution
-    filtered_catalogs = radioxmatch.filter_catalogs(
-        conn, catalogs, imobj)
+    if catflag:
+        filtered_catalogs = catalogs
+    else:
+        # Filter catalogs by resolution
+        filtered_catalogs = radioxmatch.filter_catalogs(
+            conn, catalogs, imobj)
     # Remove catalogs that have already been checked for this image
     if save:
         new_catalogs = dbio.update_checked_catalogs(
@@ -1177,7 +1189,7 @@ def nullfind(conn, imobj, sfparams, save, asrcs):
     return
 
 
-def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup):
+def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup, catflag):
     """This function handles the logic and transitions between
     processing stages.
 
@@ -1210,6 +1222,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
         Keys are the setup parameters (root directory, year, month, day,
         files, database name, database user, smear_time and catalogs) and values
         are the user-supplied inputs.
+    catflag : boolean
+        If True, match sources to all user-given catalogs 
+        regardless of resolution.
     """
     global branch
     # Define booleans from stages & opts dictionaries
@@ -1319,7 +1334,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                         # STAGE 4 -- Sky survey catalog cross-matching
                         if cm:  # sf + sa + cm - branch 12, 15
                             # Cross-match new sources only
-                            catmatch(conn, imobj, new_sources, catalogs, save)
+                            catmatch(conn, imobj, new_sources, catalogs, save, catflag)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1353,7 +1368,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                 else:
                     if cm:  # sf + cm - branch 10, 13
                         if imobj.ass_flag:
-                            catmatch(conn, imobj, sources, catalogs, False)
+                            catmatch(conn, imobj, sources, catalogs, False, catflag)
                             if glob.glob(imgdir+'*matches.reg'):
                                 os.system(
                                     'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1392,7 +1407,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                             if cm:  # sa + cm - branch 20
                                 # Cross-match new sources only
                                 catmatch(conn, imobj, new_sources,
-                                         catalogs, save)
+                                         catalogs, save, catflag)
                                 if glob.glob(imgdir+'*matches.reg'):
                                     os.system(
                                         'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1440,7 +1455,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                                         # Use all sources if updating
                                         pass
                                 catmatch(conn, imobj, assoc_sources,
-                                         catalogs, save)
+                                         catalogs, save, catflag)
                                 if glob.glob(imgdir+'*matches.reg'):
                                     os.system(
                                         'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1486,7 +1501,7 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
                                 # Use all sources if updating
                                 branch = 17.3
                                 pass
-                        catmatch(conn, imobj, assoc_sources, catalogs, save)
+                        catmatch(conn, imobj, assoc_sources, catalogs, save, catflag)
                         if glob.glob(imgdir+'*matches.reg'):
                             os.system(
                                 'mv '+imgdir+'*matches.reg '+pybdsfdir+'.')
@@ -1556,7 +1571,7 @@ def main():
     start_time = datetime.now()
 
     # Parse run configuration file
-    stages, opts, setup, sfparams, qaparams, dirs = cfgparse(args.config_file)
+    stages, opts, setup, sfparams, qaparams, dirs, catflag = cfgparse(args.config_file)
 
     # Initialize logger handlers for console & file
     logfile = str(setup['year']) + str(setup['month']).zfill(2) + '.log'
@@ -1731,7 +1746,7 @@ def main():
     '''
     # Process images
     process(conn, stages, opts, dirs, setup['files'],
-            setup['catalogs'], sfparams, qaparams, setup)
+            setup['catalogs'], sfparams, qaparams, setup, catflag)
 
     # Update run_config table & close database connection
     nimages, exec_time = print_run_stats(start_time)

@@ -39,10 +39,10 @@ in the same spatial resolution class.
 - *e_ave_total*: error on the weighted average of corrected total flux light curve (mJy) 
 - *ave_peak*: weighted average of corrected peak flux light curve (mJy/beam)
 - *e_ave_peak*: error on the weighted average of corrected peak flux light curve (mJy/beam)
-- *v_total*: variability metric of corrected total flux light curve
-- *v_peak*: variability metric of corrected peak flux light curve
-- *eta_total*: variability significance metric of corrected total flux light curve
-- *eta_peak*: variability significance metric of corrected peak flux light curve
+- *v_total*: variability metric of corrected total flux light curve = standard deviation / average
+- *v_peak*: variability metric of corrected peak flux light curve = standard deviation / average
+- *eta_total*: variability significance metric of corrected total flux light curve = reduced chi square
+- *eta_peak*: variability significance metric of corrected peak flux light curve = reduced chi square
 
 .. _catalog_match:
 
@@ -90,14 +90,14 @@ uncertainties for every flux measurement error, typically 3%.
   *id* column in the **image** table and the *image_id* columns
   in the **detected_source** and **detected_island** tables
 - *total_flux*: primary beam corrected total integrated flux (mJy)
-- *e_total_flux*: 1-sigma statistical + systematic error on the
-  corrected total integrated flux (mJy)
+- *e_total_flux*: primary beam corrected detected_source error on the
+   total integrated flux (mJy)
 - *peak_flux*: primary beam corrected peak flux density per beam (mJy/beam)
-- *e_peak_flux*: 1-sigma statistical + systematic error on the
-  corrected peak flux (mJy/beam)
+- *e_peak_flux*: primary beam corrected detected_source error on the
+   peak flux (mJy/beam)
 - *isl_total_flux*: primary beam corrected total integrated flux density
   of the island in which the source is located (mJy)
-- *isl_e_total_flux*: 1-sigma statistical + systematic error on the
+- *isl_e_total_flux*: primary beam corrected error on the
   corrected island integrated flux (mJy)
 - *isl_rms*: average background rms noise of the island (mJy/beam)
 - *isl_mean*: avearage background mean value of the island (mJy/beam)

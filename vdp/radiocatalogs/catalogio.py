@@ -27,7 +27,7 @@ exist using the same format as all the others.
 Adapted from EP's iofuncs.py.
 
 """
-import os
+import os,sys
 import logging
 import pandas as pd
 
@@ -53,7 +53,9 @@ catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
                 'txs' : {'id' : 17}, 'vlssr' : {'id' : 18},
                 'wenss': {'id' : 19}, 'atlas': {'id' : 20},
                 'lotssdr1' : {'id' : 21}, 'racs' : {'id' : 22},
-                'psr' : {'id' : 23}}
+                'psr' : {'id' : 23}, 'vlass1' : {'id' : 24},
+                'vlass2' : {'id' : 25}}
+                #'vlass2' : {'id' : 25}, 'vlass3' : {'id' : 26}}
 
 
 def dms2deg(d, m, s):
@@ -150,6 +152,12 @@ class CatalogSource(object):
     sep : float
         Angular separation between this catalog source and the
         closest VLITE source (arcsec).
+    duplicate_flag : float
+        For VLASS catalogs. Select < 2 for high quality sources
+    quality_flag : float
+        For VLASS catalogs. Select =0 or =4 for high quality sources
+    p_sidelobe : float
+        For VLASS catalogs. Probability source is a sidelobe
     """
     def __init__(self):
         self.id = None
@@ -174,7 +182,9 @@ class CatalogSource(object):
         self.pt_like = None
         self.assoc_id = None
         self.sep = None
-
+        self.duplicate_flag = None
+        self.quality_flag = None
+        self.p_sidelobe = None
 
 def read_tgss(return_sources=False):
     """Generates a list of CatalogSource objects from
@@ -235,7 +245,7 @@ def read_tgss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -308,7 +318,7 @@ def read_first(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -373,7 +383,7 @@ def read_sumss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -440,7 +450,7 @@ def read_wenss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -545,7 +555,7 @@ def read_nvss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %s %s\n' % (
+                         '%s %s %s %s %s %s %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -618,7 +628,7 @@ def read_gleam(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -703,7 +713,7 @@ def read_cosmos(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -769,7 +779,7 @@ def read_vlssr(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -830,7 +840,7 @@ def read_txs(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -894,7 +904,7 @@ def read_sevenc(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -963,7 +973,7 @@ def read_gpsr5(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1032,7 +1042,7 @@ def read_gpsr1(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1120,7 +1130,7 @@ def read_nordgc(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1187,7 +1197,7 @@ def read_lazio04(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1266,7 +1276,7 @@ def read_m31_glg04(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1335,7 +1345,7 @@ def read_lotss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1400,7 +1410,7 @@ def read_lofar_lba(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1474,7 +1484,7 @@ def read_lofar_hba(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1545,7 +1555,7 @@ def read_nrl_nvss(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1618,7 +1628,7 @@ def read_atlas(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1687,7 +1697,7 @@ def read_lotssdr1(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1763,7 +1773,7 @@ def read_racs(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1834,7 +1844,7 @@ def read_psr(return_sources=False):
     with open(psqlf, 'w') as fwrite:
         for src in sources:
             fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
-                         '%s %s %s %s %s %i %s\n' % (
+                         '%s %s %s %s %s %i %s None None None\n' % (
                              src.id, src.name, src.ra, src.e_ra, src.dec,
                              src.e_dec, src.total_flux, src.e_total_flux,
                              src.peak_flux, src.e_peak_flux, src.maj,
@@ -1844,3 +1854,108 @@ def read_psr(return_sources=False):
         len(sources)))
     return sources
 
+def read_vlass1(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the VLASS epoch 1 QuickLook catalog and writes them into a file in the 
+    same directory called vlass1_psql.txt if the file does
+    not already exist.
+
+    Telescope/frequency: VLA 3000 MHz
+
+    Spatial resolution: 2.5" 
+
+    """
+    catalog_dict['vlass1']['telescope'] = 'VLA'
+    catalog_dict['vlass1']['frequency'] = 3000.
+    catalog_dict['vlass1']['resolution'] = 2.5
+    catalog_dict['vlass1']['reference'] = 'cirada.ca/vlasscatalogueql0'
+    
+    psqlf = os.path.join(catalogdir, 'vlass1_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        sources = pd.read_csv('/roadraid2/emilp/VLASS/epoch1/CIRADA_VLASS1QL_table1_components_v2.csv.gz')
+        #output file
+        psqlf = 'vlass1_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in sources.iterrows():
+                fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s %s %s %s\n' % (i+1,row['Component_name'],row['RA'],row['E_RA'],row['DEC'],row['E_DEC'],row['Total_flux'],row['E_Total_flux'],row['Peak_flux'],row['E_Peak_flux'],row['Maj'],row['E_Maj'],row['Min'],row['E_Min'],row['PA'],row['E_PA'],row['Isl_rms'],row['Tile'],25,'None',row['Duplicate_flag'],row['Quality_flag'],row['P_sidelobe']))
+        catio_logger.info(' -- wrote {} sources to vlass1_psql.txt'.format(len(sources)))
+        return sources
+    
+        
+def read_vlass2(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the VLASS epoch 2 QuickLook catalog and writes them into a file in the 
+    same directory called vlass1_psql.txt if the file does
+    not already exist.
+
+    Telescope/frequency: VLA 3000 MHz
+
+    Spatial resolution: 2.5" 
+
+    """
+    catalog_dict['vlass2']['telescope'] = 'VLA'
+    catalog_dict['vlass2']['frequency'] = 3000.
+    catalog_dict['vlass2']['resolution'] = 2.5
+    catalog_dict['vlass2']['reference'] = 'cirada.ca/vlasscatalogueql0'
+    
+    psqlf = os.path.join(catalogdir, 'vlass2_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        sources=pd.read_csv('/roadraid2/emilp/VLASS/epoch2/CIRADA_VLASS2QLv1_table1_components.csv.gz')
+        #output file
+        psqlf = 'vlass2_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in sources.iterrows():
+                fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s %s %s %s\n' % (i+1,row['Component_name'],row['RA'],row['E_RA'],row['DEC'],row['E_DEC'],row['Total_flux'],row['E_Total_flux'],row['Peak_flux'],row['E_Peak_flux'],row['Maj'],row['E_Maj'],row['Min'],row['E_Min'],row['PA'],row['E_PA'],row['Isl_rms'],row['Tile'],25,'None',row['Duplicate_flag'],row['Quality_flag'],'None'))
+        catio_logger.info(' -- wrote {} sources to vlass2_psql.txt'.format(len(sources)))
+        return sources
+
+
+'''
+def read_vlass3(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the VLASS epoch 2 QuickLook catalog and writes them into a file in the 
+    same directory called vlass1_psql.txt if the file does
+    not already exist.
+
+    Telescope/frequency: VLA 3000 MHz
+
+    Spatial resolution: 2.5" 
+
+    """
+    catalog_dict['vlass3']['telescope'] = 'VLA'
+    catalog_dict['vlass3']['frequency'] = 3000.
+    catalog_dict['vlass3']['resolution'] = 2.5
+    catalog_dict['vlass3']['reference'] = 'cirada.ca/vlasscatalogueql0'
+    
+    psqlf = os.path.join(catalogdir, 'vlass3_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        sources=pd.read_csv('/roadraid2/emilp/VLASS/epoch3/CIRADA_VLASS3QLv1_table1_components.csv.gz')
+        #output file
+        psqlf = 'vlass3_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in sources.iterrows():
+                fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s %s %s %s\n' % (i+1,row['Component_name'],row['RA'],row['E_RA'],row['DEC'],row['E_DEC'],row['Total_flux'],row['E_Total_flux'],row['Peak_flux'],row['E_Peak_flux'],row['Maj'],row['E_Maj'],row['Min'],row['E_Min'],row['PA'],row['E_PA'],row['Isl_rms'],row['Tile'],25,'None',row['Duplicate_flag'],row['Quality_flag'],'None'))
+        catio_logger.info(' -- wrote {} sources to vlass3_psql.txt'.format(len(sources)))
+        return sources
+'''
