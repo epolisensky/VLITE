@@ -151,7 +151,7 @@ def create(conn, params, safe=False):
                 noise REAL,
                 peak REAL,
                 config VARCHAR(3),
-                cycle VARCHAR(3),
+                cycle VARCHAR(5),
                 semester VARCHAR(6),
                 nvis INTEGER,
                 niter INTEGER,
