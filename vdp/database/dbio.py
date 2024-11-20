@@ -143,11 +143,11 @@ def add_image(conn, img, status, delete=False):
             az_end, el_end, pa_end, az_i, az_f, alt_i, alt_f, parang_i, 
             parang_f, pri_cals, ass_flag, nsn, tsky, square, sunsep, pbkey, 
             pb_flag, max_dt, nvisnx, ninterval, nbeam, pbparangs, pbweights, 
-            pbza)
+            pbza, point_ra, point_dec)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
             %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec, 
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
@@ -164,7 +164,7 @@ def add_image(conn, img, status, delete=False):
                 img.max_dt, img.nvisnx, img.ninterval, img.nbeam,
                 np.array(img.pbparangs).tolist(),
                 np.array(img.pbweights).tolist(),
-                np.array(img.pbza).tolist())
+                np.array(img.pbza).tolist(), img.point_ra, img.point_dec)
         cur.execute(sql, vals)
         img.id = cur.fetchone()[0]
     # Update existing image entry
@@ -185,7 +185,7 @@ def add_image(conn, img, status, delete=False):
             pri_cals = %s, ass_flag = %s, nsn = %s, tsky = %s, square = %s, 
             sunsep = %s, pbkey = %s, pb_flag = %s, ninterval = %s, 
             max_dt = %s, nvisnx = %s, nbeam = %s, pbparangs = %s, 
-            pbweights = %s, pbza = %s WHERE id = %s'''
+            pbweights = %s, pbza = %s, point_ra = %s, point_dec = %s WHERE id = %s'''
         vals = (img.filename, img.imsize, img.obs_ra, img.obs_dec,
                 img.pixel_scale, img.obj, img.obs_date, img.map_date,
                 img.obs_freq, img.pri_freq, img.bmaj, img.bmin, img.bpa,
@@ -200,7 +200,7 @@ def add_image(conn, img, status, delete=False):
                 img.sunsep, img.pbkey, img.pb_flag, img.ninterval, img.max_dt,
                 img.nvisnx, img.nbeam, np.array(img.pbparangs).tolist(),
                 np.array(img.pbweights).tolist(),
-                np.array(img.pbza).tolist(),img.id)
+                np.array(img.pbza).tolist(), img.point_ra, img.point_dec, img.id)
         cur.execute(sql, vals)
         if delete:
             # Delete corresponding sources

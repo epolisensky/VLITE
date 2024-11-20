@@ -90,6 +90,8 @@ def add_table(tblname, conn):
             duplicate_flag REAL,
             quality_flag REAL,
             p_sidelobe REAL,
+            nn_dist REAL,
+            nn_id INTEGER,
             PRIMARY KEY (id),
             FOREIGN KEY (catalog_id)
               REFERENCES radcat.catalogs (id)
@@ -149,6 +151,14 @@ def add_table(tblname, conn):
         sources = catalogio.read_vlass1()
     elif tblname == 'vlass2':
         sources = catalogio.read_vlass2()
+    elif tblname == 'racsgp':
+        sources = catalogio.read_racsgp()
+    elif tblname == 'racsmid':
+        sources = catalogio.read_racsmid()
+    elif tblname == 'srsc':
+        sources = catalogio.read_srsc()
+    elif tblname == 'lotssdr2':
+        sources = catalogio.read_lotssdr2()
     #elif tblname == 'vlass3':
     #    sources = catalogio.read_vlass3()
     else:

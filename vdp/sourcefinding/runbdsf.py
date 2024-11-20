@@ -78,6 +78,8 @@ class BDSFImage(Image):
             if key == 'adaptive_thresh':
                 if value == '' or value == 'None':
                     value = None
+            if key == 'trim_box':
+                value = eval(value)
             setattr(self, key, value)
 
 
@@ -120,6 +122,7 @@ class BDSFImage(Image):
         sf_logger.info('Extracting sources...')
         start = datetime.now()
         opts = self.get_attr()
+        print(opts)
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', r'invalid value')
             try:

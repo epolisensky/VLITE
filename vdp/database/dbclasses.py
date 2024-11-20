@@ -54,14 +54,16 @@ res_dict = {
           '2': {'mjd': [58697, 58778], 'bsanorm': 18.526056, 'bmin': [3.26, 4.90], 'semester': '2019A'},
           '3': {'mjd': [59190, 59285], 'bsanorm': 19.693765, 'bmin': [3.57, 5.36], 'semester': '2020B'},
           '4': {'mjd': [59648.1, 59766], 'bsanorm': 16.536189, 'bmin': [3.13, 4.70], 'semester': '2022A'},
-          '5': {'mjd': [60129, 60220], 'bsanorm': 16.096211, 'bmin': [-1,-1], 'semester': '2023A'}},
+          '5': {'mjd': [60129, 60220], 'bsanorm': 16.096211, 'bmin': [-1,-1], 'semester': '2023A'},
+          '6': {'mjd': [60594, 99999], 'bsanorm': 17.839476, 'bmin': [-1,-1], 'semester': '2024B'}},
     'BnA': {'V10_1': {'mjd': [57154, 57182], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             'V10_2': {'mjd': [57639, 57668], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '1': {'mjd': [58148, 58179], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58660, 58697], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59142, 59190], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59610.4, 59648.1], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5': {'mjd': [60094.46, 60129], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
+            '5': {'mjd': [60094.46, 60129], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
+            '6': {'mjd': [60570, 60594], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
     'B': {'V10_1': {'mjd': [57050, 57154], 'bsanorm': 199.050, 'bmin': [0, 0], 'semester': ''},
           'V10_2': {'mjd': [57528, 57639], 'bsanorm': 313.233, 'bmin': [0, 0], 'semester': ''},
           '1': {'mjd': [57997, 58148], 'bsanorm': 203.477612, 'bmin': [10.77, 16.16], 'semester': '2017B'},
@@ -69,14 +71,16 @@ res_dict = {
           '3': {'mjd': [59026, 59142], 'bsanorm': 231.048076, 'bmin': [11.27, 16.91], 'semester': '2020A'},
           '4': {'mjd': [59475.4, 59610.4], 'bsanorm': 211.639557, 'bmin': [10.33, 15.50], 'semester': '2021B'},
           '5.1': {'mjd': [59957, 59993], 'bsanorm': 175.283348, 'bmin': [-1,-1], 'semester': '2023A'},
-          '5.2': {'mjd': [59993, 60094.46], 'bsanorm': 209.598754, 'bmin': [-1,-1], 'semester': '2023A'}},
+          '5.2': {'mjd': [59993, 60094.46], 'bsanorm': 209.598754, 'bmin': [-1,-1], 'semester': '2023A'},
+          '6': {'mjd': [60431, 60570], 'bsanorm': 212.462536, 'bmin': [-1,-1], 'semester': '2024A'}},
     'CnB': {'V10_1': {'mjd': [57029, 57050], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             'V10_2': {'mjd': [57526, 57528], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '1': {'mjd': [57994, 57997], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58519, 58541], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [59008, 59026], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59471, 59475.4], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5': {'mjd': [59948, 59957], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+            '5': {'mjd': [59948, 59957], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''},
+            '6': {'mjd': [60423, 60431], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
     'C': {'V10_1': {'mjd': [56986, 57029], 'bsanorm': 1910.885, 'bmin': [32.2, 65.91], 'semester': ''},
           'V10_2': {'mjd': [57423.6, 57526], 'bsanorm': 1967.009, 'bmin': [32.2, 65.91], 'semester': ''},
           'V10_3': {'mjd': [57898, 57954], 'bsanorm': 2134.905, 'bmin': [32.2, 65.91], 'semester': ''},
@@ -84,20 +88,22 @@ res_dict = {
           '2': {'mjd': [58441, 58519], 'bsanorm': 1744.137879, 'bmin': [32.20, 48.30], 'semester': '2018B'},
           '3': {'mjd': [58885, 59008], 'bsanorm': 2393.579216, 'bmin': [39.69, 59.54], 'semester': '2020A'},
           '4': {'mjd': [59419, 59471], 'bsanorm': 1730.897165, 'bmin': [33.29, 49.93], 'semester': '2021A'},
-          '5': {'mjd': [59853, 59948], 'bsanorm': 2131.092858, 'bmin': [-1,-1], 'semester': '2022B'}},
+          '5': {'mjd': [59853, 59948], 'bsanorm': 2131.092858, 'bmin': [-1,-1], 'semester': '2022B'},
+          '6': {'mjd': [60334, 60423], 'bsanorm': 1877.441356, 'bmin': [-1,-1], 'semester': '2024A'}},
     'DnC': {'V10_2': {'mjd': [57393, 57423.6], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             'V10_3': {'mjd': [57890, 57898], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '2': {'mjd': [58437, 58441], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3': {'mjd': [58876, 58885], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4': {'mjd': [59367, 59374], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5': {'mjd': [59848, 59853], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+            '5': {'mjd': [59848, 59853], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''},
+            '6': {'mjd': [60324, 60334], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
     'D': {'V10_2': {'mjd': [57308, 57393], 'bsanorm': 13061.635, 'bmin': [0, 0], 'semester': ''},
           'V10_3': {'mjd': [57794, 57890], 'bsanorm': 16572.679, 'bmin': [0, 0], 'semester': ''},
           '2': {'mjd': [58360, 58437], 'bsanorm': 20271.136987, 'bmin': [117.58, 176.37], 'semester': '2018A'},
           '3': {'mjd': [58802, 58876], 'bsanorm': 24069.990270, 'bmin': [133.07, 199.60], 'semester': '2019B'},
           '4': {'mjd': [59295, 59367], 'bsanorm': 22982.854365, 'bmin': [127.37, 191.05], 'semester': '2021A'},
           '5': {'mjd': [59785, 59848], 'bsanorm': 21899.169321, 'bmin': [-1,-1], 'semester': '2022A'},
-          '6': {'mjd': [-1,-1], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': ''}},
+          '6': {'mjd': [60237, 60324], 'bsanorm': -1, 'bmin': [-1,-1], 'semester': '2023B'}}, #VLITE OFF!
     'B+': {'V10_1': {'mjd': [57212, 57295], 'bsanorm': 99.404, 'bmin': [0, 0], 'semester': ''},
            'V10_2': {'mjd': [57668, 57778], 'bsanorm': 60.267, 'bmin': [0, 0], 'semester': ''}},
     'A-D': {'V10_1-2': {'mjd': [57295, 57308], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
@@ -106,53 +112,52 @@ res_dict = {
             '2-3': {'mjd': [58778, 58802], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '3-4': {'mjd': [59285, 59295], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
             '4-5': {'mjd': [59766, 59785], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''},
-            '5-6': {'mjd': [60220, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
+            '5-6': {'mjd': [60220, 60237], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}},
     'Unk': {'0': {'mjd': [99998, 99999], 'bsanorm': -1, 'bmin': [0, 0], 'semester': ''}}
 }
 
 compactness_dict = {
-    'A' : {'1' : {'a0': 1.031822, 'a1': 4.274405e-03, 'c0': 9.869077, 'c1': -1.670031},
-           '2' : {'a0': 1.018140, 'a1': 2.699981e-03, 'c0': 6.620082, 'c1': -1.542459},
-           '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.503045, 'c1': -1.562968},
-           '4' : {'a0': 1.037511, 'a1': 5.213945e-03, 'c0': 10.94359, 'c1': -1.688772},
-           '5' : {'a0': 1.057989, 'a1': 9.898536e-03, 'c0': 11.16176, 'c1': -1.774644},
+    'A' : {'1' : {'a0': 1.031571, 'a1': 4.266747e-03, 'c0': 9.784101, 'c1': -1.666293},
+           '2' : {'a0': 1.018140, 'a1': 2.699981e-03, 'c0': 6.541704, 'c1': -1.538327},
+           '3' : {'a0': 1.019842, 'a1': 2.439492e-03, 'c0': 8.346418, 'c1': -1.556666},
+           '4' : {'a0': 1.037543, 'a1': 5.210229e-03, 'c0': 14.28838, 'c1': -1.801248},
+           '5' : {'a0': 1.057399, 'a1': 9.871675e-03, 'c0': 10.88056, 'c1': -1.763789},
            '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0},
-           'V10_1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0}},
-    'B' : {'1' : {'a0': 1.021807, 'a1': 1.285446e-03, 'c0': 6.660220, 'c1': -1.624589},
-           '2' : {'a0': 1.024552, 'a1': 1.934734e-03, 'c0': 5.512317, 'c1': -1.567072},
-           '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.529997, 'c1': -1.452613},
-           '4' : {'a0': 1.000302, 'a1': 4.042864e-04, 'c0': 3.675372, 'c1': -1.363325},
-           '5.1' : {'a0': 1.005104, 'a1': 7.590107e-04, 'c0': 3.287098, 'c1': 1.340908},
-           '5.2' : {'a0': 1.010506, 'a1': 9.914954e-04, 'c0': 3.463105, 'c1': 1.392764},
-           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0},
-           'V10_1' : {'a0': 1.004090, 'a1': 1.686410e-03, 'c0': 8.876611, 'c1': -1.665660},
-           'V10_2' : {'a0': 1.030065, 'a1': 4.056787e-03, 'c0': 6.037686, 'c1': -1.605704}},
-    'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.384203, 'c1': -1.541476},
-           '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.596905, 'c1': -1.366059},
-           '3' : {'a0': 1.013467, 'a1': 1.223201e-03, 'c0': 2.573016, 'c1': -1.467219},
-           '4' : {'a0': 1.021208, 'a1': 1.597061e-03, 'c0': 2.635157, 'c1': -1.504554},
-           '5' : {'a0': 1.022591, 'a1': 1.728112e-03, 'c0': 2.628672, 'c1': -1.554690},
-           '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0},
-           'V10_1' : {'a0': 1.005797, 'a1': 1.423348e-03, 'c0': 3.327563, 'c1': -1.510010},
-           'V10_2' : {'a0': 1.015172, 'a1': 1.888109e-03, 'c0': 1.573026, 'c1': -1.157422},
-           'V10_3' : {'a0': 1.002362, 'a1': 9.636460e-04, 'c0': 4.357370, 'c1': -1.475267}},
-    'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.702012, 'c1': -1.681850},
-           '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.085506, 'c1': -1.397051},
-           '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.478990, 'c1': -1.547422},
-           '5' : {'a0': 1.028406, 'a1': 3.053088e-03, 'c0': 4.026483, 'c1': -1.731318},
+           'V10_1' : {'a0': 1.0, 'a1': 2.831733e-04, 'c0': 3.346050, 'c1': -1.001673}},
+    'B' : {'1' : {'a0': 1.021638, 'a1': 1.284321e-03, 'c0': 6.533840, 'c1': -1.617770},
+           '2' : {'a0': 1.025000, 'a1': 1.960815e-03, 'c0': 5.327601, 'c1': -1.557729},
+           '3' : {'a0': 1.013762, 'a1': 1.104968e-03, 'c0': 4.491889, 'c1': -1.451631},
+           '4' : {'a0': 1.017186, 'a1': 1.274251e-03, 'c0': 4.754481, 'c1': -1.506705},
+           '5.1' : {'a0': 1.005072, 'a1': 7.54856e-04, 'c0': 3.301659, 'c1': -1.341046},
+           '5.2' : {'a0': 1.010506, 'a1': 9.91735e-04, 'c0': 3.481263, 'c1': -1.393633},
+           '6' : {'a0': 1.002334, 'a1': 9.046608e-04, 'c0': 2.150379, 'c1': -1.236555},
+           'V10_1' : {'a0': 1.007135, 'a1': 2.925095e-03, 'c0': 4.855276, 'c1': -1.499755},
+           'V10_2' : {'a0': 1.030928, 'a1': 4.127990e-03, 'c0': 6.398501, 'c1': -1.633580}},
+    'C' : {'1' : {'a0': 1.005082, 'a1': 8.677483e-04, 'c0': 3.476722, 'c1': -1.549343},
+           '2' : {'a0': 1.010657, 'a1': 1.655885e-03, 'c0': 2.591503, 'c1': -1.365536},
+           '3' : {'a0': 1.013413, 'a1': 1.218773e-03, 'c0': 2.570887, 'c1': -1.465882},
+           '4' : {'a0': 1.021204, 'a1': 1.598263e-03, 'c0': 2.603568, 'c1': -1.499281},
+           '5' : {'a0': 1.020900, 'a1': 1.759167e-03, 'c0': 2.626716, 'c1': -1.544575},
+           '6' : {'a0': 1.033150, 'a1': 2.817737e-03, 'c0': 2.897327, 'c1': -1.553051},
+           'V10_1' : {'a0': 1.006811, 'a1': 1.476478e-03, 'c0': 2.679202, 'c1': -1.463098},
+           'V10_2' : {'a0': 1.012908, 'a1': 1.788574e-03, 'c0': 1.606308, 'c1': -1.148350},
+           'V10_3' : {'a0': 1.003027, 'a1': 1.152652e-03, 'c0': 2.942781, 'c1': -1.387235}},
+    'D' : {'2' : {'a0': 1.029931, 'a1': 3.368299e-03, 'c0': 3.831083, 'c1': -1.696777},
+           '3' : {'a0': 1.011935, 'a1': 1.780312e-03, 'c0': 2.105211, 'c1': -1.401127},
+           '4' : {'a0': 1.016972, 'a1': 1.515647e-03, 'c0': 2.492477, 'c1': -1.549401},
+           '5' : {'a0': 1.020662, 'a1': 2.635404e-03, 'c0': 3.467282, 'c1': -1.627111},
            '6' : {'a0': 0, 'a1': 0, 'c0': 0, 'c1': -0},
            'V10_2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
            'V10_3' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0}},
-    'VCSS' : {'1.1' : {'a0': 1.011306, 'a1': 7.558691e-04, 'c0': 2.920139, 'c1': -1.499045},
-              '1.2' : {'a0': 1.007941, 'a1': 6.682657e-04, 'c0': 3.970741, 'c1': -1.529810},
-              '2.1' : {'a0': 1.022806, 'a1': 7.585378e-04, 'c0': 8.208039, 'c1': -1.833907},
-              '2.2' : {'a0': 1.019820, 'a1': 1.005684e-03, 'c0': 2.693203, 'c1': -1.634663},
-              '3.1' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
-              '3.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0},
-    'B+': {'V10_1' : {'a0': 1.027627, 'a1': 3.171649e-03, 'c0': 13.378114, 'c1': -1.784012},
-           'V10_2' : {'a0': 1.059872, 'a1': 9.064586e-03, 'c0': 21.320951, 'c1': -1.916799}},
+    'B+' : {'V10_1' : {'a0': 1.027355, 'a1': 2.882720e-03, 'c0': 12.065286, 'c1': -1.783792},
+           'V10_2' : {'a0': 1.055854, 'a1': 8.093716e-03, 'c0': 15.708964, 'c1': -1.867890}},
+    'VCSS' : {'1.1' : {'a0': 1.010937, 'a1': 7.324113e-04, 'c0': 2.917032, 'c1': -1.496858},
+              '1.2' : {'a0': 1.008186, 'a1': 6.611323e-04, 'c0': 3.978883, 'c1': -1.532021},
+              '2.1' : {'a0': 1.020981, 'a1': 8.210672e-04, 'c0': 7.564879, 'c1': -1.807970},
+              '2.2' : {'a0': 1.018776, 'a1': 9.647108e-04, 'c0': 2.845967, 'c1': -1.668669},
+              '3.1' : {'a0': 1.016622, 'a1': 7.122767e-04, 'c0': 1.295902, 'c1': -1.332420},
+              '3.2' : {'a0': 0.0, 'a1': 0.0, 'c0': 0.0, 'c1': -0.0}},
     }
-}
 
 class ImgMjd(object):
     """A class to hold the name & mjd of a FITS image.
@@ -219,9 +224,13 @@ class Image(object):
     imsize : str
         Image size in pixels -- (``NAXIS1``, ``NAXIS2``).
     obs_ra : float
-        Right ascension of image pointing center (degrees).
+        Right ascension of image center (degrees). Keyword: CRVAL1
     obs_dec : float
-        Declination of image pointing center (degrees).
+        Declination of image center (degrees). Keyword: CRVAL2
+    point_ra : float
+        Right ascension of VLA pointing center (degrees). Keyword: OBSRA
+    point_dec : float
+        Declination of VLA pointing center (degrees). Keyword: OBSDEC
     glon : float
         Galactic longitude of image pointing center (degrees).
     glat : float
@@ -345,6 +354,10 @@ class Image(object):
         X reference pixel. Keyword CRPIX1
     yref : float
         y reference pixel. Keyword CRPIX2
+    xpoint : float
+        X reference pixel of VLA pointing center
+    ypoint : float
+        y reference pixel of VLA pointing center
     naxis1 : int
         Number of x-dimension pixels. Keyword NAXIS1
     naxis2 : int
@@ -391,6 +404,8 @@ class Image(object):
         self.imsize = None
         self.obs_ra = None
         self.obs_dec = None
+        self.point_ra = None
+        self.point_dec = None
         self.glon = None
         self.glat = None
         self.az_star = None
@@ -442,6 +457,8 @@ class Image(object):
         self.square = None
         self.xref = None
         self.yref = None
+        self.xpoint = None
+        self.ypoint = None
         self.naxis1 = None
         self.naxis2 = None
         self.bmimg = None
@@ -620,19 +637,26 @@ class Image(object):
         try:
             self.obs_ra = hdr['CRVAL1']  # deg
         except:
-            try:
-                self.obs_ra = hdr['OBSRA']  # deg
-            except KeyError:
-                self.obs_ra = None
-                self.error_id = 1
+            self.obs_ra = None
+            self.error_id = 1
+        try:
+            self.point_ra = hdr['OBSRA']  # deg
+        except KeyError:
+            self.point_ra = None
+            self.error_id = 1
         try:
             self.obs_dec = hdr['CRVAL2']  # deg
-        except:
-            try:
-                self.obs_dec = hdr['OBSDEC']  # deg
-            except KeyError:
-                self.obs_dec = None
-                self.error_id = 1
+        except KeyError:
+            self.obs_dec = None
+            self.error_id = 1
+        try:
+            self.point_dec = hdr['OBSDEC']  # deg
+        except KeyError:
+            self.point_dec = None
+            self.error_id = 1
+
+        self.xpoint, self.ypoint = beam_tools.EQtoPIX(self.point_ra, self.point_dec, self.wcsobj)
+        
         try:
             self.pixel_scale = abs(hdr['CDELT1']) * 3600.  # arcsec/pixel
         except KeyError:
@@ -754,22 +778,22 @@ class Image(object):
                         date[2]))).mjd  # day
                 t = Time(self.mjdtime, format='mjd')
                 self.lst_i = t.sidereal_time('apparent', VLALON).hour  # hrs
-                if self.obs_ra is not None and self.obs_dec is not None:
-                    coord = SkyCoord(self.obs_ra, self.obs_dec,
+                if self.point_ra is not None and self.point_dec is not None:
+                    coord = SkyCoord(self.point_ra, self.point_dec,
                                      unit='deg', frame='fk5')
                     altaz = coord.transform_to(
                         AltAz(obstime=t, location=locVLA))
                     self.az_i = altaz.az.deg
                     self.alt_i = altaz.alt.deg
-                    hrang = (15*self.lst_i) - self.obs_ra  # deg
+                    hrang = (15*self.lst_i) - self.point_ra  # deg
                     if hrang > 180:
                         hrang -= 360
                     if hrang < -180:
                         hrang += 360
                     self.hrang_i = hrang/15 # hrs
                     tmp1 = np.sin(hrang*DEG2RAD)
-                    tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - \
-                        np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                    tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.point_dec*DEG2RAD) - \
+                        np.sin(self.point_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
                     self.parang_i = np.arctan2(tmp1, tmp2)*RAD2DEG
                     if self.duration is not None:
                         t_end = Time(self.mjdtime+(self.duration /
@@ -780,15 +804,15 @@ class Image(object):
                             AltAz(obstime=t_end, location=locVLA))
                         self.az_f = altaz.az.deg
                         self.alt_f = altaz.alt.deg
-                        hrang = (15*self.lst_f) - self.obs_ra  # deg
+                        hrang = (15*self.lst_f) - self.point_ra  # deg
                         if hrang > 180:
                             hrang -= 360
                         if hrang < -180:
                             hrang += 360
                         self.hrang_f = hrang/15 # hrs
                         tmp1 = np.sin(hrang*DEG2RAD)
-                        tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.obs_dec*DEG2RAD) - \
-                            np.sin(self.obs_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
+                        tmp2 = np.tan(VLALAT*DEG2RAD)*np.cos(self.point_dec*DEG2RAD) - \
+                            np.sin(self.point_dec*DEG2RAD)*np.cos(hrang*DEG2RAD)
                         self.parang_f = np.arctan2(tmp1, tmp2)*RAD2DEG
         except KeyError:
             self.mjdtime = None
@@ -1466,7 +1490,7 @@ class DetectedSource(object):
 
     def calc_center_dist(self, imobj):
         """Calculates a detected source's angular distance
-        from the image pointing center in degrees and sets
+        from the image center in degrees and sets
         the ``dist_from_center`` attribute.
 
         Parameters
@@ -1536,7 +1560,7 @@ class DetectedSource(object):
 
     def calc_snr(self):
         # Compute S/N of source detection
-        self.snr = (self.peak_flux - self.mean_isl) / self.rms_isl
+        self.snr = self.peak_flux / self.rms_isl
 
     # nulls need special handling
     def correct_flux_null(self, pri_freq):
@@ -1594,6 +1618,9 @@ class DetectedSource(object):
                 flag = True
             elif imobj.mjdtime > 59400 and imobj.mjdtime < 59700:
                 cycle = '2.2'
+                flag = True
+            elif imobj.mjdtime > 59900 and imobj.mjdtime < 60150:
+                cycle = '3.1'
                 flag = True
             else:
                 pass
@@ -1694,7 +1721,9 @@ def translate(img, out):
     """
     # Translate PyBDSF output source objects to DetectedSource objects
     newsrcs = []
-    for oldsrc in out.sources:
+    print('**************************************')
+    print('len sources = ',len(out.sources))
+    for oldsrc in out.sources: #flagged sources are in out.dsources (d for dummy)
         newsrcs.append(DetectedSource())
         newsrcs[-1].cast(oldsrc)
         newsrcs[-1].image_id = img.id
@@ -1709,7 +1738,28 @@ def translate(img, out):
         elif oldsrc.code == 'C': newsrcs[-1].nc = 1
         elif oldsrc.code == 'M': newsrcs[-1].nm = 1
         else: print('ERROR! CODE'+oldsrc.code+'NOT RECOGNIZED!')
-
+    '''
+    ############################## works, but not being written to database!:
+    print('len dsources =',len(out.dsources))
+    for oldsrc in out.dsources: #flagged sources are in out.dsources (d for dummy)
+        newsrcs.append(DetectedSource())
+        newsrcs[-1].cast(oldsrc)
+        newsrcs[-1].image_id = img.id
+        newsrcs[-1].calc_center_dist(img)
+        newsrcs[-1].calc_pixel_coords(img)
+        newsrcs[-1].calc_polar_angle(img)
+        #initialize to 0
+        newsrcs[-1].ns = 0
+        newsrcs[-1].nc = 0
+        newsrcs[-1].nm = 0
+        if oldsrc.code == 'S': newsrcs[-1].ns = 1
+        elif oldsrc.code == 'C': newsrcs[-1].nc = 1
+        elif oldsrc.code == 'M': newsrcs[-1].nm = 1
+        else: print('ERROR! CODE'+oldsrc.code+'NOT RECOGNIZED!')
+    print('len newsources = ',len(newsrcs))
+    print('*****************************************')
+    ##############################
+    '''
     return newsrcs
 
 
@@ -1822,7 +1872,13 @@ def set_fromnx(img, smear_time):
     uvname1 = ''
     for i in range(len(b)-2):
         uvname1 += (b[i]+'.')
-    uvname = uvname1 + 'uvout.gz'
+    # for time chop images:
+    if img.filename.endswith('ITime.fits'):
+        uvname = uvname1 + 'UVOUT.fits'
+    # for dailies:
+    else:
+        uvname = uvname1 + 'uvout.gz'
+
     # Check file
     if not os.path.isfile(os.path.join(uvdir, uvname)):
         # unzipped?
@@ -1836,7 +1892,6 @@ def set_fromnx(img, smear_time):
                 'Cannot calc primary beam for this image')
             return img
 
-    #print(uvname)
     # Count number of SN tables & set times, weights from NX table
     img.nsn = 0
     img.nbeam = 0
@@ -1909,9 +1964,10 @@ def init_image(impath, alwaysass, smear_time):
     imobj.header_attrs(hdr)
     # Fix header keywords for PyBDSF, if necessary
     header_changed = False
-    if hdr['CTYPE3'] == 'SPECLNMF':
-        hdr['CTYPE3'] = 'FREQ'
-        header_changed = True
+    if hdr['NAXIS'] > 2:
+        if hdr['CTYPE3'] == 'SPECLNMF':
+            hdr['CTYPE3'] = 'FREQ'
+            header_changed = True
     try:
         hdr['BMAJ']
     except KeyError:

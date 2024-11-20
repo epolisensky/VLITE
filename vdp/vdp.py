@@ -857,7 +857,7 @@ ass        Dictionary of ``sourcefinding.beam_tools.pribeam`` instances
                         hdrbm['HISTORY'] = 'Generated with vdp.py version %s ' % __version__
                         if imobj.vcss:
                             hdrbm['HISTORY'] = 'This is a VCSS snapshot primary beam image.'
-                        hdubm = fits.PrimaryHDU(imobj.bmimg,header=hdrbm)
+                        hdubm = fits.PrimaryHDU(np.float32(imobj.bmimg),header=hdrbm)
                         hdulbm = fits.HDUList([hdubm])
                         btmp = imobj.filename.split('/')[-1].split('.')
                         bnametmp = ''
@@ -1272,9 +1272,9 @@ def process(conn, stages, opts, dirs, files, catalogs, sfparams, qaparams, setup
             os.system('mkdir '+beamsdir)    
 
         if not files[0]:
-            # Select all images that end with 'IPln1.fits' or 'pbcor.fits'...
+            # Select all images that end with 'IPln1.fits' or 'pbcor.fits' or 'ITime.fits'...
             imglist = [f for f in os.listdir(imgdir) if
-                       f.endswith('IPln1.fits') or f.endswith('pbcor.fits')]
+                       f.endswith('IPln1.fits') or f.endswith('pbcor.fits') or f.endswith('ITime.fits')]
             # ...or 'IMSC.fits' for the VCSS mosaics
             if len(imglist) < 1:
                 imglist = [f for f in os.listdir(imgdir) if

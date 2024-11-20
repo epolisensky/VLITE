@@ -54,8 +54,10 @@ catalog_dict = {'cosmos' : {'id' : 1}, 'first' : {'id' : 2},
                 'wenss': {'id' : 19}, 'atlas': {'id' : 20},
                 'lotssdr1' : {'id' : 21}, 'racs' : {'id' : 22},
                 'psr' : {'id' : 23}, 'vlass1' : {'id' : 24},
-                'vlass2' : {'id' : 25}}
-                #'vlass2' : {'id' : 25}, 'vlass3' : {'id' : 26}}
+                'vlass2' : {'id' : 25}, 'racsgp' : {'id' : 26},
+                'racsmid' : {'id' : 27}, 'srsc' : {'id' : 28},
+                'lotssdr2' : {'id' : 29}}
+                #'vlass3' : {'id' : 30}}
 
 
 def dms2deg(d, m, s):
@@ -1922,6 +1924,217 @@ def read_vlass2(return_sources=False):
                 fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s %s %s %s\n' % (i+1,row['Component_name'],row['RA'],row['E_RA'],row['DEC'],row['E_DEC'],row['Total_flux'],row['E_Total_flux'],row['Peak_flux'],row['E_Peak_flux'],row['Maj'],row['E_Maj'],row['Min'],row['E_Min'],row['PA'],row['E_PA'],row['Isl_rms'],row['Tile'],25,'None',row['Duplicate_flag'],row['Quality_flag'],'None'))
         catio_logger.info(' -- wrote {} sources to vlass2_psql.txt'.format(len(sources)))
         return sources
+
+
+def read_racsgp(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the Rapid ASKAP Continuum Survey: RACS, Gal Plane catalog and writes
+    them into a file in the same directory called racsgp_psql.txt
+    if the file does not already exist.
+
+    Telescope/frequency: ASKAP 887.5 MHz
+
+    Spatial resolution: 25''
+
+    """
+    catalog_dict['racsgp']['telescope'] = 'ASKAP'
+    catalog_dict['racsgp']['frequency'] = 887.5
+    catalog_dict['racsgp']['resolution'] = 25.0
+    catalog_dict['racsgp']['reference'] = 'Hale et al. (2021)'
+
+    a0 = 1.027435
+    a1 = 3.284e-4
+    c0 = 3.148895
+    c1 = -1.403519
+
+    psqlf = os.path.join(catalogdir, 'racsgp_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        racs=pd.read_csv('/data3/vpipe/vlite-emil/data/RACS/AS110_Derived_Catalogue_racs_dr1_sources_galacticregion_v2021_08_v02_5726.csv')
+        racs['snr']  = racs['peak_flux']/racs['noise']
+        racs.loc[:, ['pt_src']] = False
+        racs['rat_obs'] = racs['total_flux_source']/racs['peak_flux']
+        racs['rat_fit'] = a1 + (c0*(np.power((racs['snr']),c1)))
+        racs['rat_fit'] = a0 + np.power((racs['rat_fit']),0.5)
+        racs['compact'] = racs['rat_fit'] / racs['rat_obs']
+        index   = racs[racs['compact'] >= 1].index
+        racs.loc[index,'pt_src'] = True
+        #output file
+        psqlf = 'racsgp_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in racs.iterrows():
+                name = row['source_name'].split()[0]+'_'+row['source_name'].split()[1]
+                fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s None None None\n' % (i+1,name,row['ra'],row['e_ra']/3600,row['dec'],row['e_dec']/3600,row['total_flux_source'],row['e_total_flux_source'],row['peak_flux'],row['e_peak_flux'],row['maj_axis'],row['e_maj_axis'],row['min_axis'],row['e_min_axis'],row['pa'],row['e_pa'],row['noise'],row['tile_id'],26,row['pt_src']))
+        catio_logger.info(' -- wrote {} sources to racsgp_psql.txt'.format(len(racs)))
+        return racs
+
+def read_racsmid(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the Rapid ASKAP Continuum Survey RACS-Mid frequency catalog and writes
+    them into a file in the same directory called racsmid_psql.txt
+    if the file does not already exist.
+
+    Telescope/frequency: ASKAP 1367.5 MHz
+
+    Spatial resolution: ~ 8''
+
+    """
+    catalog_dict['racsmid']['telescope'] = 'ASKAP'
+    catalog_dict['racsmid']['frequency'] = 1367.5
+    catalog_dict['racsmid']['resolution'] = 8.0
+    catalog_dict['racsmid']['reference'] = 'Hale et al. (2021)'
+
+    a0 = 1.038946
+    a1 = 1.377979e-3
+    c0 = 6.661338
+    c1 = -1.801624
+
+    psqlf = os.path.join(catalogdir, 'racsmid_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        racs=pd.read_csv('/data3/vpipe/vlite-emil/data/RACS/MID/AS110_Derived_Catalogue_racs_mid_sources_v01_15372.csv')
+        racs['snr']  = racs['peak_flux']/racs['noise']
+        racs.loc[:, ['pt_src']] = False
+        racs['rat_obs'] = racs['total_flux']/racs['peak_flux']
+        racs['rat_fit'] = a1 + (c0*(np.power((racs['snr']),c1)))
+        racs['rat_fit'] = a0 + np.power((racs['rat_fit']),0.5)
+        racs['compact'] = racs['rat_fit'] / racs['rat_obs']
+        index   = racs[racs['compact'] >= 1].index
+        racs.loc[index,'pt_src'] = True
+        #output file
+        psqlf = 'racsmid_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in racs.iterrows():
+                name = row['name'].split()[0]+'_'+row['name'].split()[1]
+                fwrite.write('%d %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %i %s None None None\n' % (i+1,name,row['ra'],row['e_ra']/3600,row['dec'],row['e_dec']/3600,row['total_flux_source'],row['e_total_flux_source'],row['peak_flux'],row['e_peak_flux'],row['maj_axis'],row['e_maj_axis'],row['min_axis'],row['e_min_axis'],row['pa'],row['e_pa'],row['noise'],row['tile_id'],26,row['pt_src']))
+        catio_logger.info(' -- wrote {} sources to racsmid_psql.txt'.format(len(racs)))
+        return racs
+
+
+
+def read_srsc(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the Sydney Radio Stars Catalog and writes them into 
+    a file in the same directory called srsc_psql.txt
+    if the file does not already exist.
+
+    No single telescope/frequency
+
+    No single spatial resolution
+
+    """
+    catalog_dict['srsc']['telescope'] = 'Sydney RSC'
+    catalog_dict['srsc']['frequency'] = None
+    catalog_dict['srsc']['resolution'] = 0
+    catalog_dict['srsc']['reference'] = 'Driessen et al. (2024)'
+
+    psqlf = os.path.join(catalogdir, 'srsc_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        #read file
+        colspecs=[(0,11),(11,40),(40,69),(69,85),(85,108),(108,121),(121,132),(132,150),(150,160),(160,189),(189,209),(209,226),(226,232),(232,249),(249,256),(256,265),(265,273),(273,282),(282,290),(290,300),(300,306),(306,309),(309,-1)]
+        names=['id','simbad','gaia','tycho','2MASS','GCVS','HIP','UCAC4','Survey','SurveyID','Epoch','RAdeg','e_RAdeg','DEdeg','e_DEdeg','plx','e_plx','pmRA','e_pmRA','pmDE','e_pmDE','unk1','unk2']
+        stars=pd.read_fwf('/home/vpipe/vlite-emil/data/SydneyRadioStarCatalog/Stars.dat',colspecs = colspecs,names=names)
+        #output file
+        psqlf = 'srsc_psql.txt'
+        #loop over srcs & write to file
+        with open(psqlf, 'w') as fwrite:
+            for i,row in stars.iterrows():
+                name = row['id'].replace(' ','_')
+                fwrite.write('%d %s %s %s %s %s None None None None None None None None None None None None %i None None None None\n' % (i+1,name,row['RAdeg'],row['e_RAdeg'],row['DEdeg'],row['e_DEdeg'],28))
+        catio_logger.info(' -- wrote {} sources to srsc_psql.txt'.format(len(stars)))
+        return stars
+
+
+def read_lotssdr2(return_sources=False):
+    """Generates a list of CatalogSource objects from
+    the LOFAR 2m Sky Survey: LoTSS DR2, catalog and writes
+    them into a file in the same directory called lotssdr2_psql.txt
+    if the file does not already exist.
+
+    Telescope/frequency: LOFAR 144 MHz
+
+    Spatial resolution: 6''
+
+    """
+    catalog_dict['lotssdr2']['telescope']  = 'LOFAR'
+    catalog_dict['lotssdr2']['frequency']  = 144
+    catalog_dict['lotssdr2']['resolution'] = 6.
+    catalog_dict['lotssdr2']['reference']  = 'Shimwell et al. (2022)'
+    
+    psqlf = os.path.join(catalogdir, 'lotssdr2_psql.txt')
+    if os.path.isfile(psqlf):
+        if not return_sources:
+            return
+        else:
+            pass
+    else:
+        print('ERROR! DIDNT FIND lotssdr2_psql.txt')
+        pass
+
+    '''
+    fname = os.path.join(catalogdir, 'lotssdr1.dat')
+    sources = []
+    fread = open(fname, 'r')
+    cnt = 1
+    while 1:
+        line = fread.readline()
+        if not line: break
+        line = line.split()
+        sources.append(CatalogSource())
+        sources[-1].id = cnt
+        cnt += 1
+        sources[-1].name = line[0]
+        sources[-1].ra = float(line[1]) # deg
+        sources[-1].e_ra = float(line[2])# deg (total 1sigma error)
+        sources[-1].dec = float(line[3]) # deg
+        sources[-1].e_dec = float(line[4])# deg (total 1 sigma error)
+        sources[-1].total_flux = float(line[5]) # mJy
+        sources[-1].e_total_flux = float(line[6]) # mJy
+        sources[-1].peak_flux = float(line[7]) # mJy/bm
+        sources[-1].e_peak_flux = float(line[8]) # mJy/bm
+        sources[-1].maj   = float(line[9]) # arcsec
+        sources[-1].e_maj = float(line[10]) # arcsec
+        sources[-1].min   = float(line[11]) # arcsec
+        sources[-1].e_min = float(line[12]) # arcsec
+        sources[-1].pa    = float(line[13]) # deg
+        sources[-1].e_pa  = float(line[14]) # deg        
+        sources[-1].rms = float(line[15]) # mJy/bm
+        sources[-1].field = line[16]
+        sources[-1].catalog_id = catalog_dict['lotssdr1']['id']
+    fread.close()
+    with open(psqlf, 'w') as fwrite:
+        for src in sources:
+            fwrite.write('%s %s %s %s %s %s %s %s %s %s %s %s %s '
+                         '%s %s %s %s %s %i %s None None None\n' % (
+                             src.id, src.name, src.ra, src.e_ra, src.dec,
+                             src.e_dec, src.total_flux, src.e_total_flux,
+                             src.peak_flux, src.e_peak_flux, src.maj,
+                             src.e_maj, src.min, src.e_min, src.pa, src.e_pa,
+                             src.rms, src.field, src.catalog_id, src.pt_like))
+    catio_logger.info(' -- wrote {} LoTSS DR1 sources to lotssdr1_psql.txt'.format(
+        len(sources)))
+    return sources
+    '''
+    return
+
+
 
 
 '''

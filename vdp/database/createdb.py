@@ -139,6 +139,8 @@ def create(conn, params, safe=False):
                 imsize VARCHAR(14),
                 obs_ra DOUBLE PRECISION,
                 obs_dec DOUBLE PRECISION,
+                point_ra REAL,
+                point_dec REAL,
                 pixel_scale DOUBLE PRECISION,
                 object TEXT,
                 obs_date DATE,

@@ -1,10 +1,10 @@
-List & description of sql databases
+Descriptive list of sql databases
 
-####################################
+#######################################
 # MAIN VLITE DATABASES
-# i.e. the only ones you need to 
-#      care about if you're not Emil
-####################################
+# i.e. the only ones you probably need 
+#      to care about if you're not Emil
+#######################################
 
 meta : Database of META files. It contains only 1 table, also
        named "meta"
@@ -25,18 +25,8 @@ vlite16 : VLITE16 data with "0.934" beam corrections.
           Starts from 2017-07/20
 
 vlite10 : VLITE10 images from 2014-11/25 to 2017-07/19
-          Processed with older VDP version, tables may
-	  not contain all columns from online docs. 
-	  DO NOT TRUST BEAM CORRECTIONS IN THIS
-	  DATABASE
-
-vlite10img : Just VLITE10 images, no source finding. 
-	     This database is more complete than "vlite10"
-	     for some unknown reason
-
-vlite10c : VLITE10 C config images. DO NOT TRUST BEAM
-	   CORRECTIONS
-
+          Re-processed 19 Nov 2023 with "0.934" beam
+	  corrections
 
 ###################################
 # MISCELLANEOUS DATABASES

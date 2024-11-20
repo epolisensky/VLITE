@@ -108,8 +108,7 @@ uncertainties for every flux measurement error, typically 3%.
 - *distance_from_center*: angular separation between the source position
   and the image pointing center (degrees)
 - *polar_angle*: angle east of north of source in image plane (degrees)
-- *snr*: signal-to-noise ratio of the source detection; defined as
-  (*peak_flux* - *isl_mean*) / *isl_rms*
+- *snr*: signal-to-noise ratio of the source detection; defined as *peak_flux* / *isl_rms*
 - *compactness*: measures source spatial extent from its *snr* and flux ratio; C > 1 is point-like, < 1 is extended source
 - *clean*: True if source was CLEANed
 - *xpix*: Source x coordinate in image (pixels)

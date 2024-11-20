@@ -198,13 +198,13 @@ def Find_Beam_Center(imobj, parang, dxpix=0, dypix=0):
     * dypix is optional offset added to account for RA drift (i.e. VCSS snapshots)
     """
     if imobj.priband == '0.3': #300 MHz needs no offset correction
-        xbeam = imobj.xref
-        ybeam = imobj.yref
-        beam_center = SkyCoord(imobj.obs_ra,imobj.obs_dec,unit='deg')
+        xbeam = imobj.xpoint
+        ybeam = imobj.ypoint
+        beam_center = SkyCoord(imobj.point_ra,imobj.point_dec,unit='deg')
         return beam_center,xbeam,ybeam
     #find coords of beam center
-    x0 = imobj.xref
-    y0 = imobj.yref
+    x0 = imobj.xpoint
+    y0 = imobj.ypoint
     theta = parang - offset_dict[imobj.priband]
     if theta > 180: theta -= 360
     if theta < -180: theta += 360
@@ -302,7 +302,7 @@ def Calc_Beam_Image(imobj, pbdic, nobeamimage=False):
         #Set mjd time
         mjdtime0 = imobj.mjdtime + imobj.pbtimes[i]
         #Calc parang
-        parang,za = Calc_Parang(mjdtime0,imobj.obs_ra,imobj.obs_dec)
+        parang,za = Calc_Parang(mjdtime0,imobj.point_ra,imobj.point_dec)
         imobj.pbparangs.append(parang)
         imobj.pbza.append(za)
         #Calc beam center
